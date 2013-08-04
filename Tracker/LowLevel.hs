@@ -4,6 +4,7 @@ module Tracker.LowLevel
     , close
     , writeCommand
     , readReply
+    , readAck
     ) where
 
 import System.USB
@@ -64,3 +65,10 @@ readReply (Tracker h) = do
         Completed -> if BS.head d == 0x06
                        then return $ Just $ BS.tail d
                        else return Nothing
+                       
+readAck :: Tracker -> IO ()
+readAck tracker = do
+    a <- readReply tracker
+    case a of
+        Just _  -> return ()
+        Nothing -> error "Ack expected"
