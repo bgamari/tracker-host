@@ -4,6 +4,7 @@ module Tracker.LowLevel
     , close
     , writeCommand
     , readReply
+    , parseReply
     , readAck
     ) where
 
@@ -11,6 +12,7 @@ import System.USB
 import Control.Applicative
 import Data.Word
 import Data.Binary.Put
+import Data.Binary.Get
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -72,3 +74,11 @@ readAck tracker = do
     case a of
         Just _  -> return ()
         Nothing -> error "Ack expected"
+
+parseReply :: Tracker -> Get a -> IO (Maybe a)
+parseReply tracker parser = do
+     reply <- readReply tracker
+     return $ case reply of
+         Nothing    -> Nothing
+         Just reply -> either (const Nothing) (\(_,_,a)->Just a)
+                     $ runGetOrFail parser $ BSL.fromStrict reply

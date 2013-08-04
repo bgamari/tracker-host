@@ -5,6 +5,7 @@ module Tracker.Commands where
 import Prelude hiding (mapM_)
 import Data.Binary
 import Data.Binary.Put
+import Data.Binary.Get
 import Data.Word
 import Data.Int
 import Data.Foldable
@@ -16,9 +17,10 @@ import Linear
 
 echo :: Tracker -> ByteString -> IO (Maybe ByteString)
 echo tracker payload = do
-    writeCommand tracker 0x0 $ do putWord8 (BS.length payload)
+    writeCommand tracker 0x0 $ do putWord8 (fromIntegral $ BS.length payload)
                                   putByteString payload
-    readReply tracker
+    parseReply tracker $ do length <- getWord8
+                            getByteString $ fromIntegral length
 
 data Stage a = Stage !a !a !a
              deriving (Show, Functor, Foldable, Traversable)
