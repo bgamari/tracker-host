@@ -16,7 +16,8 @@ import Linear
 
 echo :: Tracker -> ByteString -> IO (Maybe ByteString)
 echo tracker payload = do
-    writeCommand tracker 0x0 $ do putByteString payload
+    writeCommand tracker 0x0 $ do putWord8 (BS.length payload)
+                                  putByteString payload
     readReply tracker
 
 data Stage a = Stage !a !a !a
