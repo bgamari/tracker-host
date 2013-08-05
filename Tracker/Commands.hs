@@ -15,6 +15,8 @@ import Data.ByteString (ByteString)
 import Tracker.LowLevel
 import Linear
 
+type Sample = Int16
+
 -- | Put a 32-bit signed integer
 --
 -- Exploits the fact that 'fromIntegral' preserves representation, not sign
@@ -85,14 +87,24 @@ setAdcFreq tracker freq = do
     writeCommand tracker 0x20 $ putWord32le freq
     readAck tracker
 
+data TriggerMode = TriggerOff
+                 | TriggerAuto
+                 | TriggerManual
+                 deriving (Show, Eq, Bounded, Enum)
+
+setAdcTriggerMode :: Tracker -> TriggerMode -> IO ()
+setAdcTriggerMode tracker mode = do
+    writeCommand tracker 0x21 $ putWord32le (fromIntegral mode)
+    readAck tracker
+
 startAdcStream :: Tracker -> IO ()
 startAdcStream tracker = do
-    writeCommand tracker 0x21 $ return ()
+    writeCommand tracker 0x22 $ return ()
     readAck tracker
 
 stopAdcStream :: Tracker -> IO ()
 stopAdcStream tracker = do
-    writeCommand tracker 0x22 $ return ()
+    writeCommand tracker 0x23 $ return ()
     readAck tracker
 
 setFeedbackFreq :: Tracker -> Word32 -> IO ()
