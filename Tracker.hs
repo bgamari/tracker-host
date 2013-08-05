@@ -62,8 +62,6 @@ data RasterScan = RasterScan { scanStart  :: V3 Word16
                              , scanPoints :: V3 Int
                              }
                 deriving (Show, Eq)
-                
-maxPathPoints = 80 :: Int
 
 batchBy :: Int -> [a] -> [[a]]
 batchBy _ [] = []

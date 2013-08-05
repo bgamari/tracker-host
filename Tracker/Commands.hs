@@ -100,12 +100,16 @@ setFeedbackMode tracker mode = do
     writeCommand tracker 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck tracker
 
+maxPathPoints = 80 :: Int
+
 enqueuePoints :: Tracker -> V.Vector (V3 Word16) -> IO Bool
-enqueuePoints tracker points = do
-    writeCommand tracker 0x40 $ do
-        putWord8 $ fromIntegral $ V.length points
-        mapM_ (mapM_ putWord16le) points
-    maybe False (const True) `fmap` readReply tracker
+enqueuePoints tracker points 
+  | V.length points > maxPathPoints = return False
+  | otherwise = do
+      writeCommand tracker 0x40 $ do
+          putWord8 $ fromIntegral $ V.length points
+          mapM_ (mapM_ putWord16le) points
+      maybe False (const True) `fmap` readReply tracker
 
 startPath :: Tracker -> Word32 -> IO ()
 startPath tracker freq = writeCommand tracker 0x41 $ putWord32le freq
