@@ -51,7 +51,7 @@ cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
 cmdTimeout = 100
-dataTimeout = 100
+dataTimeout = 1000
 
 writeCommand :: Tracker -> Word8 -> Put -> IO ()
 writeCommand (Tracker h) cmd payload = do
