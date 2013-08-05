@@ -85,9 +85,9 @@ parseReply tracker parser = do
          Just reply -> either (const Nothing) (\(_,_,a)->Just a)
                      $ runGetOrFail parser $ BSL.fromStrict reply
 
-readData :: Tracker -> IO ByteString
+readData :: Tracker -> IO (Maybe ByteString)
 readData (Tracker h) = do
     (d, status) <- readBulk h dataInEndpt 512 dataTimeout
     case status of
-        TimedOut  -> error "Data read timed out"
-        Completed -> return d
+        TimedOut  -> return Nothing
+        Completed -> return $ Just d

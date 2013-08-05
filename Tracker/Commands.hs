@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Tracker.Commands where
 
@@ -8,14 +8,13 @@ import Data.Binary.Put
 import Data.Binary.Get
 import Data.Word
 import Data.Int
-import Data.Foldable
 import Data.Traversable
+import Data.Foldable
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import Tracker.LowLevel
+import Tracker.Types
 import Linear
-
-type Sample = Int16
 
 -- | Put a 32-bit signed integer
 --
@@ -30,9 +29,6 @@ echo tracker payload = do
     parseReply tracker $ do length <- getWord8
                             getByteString $ fromIntegral length
 
-data Stage a = Stage !a !a !a
-             deriving (Show, Functor, Foldable, Traversable)
-
 setStageGains :: Tracker -> Stage (Stage Int32) -> IO ()
 setStageGains tracker gains = do
     writeCommand tracker 0x10 $ mapM_ (mapM_ putInt32le) gains
@@ -42,9 +38,6 @@ setStageSetpoint :: Tracker -> Stage Int32 -> IO ()
 setStageSetpoint tracker setpoint = do
     writeCommand tracker 0x11 $ mapM_ putInt32le setpoint
     readAck tracker
-
-data Psd a = Psd !a !a !a !a
-             deriving (Show, Functor, Foldable, Traversable)
 
 setPsdGains :: Tracker -> Psd (Stage Int32) -> IO ()
 setPsdGains tracker gains = do
@@ -66,10 +59,10 @@ setOutputGains tracker gains = do
     writeCommand tracker 0x13 $ mapM_ putInt32le gains
     readAck tracker
 
-data RasterScan = RasterScan { scanCenter :: V2 Word16
-                             , scanStep   :: V2 Word16
-                             , scanSize   :: V2 Word16
-                             , scanFreq   :: Word16
+data RasterScan = RasterScan { scanCenter :: V2 Word16 -- in codepoints
+                             , scanStep   :: V2 Word16 -- in codepoints
+                             , scanSize   :: V2 Word16 -- points
+                             , scanFreq   :: Word16    -- in Hz
                              }
                 deriving (Show)
 
@@ -94,7 +87,7 @@ data TriggerMode = TriggerOff
 
 setAdcTriggerMode :: Tracker -> TriggerMode -> IO ()
 setAdcTriggerMode tracker mode = do
-    writeCommand tracker 0x21 $ putWord32le (fromIntegral mode)
+    writeCommand tracker 0x21 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck tracker
 
 startAdcStream :: Tracker -> IO ()
