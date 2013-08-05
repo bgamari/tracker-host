@@ -39,7 +39,7 @@ open = do
     if V.null devices
       then return Nothing
       else do h <- openDevice $ V.head devices
-              --setConfig h (Just 1)
+              setConfig h (Just 1)
               claimInterface h 0
               return $ Just $ Tracker h
 
