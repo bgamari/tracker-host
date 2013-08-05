@@ -23,6 +23,7 @@ import Data.Foldable
 import Linear
 import Control.Monad (when)
 import Control.Applicative
+import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 
 import Tracker.Types
@@ -90,7 +91,7 @@ roughScan t freq (RasterScan {..}) = do
         queuePoints = untilTrue . enqueuePoints t . V.fromList
 
         untilTrue :: IO Bool -> IO ()
-        untilTrue m = m >>= \success->when (not success) $ untilTrue m
+        untilTrue m = m >>= \success->when (not success) $ threadDelay 1000 >> untilTrue m
 
         readFrames :: [V.Vector Frame] -> IO (V.Vector (Stage Sample, Psd Sample))
         readFrames frames = do
