@@ -9,7 +9,8 @@ main = do
     Just t <- T.open
     T.echo t "Hello World!" >>= print
     --T.setStageGains $ 
-    T.setFeedbackFreq t 1
+    T.setFeedbackFreq t 1000
+    T.setAdcFreq t 100
     T.startAdcStream t
     forever $ do a <- T.readData t
                  print $ runGet (replicateM 127 $ getWord16le) $ BSL.fromStrict a
