@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}                
+
 module Tracker
     ( open
     , close
@@ -7,18 +9,24 @@ module Tracker
     , module Tracker.Commands
     ) where
 
+import Prelude hiding (mapM_)
+import Data.Word    
 import Data.Int    
 import Data.Binary.Get
 import qualified Data.Vector as V    
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Traversable       
+import Data.Foldable       
+import Linear
+import Control.Monad (when)
 import Control.Applicative
 import Control.Concurrent.Async
 
 import Tracker.Types
 import Tracker.LowLevel
 import Tracker.Commands
+import Tracker.Raster
 
 getInt16le :: Get Int16
 getInt16le = fromIntegral `fmap` getWord16le
@@ -34,18 +42,44 @@ parseFrames a =
                    psd <- sequenceA $ pure getInt16le   :: Get (Psd Sample)
                    return (stage, psd)
 
+data RasterScan = RasterScan { scanStart  :: V3 Word16
+                             , scanSize   :: V3 Word16
+                             , scanPoints :: V3 Int
+                             , scanFreq   :: Word32
+                             }
+                deriving (Show, Eq)
+                
+maxPathPoints = 80 :: Int
+
+batchBy :: Int -> [a] -> [[a]]
+batchBy _ [] = []
+batchBy n xs = batch : batchBy n rest
+  where (batch,rest) = splitAt n xs
+
 roughScan :: Tracker -> RasterScan -> IO (V.Vector (Stage Sample, Psd Sample))
-roughScan t rscan = do
+roughScan t (RasterScan {..}) = do
     setFeedbackMode t NoFeedback
     setAdcTriggerMode t TriggerManual
+    let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
+        ps0:points = batchBy maxPathPoints
+                     $ map (fmap round)
+                     $ rasterScan (realToFrac <$> scanStart) step scanPoints
+    queuePoints ps0 -- Ensure first batch of points make it out
+    async $ mapM_ queuePoints $ points
     startAdcStream t
     framesAsync <- async $ readFrames []
-    rasterScan t rscan
+    startPath t
     frames <- wait framesAsync
     stopAdcStream t
     setAdcTriggerMode t TriggerOff
     return frames
-  where readFrames :: [V.Vector Frame] -> IO (V.Vector (Stage Sample, Psd Sample))
+  where queuePoints :: [V3 Word16] -> IO ()
+        queuePoints = untilTrue . enqueuePoints t . V.fromList
+
+        untilTrue :: IO Bool -> IO ()
+        untilTrue m = m >>= \success->when (not success) $ untilTrue m
+
+        readFrames :: [V.Vector Frame] -> IO (V.Vector (Stage Sample, Psd Sample))
         readFrames frames = do
             d <- readData t
             case d of 

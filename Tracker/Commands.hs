@@ -12,6 +12,7 @@ import Data.Traversable
 import Data.Foldable
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
+import qualified Data.Vector as V       
 import Tracker.LowLevel
 import Tracker.Types
 import Linear
@@ -59,22 +60,6 @@ setOutputGains tracker gains = do
     writeCommand tracker 0x13 $ mapM_ putInt32le gains
     readAck tracker
 
-data RasterScan = RasterScan { scanCenter :: V2 Word16 -- in codepoints
-                             , scanStep   :: V2 Word16 -- in codepoints
-                             , scanSize   :: V2 Word16 -- points
-                             , scanFreq   :: Word16    -- in Hz
-                             }
-                deriving (Show)
-
-rasterScan :: Tracker -> RasterScan -> IO (Maybe ByteString)
-rasterScan tracker (RasterScan {..}) = do
-    writeCommand tracker 0x2 $ do
-        mapM_ putWord16le scanCenter
-        mapM_ putWord16le scanStep
-        mapM_ putWord16le scanSize
-        putWord16le scanFreq
-    readReply tracker
-
 setAdcFreq :: Tracker -> Word32 -> IO ()
 setAdcFreq tracker freq = do
     writeCommand tracker 0x20 $ putWord32le freq
@@ -114,3 +99,13 @@ setFeedbackMode :: Tracker -> FeedbackMode -> IO ()
 setFeedbackMode tracker mode = do
     writeCommand tracker 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck tracker
+
+enqueuePoints :: Tracker -> V.Vector (V3 Word16) -> IO Bool
+enqueuePoints tracker points = do
+    writeCommand tracker 0x40 $ do
+        putWord8 $ fromIntegral $ V.length points
+        mapM_ (mapM_ putWord16le) points
+    maybe False (const True) `fmap` readReply tracker
+
+startPath :: Tracker -> IO ()
+startPath tracker = writeCommand tracker 0x41 $ return ()          
