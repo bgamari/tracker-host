@@ -4,12 +4,14 @@ module Tracker
     ( open
     , close
     , readData
+    , scanAround
     , roughScan
+    , RasterScan(..)
     , module Tracker.Types
     , module Tracker.Commands
     ) where
 
-import Prelude hiding (mapM_)
+import Prelude hiding (mapM_, any)
 import Data.Word    
 import Data.Int    
 import Data.Binary.Get
@@ -42,10 +44,21 @@ parseFrames a =
                    psd <- sequenceA $ pure getInt16le   :: Get (Psd Sample)
                    return (stage, psd)
 
+scanAround :: V3 Word16 -> V3 Word16 -> V3 Int -> Maybe RasterScan
+scanAround center size npts
+  | any id $ (>) <$> scanStart <*> scanEnd = Nothing
+  | otherwise =
+    Just $ RasterScan { scanStart  = scanStart
+                      , scanSize   = size
+                      , scanPoints = npts
+                      }
+  where scanStart = center ^-^ halfSize
+        scanEnd   = center ^+^ halfSize
+        halfSize  = fmap (`div` 2) size
+            
 data RasterScan = RasterScan { scanStart  :: V3 Word16
                              , scanSize   :: V3 Word16
                              , scanPoints :: V3 Int
-                             , scanFreq   :: Word32
                              }
                 deriving (Show, Eq)
                 
@@ -56,8 +69,8 @@ batchBy _ [] = []
 batchBy n xs = batch : batchBy n rest
   where (batch,rest) = splitAt n xs
 
-roughScan :: Tracker -> RasterScan -> IO (V.Vector (Stage Sample, Psd Sample))
-roughScan t (RasterScan {..}) = do
+roughScan :: Tracker -> Word32 -> RasterScan -> IO (V.Vector (Stage Sample, Psd Sample))
+roughScan t freq (RasterScan {..}) = do
     setFeedbackMode t NoFeedback
     setAdcTriggerMode t TriggerManual
     let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
@@ -68,7 +81,7 @@ roughScan t (RasterScan {..}) = do
     async $ mapM_ queuePoints $ points
     startAdcStream t
     framesAsync <- async $ readFrames []
-    startPath t
+    startPath t freq
     frames <- wait framesAsync
     stopAdcStream t
     setAdcTriggerMode t TriggerOff

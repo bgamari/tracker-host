@@ -107,5 +107,5 @@ enqueuePoints tracker points = do
         mapM_ (mapM_ putWord16le) points
     maybe False (const True) `fmap` readReply tracker
 
-startPath :: Tracker -> IO ()
-startPath tracker = writeCommand tracker 0x41 $ return ()          
+startPath :: Tracker -> Word32 -> IO ()
+startPath tracker freq = writeCommand tracker 0x41 $ putWord32le freq
