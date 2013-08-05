@@ -64,11 +64,13 @@ writeCommand (Tracker h) cmd payload = do
 readReply :: Tracker -> IO (Maybe ByteString)
 readReply (Tracker h) = do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
+    let cmd = BS.head d
+        statusCode = BS.head $ BS.drop 1 d
     case status of
         TimedOut  -> error "Reply read timed out"
-        Completed -> if BS.head d == 0x06
-                       then return $ Just $ BS.tail d
-                       else return Nothing
+        _ | BS.length d < 2    -> error "Too short reply"
+          | statusCode == 0x06 -> return $ Just $ BS.drop 2 d
+          | otherwise          -> return Nothing
                        
 readAck :: Tracker -> String -> IO ()
 readAck tracker when = do
