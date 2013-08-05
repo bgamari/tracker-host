@@ -76,11 +76,11 @@ roughScan t freq (RasterScan {..}) = do
         ps0:points = batchBy maxPathPoints
                      $ map (fmap round)
                      $ rasterScan (realToFrac <$> scanStart) step scanPoints
-    queuePoints ps0 -- Ensure first batch of points make it out
-    async $ mapM_ queuePoints $ points
+    queuePoints ps0 -- Ensure first batch of points make it out before we start streaming
     startAdcStream t
-    framesAsync <- async $ readFrames []
     startPath t freq
+    mapM_ queuePoints $ points
+    framesAsync <- async $ readFrames []
     frames <- wait framesAsync
     stopAdcStream t
     setAdcTriggerMode t TriggerOff
