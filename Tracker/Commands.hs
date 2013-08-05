@@ -33,37 +33,37 @@ echo tracker payload = do
 setStageGains :: Tracker -> Stage (Stage Int32) -> IO ()
 setStageGains tracker gains = do
     writeCommand tracker 0x10 $ mapM_ (mapM_ putInt32le) gains
-    readAck tracker
+    readAck tracker "setStageGains"
 
 setStageSetpoint :: Tracker -> Stage Int32 -> IO ()
 setStageSetpoint tracker setpoint = do
     writeCommand tracker 0x11 $ mapM_ putInt32le setpoint
-    readAck tracker
+    readAck tracker "setStageSetpoint"
 
 setPsdGains :: Tracker -> Psd (Stage Int32) -> IO ()
 setPsdGains tracker gains = do
     writeCommand tracker 0x12 $ mapM_ (mapM_ putInt32le) gains
-    readAck tracker
+    readAck tracker "setPsdGains"
 
 setPsdSetpoint :: Tracker -> Psd Int32 -> IO ()
 setPsdSetpoint tracker setpoint = do
     writeCommand tracker 0x13 $ mapM_ putInt32le setpoint
-    readAck tracker
+    readAck tracker "setPsdSetpoint"
 
 setMaxError :: Tracker -> Word32 -> IO ()
 setMaxError tracker maxError = do
     writeCommand tracker 0x14 $ putWord32le maxError
-    readAck tracker
+    readAck tracker "setMaxError"
 
 setOutputGains :: Tracker -> Stage Int32 -> IO ()
 setOutputGains tracker gains = do
     writeCommand tracker 0x13 $ mapM_ putInt32le gains
-    readAck tracker
+    readAck tracker "setOutputGains"
 
 setAdcFreq :: Tracker -> Word32 -> IO ()
 setAdcFreq tracker freq = do
     writeCommand tracker 0x20 $ putWord32le freq
-    readAck tracker
+    readAck tracker "setAdcFreq"
 
 data TriggerMode = TriggerOff
                  | TriggerAuto
@@ -73,22 +73,22 @@ data TriggerMode = TriggerOff
 setAdcTriggerMode :: Tracker -> TriggerMode -> IO ()
 setAdcTriggerMode tracker mode = do
     writeCommand tracker 0x21 $ putWord32le (fromIntegral $ fromEnum mode)
-    readAck tracker
+    readAck tracker "setAdcTriggerMode"
 
 startAdcStream :: Tracker -> IO ()
 startAdcStream tracker = do
     writeCommand tracker 0x22 $ return ()
-    readAck tracker
+    readAck tracker "startAdcStream"
 
 stopAdcStream :: Tracker -> IO ()
 stopAdcStream tracker = do
     writeCommand tracker 0x23 $ return ()
-    readAck tracker
+    readAck tracker "stopAdcStream"
 
 setFeedbackFreq :: Tracker -> Word32 -> IO ()
 setFeedbackFreq tracker freq = do
     writeCommand tracker 0x30 $ putWord32le freq
-    readAck tracker
+    readAck tracker "setFeedbackFreq"
 
 data FeedbackMode = NoFeedback
                   | PsdFeedback
@@ -98,7 +98,7 @@ data FeedbackMode = NoFeedback
 setFeedbackMode :: Tracker -> FeedbackMode -> IO ()
 setFeedbackMode tracker mode = do
     writeCommand tracker 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
-    readAck tracker
+    readAck tracker "setFeedbackMode"
 
 maxPathPoints = 80 :: Int
 

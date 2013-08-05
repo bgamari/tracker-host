@@ -70,12 +70,12 @@ readReply (Tracker h) = do
                        then return $ Just $ BS.tail d
                        else return Nothing
                        
-readAck :: Tracker -> IO ()
-readAck tracker = do
+readAck :: Tracker -> String -> IO ()
+readAck tracker when = do
     a <- readReply tracker
     case a of
         Just _  -> return ()
-        Nothing -> error "Ack expected"
+        Nothing -> error $ "Ack expected: "++when
 
 parseReply :: Tracker -> Get a -> IO (Maybe a)
 parseReply tracker parser = do
