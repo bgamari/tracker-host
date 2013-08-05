@@ -72,6 +72,7 @@ roughScan :: Tracker -> Word32 -> RasterScan -> IO (V.Vector (Stage Sample, Psd 
 roughScan t freq (RasterScan {..}) = do
     setFeedbackMode t NoFeedback
     setAdcTriggerMode t TriggerManual
+    clearPath t
     let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
         ps0:points = batchBy maxPathPoints
                      $ map (fmap round)
