@@ -17,5 +17,5 @@ main = do
     T.setAdcFreq t 100
     T.startAdcStream t
     forever $ do a <- T.readData t
-                 print $ runGet (replicateM 127 $ getInt16le) $ BSL.fromStrict a
+                 print $ runGet (replicateM 128 $ getInt16le) $ BSL.fromStrict a
     T.close t
