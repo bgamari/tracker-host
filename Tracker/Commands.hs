@@ -10,10 +10,16 @@ import Data.Word
 import Data.Int
 import Data.Foldable
 import Data.Traversable
-import qualified Data.ByteString as BS       
-import Data.ByteString (ByteString)       
+import qualified Data.ByteString as BS
+import Data.ByteString (ByteString)
 import Tracker.LowLevel
 import Linear
+
+-- | Put a 32-bit signed integer
+--
+-- Exploits the fact that 'fromIntegral' preserves representation, not sign
+putInt32le :: Int32 -> Put
+putInt32le = putWord32le . fromIntegral
 
 echo :: Tracker -> ByteString -> IO (Maybe ByteString)
 echo tracker payload = do
@@ -27,12 +33,12 @@ data Stage a = Stage !a !a !a
 
 setStageGains :: Tracker -> Stage (Stage Int32) -> IO ()
 setStageGains tracker gains = do
-    writeCommand tracker 0x10 $ mapM_ (mapM_ put) gains
+    writeCommand tracker 0x10 $ mapM_ (mapM_ putInt32le) gains
     readAck tracker
 
 setStageSetpoint :: Tracker -> Stage Int32 -> IO ()
 setStageSetpoint tracker setpoint = do
-    writeCommand tracker 0x11 $ mapM_ put setpoint
+    writeCommand tracker 0x11 $ mapM_ putInt32le setpoint
     readAck tracker
 
 data Psd a = Psd !a !a !a !a
@@ -40,43 +46,43 @@ data Psd a = Psd !a !a !a !a
 
 setPsdGains :: Tracker -> Psd (Stage Int32) -> IO ()
 setPsdGains tracker gains = do
-    writeCommand tracker 0x12 $ mapM_ (mapM_ put) gains
+    writeCommand tracker 0x12 $ mapM_ (mapM_ putInt32le) gains
     readAck tracker
 
 setPsdSetpoint :: Tracker -> Psd Int32 -> IO ()
 setPsdSetpoint tracker setpoint = do
-    writeCommand tracker 0x13 $ mapM_ put setpoint
+    writeCommand tracker 0x13 $ mapM_ putInt32le setpoint
     readAck tracker
 
 setMaxError :: Tracker -> Word32 -> IO ()
 setMaxError tracker maxError = do
-    writeCommand tracker 0x14 $ put maxError
+    writeCommand tracker 0x14 $ putWord32le maxError
     readAck tracker
 
 setOutputGains :: Tracker -> Stage Int32 -> IO ()
 setOutputGains tracker gains = do
-    writeCommand tracker 0x13 $ mapM_ put gains
+    writeCommand tracker 0x13 $ mapM_ putInt32le gains
     readAck tracker
-    
+
 data RasterScan = RasterScan { scanCenter :: V2 Word16
                              , scanStep   :: V2 Word16
                              , scanSize   :: V2 Word16
                              , scanFreq   :: Word16
                              }
                 deriving (Show)
-                
+
 rasterScan :: Tracker -> RasterScan -> IO (Maybe ByteString)
 rasterScan tracker (RasterScan {..}) = do
     writeCommand tracker 0x2 $ do
-        mapM_ putWord16be scanCenter
-        mapM_ putWord16be scanStep
-        mapM_ putWord16be scanSize
-        putWord16be scanFreq
+        mapM_ putWord16le scanCenter
+        mapM_ putWord16le scanStep
+        mapM_ putWord16le scanSize
+        putWord16le scanFreq
     readReply tracker
-    
+
 setAdcFreq :: Tracker -> Word32 -> IO ()
 setAdcFreq tracker freq = do
-    writeCommand tracker 0x20 $ put freq
+    writeCommand tracker 0x20 $ putWord32le freq
     readAck tracker
 
 startAdcStream :: Tracker -> IO ()
@@ -91,15 +97,15 @@ stopAdcStream tracker = do
 
 setFeedbackFreq :: Tracker -> Word32 -> IO ()
 setFeedbackFreq tracker freq = do
-    writeCommand tracker 0x30 $ put freq
+    writeCommand tracker 0x30 $ putWord32le freq
     readAck tracker
 
 data FeedbackMode = NoFeedback
                   | PsdFeedback
                   | StageFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
-                  
+
 setFeedbackMode :: Tracker -> FeedbackMode -> IO ()
 setFeedbackMode tracker mode = do
-    writeCommand tracker 0x30 $ put (fromEnum mode)
+    writeCommand tracker 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck tracker
