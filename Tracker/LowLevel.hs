@@ -6,6 +6,7 @@ module Tracker.LowLevel
     , readReply
     , parseReply
     , readAck
+    , readData
     ) where
 
 import System.USB
@@ -50,6 +51,7 @@ cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
 cmdTimeout = 100
+dataTimeout = 100
 
 writeCommand :: Tracker -> Word8 -> Put -> IO ()
 writeCommand (Tracker h) cmd payload = do
@@ -61,7 +63,7 @@ writeCommand (Tracker h) cmd payload = do
 
 readReply :: Tracker -> IO (Maybe ByteString)
 readReply (Tracker h) = do
-    (d, status) <- readBulk h cmdInEndpt 255 cmdTimeout
+    (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
     case status of
         TimedOut  -> error "Reply read timed out"
         Completed -> if BS.head d == 0x06
@@ -82,3 +84,10 @@ parseReply tracker parser = do
          Nothing    -> Nothing
          Just reply -> either (const Nothing) (\(_,_,a)->Just a)
                      $ runGetOrFail parser $ BSL.fromStrict reply
+
+readData :: Tracker -> IO ByteString
+readData (Tracker h) = do
+    (d, status) <- readBulk h dataInEndpt 512 dataTimeout
+    case status of
+        TimedOut  -> error "Data read timed out"
+        Completed -> return d

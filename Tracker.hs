@@ -1,6 +1,7 @@
 module Tracker
     ( open
     , close
+    , readData
     , module Tracker.Commands
     ) where
 
