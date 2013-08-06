@@ -53,8 +53,8 @@ close (Tracker h) = closeDevice h
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
-cmdTimeout = 10000
-dataTimeout = 10000
+cmdTimeout = 100
+dataTimeout = 100
 
 showByteString :: BS.ByteString -> String
 showByteString = concatMap (flip showHex " " . fromIntegral) . BS.unpack
