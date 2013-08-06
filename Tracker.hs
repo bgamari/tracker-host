@@ -74,14 +74,15 @@ roughScan t freq (RasterScan {..}) = do
     setAdcTriggerMode t TriggerManual
     clearPath t
     let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
-        ps0:points = batchBy maxPathPoints
-                     $ map (fmap round)
-                     $ rasterScan (realToFrac <$> scanStart) step scanPoints
-    queuePoints ps0 -- Ensure first batch of points make it out before we start streaming
+    
+    -- First fill up path queue
+    points <- primePath t $ batchBy maxPathPoints
+                          $ map (fmap round)
+                          $ rasterScan (realToFrac <$> scanStart) step scanPoints
     startAdcStream t
     startPath t freq
-    mapM_ queuePoints $ points
     framesAsync <- async $ readFrames []
+    mapM_ queuePoints $ points
     frames <- wait framesAsync
     stopAdcStream t
     setAdcTriggerMode t TriggerOff
@@ -90,7 +91,7 @@ roughScan t freq (RasterScan {..}) = do
         queuePoints = untilTrue . enqueuePoints t . V.fromList
 
         untilTrue :: IO Bool -> IO ()
-        untilTrue m = m >>= \success->when (not success) $ threadDelay 1000 >> untilTrue m
+        untilTrue m = m >>= \success->when (not success) $ threadDelay 10000 >> untilTrue m
 
         readFrames :: [V.Vector Frame] -> IO (V.Vector (Stage Sample, Psd Sample))
         readFrames frames = do
@@ -98,3 +99,9 @@ roughScan t freq (RasterScan {..}) = do
             case d of 
                 Just d' -> readFrames (parseFrames d' : frames)
                 Nothing -> return $ V.concat (reverse frames)
+
+primePath :: Tracker -> [[V3 Word16]] -> IO [[V3 Word16]]
+primePath t (points:rest) = do
+    success <- enqueuePoints t $ V.fromList points
+    if success then primePath t rest
+               else return rest
