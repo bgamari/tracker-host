@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, PatternGuards #-}
 
 import Data.Maybe
 import Control.Monad
@@ -12,7 +12,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
        
 import qualified Tracker as T
-import Tracker (Stage(..), Psd(..))
+import Tracker (Tracker, Stage(..), Psd(..))
 import Linear
 import System.Console.Haskeline
  
@@ -38,7 +38,7 @@ main = runInputT defaultSettings $ do
 while :: Monad m => m Bool -> m ()
 while m = m >>= \a->when a (while m)
 
---prompt :: Tracker -> InputT IO ()
+prompt :: Tracker -> InputT IO Bool
 prompt t = do
     line <- getInputLine "> "
     case maybe ["exit"] words line of

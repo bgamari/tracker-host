@@ -1,7 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}                
 
 module Tracker
-    ( open
+    ( Tracker
+    , open
     , close
     , readData
     , scanAround
