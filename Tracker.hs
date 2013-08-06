@@ -69,16 +69,20 @@ batchBy n xs = batch : batchBy n rest
   where (batch,rest) = splitAt n xs
 
 roughScan :: Tracker -> Word32 -> RasterScan -> IO (V.Vector (Stage Sample, Psd Sample))
-roughScan t freq (RasterScan {..}) = do
+roughScan t freq (RasterScan {..}) =
+    let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
+        path = map (fmap round)
+               $ rasterScan (realToFrac <$> scanStart) step scanPoints
+    in pathAcquire t freq path
+
+pathAcquire :: Tracker -> Word32 -> [V3 Word16]
+            -> IO (V.Vector (Stage Sample, Psd Sample))
+pathAcquire t freq path = do
     setFeedbackMode t NoFeedback
     setAdcTriggerMode t TriggerManual
     clearPath t
-    let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
-    
     -- First fill up path queue
-    points <- primePath t $ batchBy maxPathPoints
-                          $ map (fmap round)
-                          $ rasterScan (realToFrac <$> scanStart) step scanPoints
+    points <- primePath t $ batchBy maxPathPoints path
     startAdcStream t
     startPath t freq
     framesAsync <- async $ readFrames []
@@ -90,6 +94,13 @@ roughScan t freq (RasterScan {..}) = do
   where queuePoints :: [V3 Word16] -> IO ()
         queuePoints = untilTrue . enqueuePoints t . V.fromList
 
+        primePath :: Tracker -> [[V3 Word16]] -> IO [[V3 Word16]]
+        primePath t (points:rest) = do
+            success <- enqueuePoints t $ V.fromList points
+            if success then primePath t rest
+                       else return rest
+
+
         untilTrue :: IO Bool -> IO ()
         untilTrue m = m >>= \success->when (not success) $ threadDelay 10000 >> untilTrue m
 
@@ -99,9 +110,3 @@ roughScan t freq (RasterScan {..}) = do
             case d of 
                 Just d' -> readFrames (parseFrames d' : frames)
                 Nothing -> return $ V.concat (reverse frames)
-
-primePath :: Tracker -> [[V3 Word16]] -> IO [[V3 Word16]]
-primePath t (points:rest) = do
-    success <- enqueuePoints t $ V.fromList points
-    if success then primePath t rest
-               else return rest
