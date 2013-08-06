@@ -37,4 +37,3 @@ instance Applicative Diode where
              
 newtype Psd a = Psd {getPsd :: V2 a}
               deriving (Show, Functor, Foldable, Traversable, Applicative, Additive)
-     

@@ -79,7 +79,7 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     case scan of
         Nothing -> liftInputT $ outputStrLn "No rough calibration done."
         Just s  -> liftIO $ writeFile fname
-                          $ unlines $ map (show . T.stage) $ V.toList s
+                          $ unlines $ map (show . (^. T.stage)) $ V.toList s
   where help = "Dump last rough calibration"
 
 helpCmd :: Command
