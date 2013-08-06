@@ -1,15 +1,39 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell #-}
 
-module Tracker.Raster ( rasterScan
+module Tracker.Raster ( RasterScan(..), scanStart, scanSize, scanPoints
+                      , scanAround
+                      , rasterScan
                       , rasterSine
                       ) where
 
-import Prelude hiding (maximum)
+import Prelude hiding (maximum, any)
 import Control.Applicative
 import Data.Traversable
 import Data.Foldable
 import Linear
+import Control.Lens
     
+data RasterScan f a = RasterScan { _scanStart  :: f a
+                                 , _scanSize   :: f a
+                                 , _scanPoints :: f Int
+                                 }
+makeLenses ''RasterScan     
+
+-- | Construct a scan around the given center with the given size           
+scanAround :: (Additive f, Foldable f, Applicative f, Integral a, Ord a)
+           => f a -> f a -> f Int -> Maybe (RasterScan f a)
+scanAround center size npts
+  | any id $ (>) <$> scanStart <*> scanEnd = Nothing
+  | otherwise =
+    Just $ RasterScan { _scanStart  = scanStart
+                      , _scanSize   = size
+                      , _scanPoints = npts
+                      }
+  where scanStart = center ^-^ halfSize
+        scanEnd   = center ^+^ halfSize
+        halfSize  = fmap (`div` 2) size
+
+
 newtype FlipList a = FList {getFlipList :: [a]}
                    deriving (Functor, Foldable, Traversable)
 

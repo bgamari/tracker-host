@@ -2,6 +2,7 @@
 
 module TrackerUI.Types where
 
+import Data.Word
 import Control.Monad.State
 import Control.Applicative
 
@@ -15,7 +16,7 @@ import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 
 data TrackerState
     = TrackerState { _lastRoughCal :: Maybe (V.Vector (Sensors Sample))
-                   , _roughScan    :: T.RasterScan
+                   , _roughScan    :: T.RasterScan V3 Word16
                    }
 makeLenses ''TrackerState
            

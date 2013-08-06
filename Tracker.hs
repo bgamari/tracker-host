@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell #-}                
+{-# LANGUAGE RecordWildCards #-}                
 
 module Tracker
     ( TrackerT
@@ -56,26 +56,7 @@ sumDiffToPsd :: Num a => Psd (SumDiff a) -> Psd (Diode a)
 sumDiffToPsd = fmap diode
   where diode :: Num a => SumDiff a -> Diode a
         diode (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
-            
-data RasterScan = RasterScan { _scanStart  :: V3 Word16
-                             , _scanSize   :: V3 Word16
-                             , _scanPoints :: V3 Int
-                             }
-                deriving (Show, Eq)
-makeLenses ''RasterScan     
   
-scanAround :: V3 Word16 -> V3 Word16 -> V3 Int -> Maybe RasterScan
-scanAround center size npts
-  | any id $ (>) <$> scanStart <*> scanEnd = Nothing
-  | otherwise =
-    Just $ RasterScan { _scanStart  = scanStart
-                      , _scanSize   = size
-                      , _scanPoints = npts
-                      }
-  where scanStart = center ^-^ halfSize
-        scanEnd   = center ^+^ halfSize
-        halfSize  = fmap (`div` 2) size
-
 batchBy :: Int -> [a] -> [[a]]
 batchBy _ [] = []
 batchBy n xs = batch : batchBy n rest
@@ -87,7 +68,7 @@ data Sensors a = Sensors { stage :: !(Stage a)
                deriving (Show)
                
 roughScan :: MonadIO m
-          => Word32 -> RasterScan -> TrackerT m (V.Vector (Sensors Sample))
+          => Word32 -> RasterScan V3 Word16 -> TrackerT m (V.Vector (Sensors Sample))
 roughScan freq (RasterScan {..}) =
     let step = ((/) <$> fmap realToFrac _scanSize <*> fmap realToFrac _scanPoints)
         path = map (fmap round)
