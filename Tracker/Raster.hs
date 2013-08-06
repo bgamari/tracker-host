@@ -1,7 +1,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Tracker.Raster ( rasterScan ) where
+module Tracker.Raster ( rasterScan
+                      , rasterSine
+                      ) where
 
+import Prelude hiding (maximum)
 import Control.Applicative
 import Data.Traversable
 import Data.Foldable
@@ -24,3 +27,10 @@ rasterScan :: (RealFrac a, Additive f, Applicative f, Traversable f)
 rasterScan start step npts =
     map (\n->start ^+^ ((*) <$> step <*> fmap realToFrac n))
     $ rasterScan' npts
+
+rasterSine :: (RealFloat a, Foldable f, Applicative f)
+           => f a -> f a -> f a -> Int -> [f a]
+rasterSine center amp period n = 
+    map (\i->f $ realToFrac i / realToFrac n * t) [0..n-1]
+  where t = maximum period
+        f t = (\c a p->c + a/2 * sin (2*pi*t/p)) <$> center <*> amp <*> period

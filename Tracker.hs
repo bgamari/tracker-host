@@ -74,6 +74,7 @@ roughScan t freq (RasterScan {..}) =
     let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
         path = map (fmap round)
                $ rasterScan (realToFrac <$> scanStart) step scanPoints
+               -- $ rasterSine (realToFrac <$> scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire t freq path
 
 pathAcquire :: Tracker -> Word32 -> [V3 Word16]
