@@ -46,7 +46,7 @@ roughCalCmd = command "rough-cal" help "" $ \args->do
   where help = "Perform rough calibration"
 
 dumpRoughCmd :: Command
-dumpRoughCmd = command "dump-rough" help "FILENAME" $ \args->do
+dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     scan <- use lastRoughCal
     case scan of
@@ -56,20 +56,20 @@ dumpRoughCmd = command "dump-rough" help "FILENAME" $ \args->do
   where help = "Dump last rough calibration"
 
 helpCmd :: Command
-helpCmd = command "help" help "[CMD]" $ \args->do
-    let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
-    scan <- use lastRoughCal
-    case scan of
-        Nothing -> liftInputT $ outputStrLn "No rough calibration done."
-        Just s  -> liftIO $ writeFile fname
-                          $ unlines $ map (show . T.stage) $ V.toList s
-  where help = "Dump last rough calibration"
+helpCmd = command "help" help "[CMD]" $ \args->
+    let cmdFilter = maybe id (\fc->filter (\c->c^.cmdName == fc)) $ listToMaybe args
+        cmds = cmdFilter commands
+        formatCmd :: Command -> String
+        formatCmd c = take 40 (c^.cmdName++" "++c^.cmdArgs++repeat ' ')++c^.cmdHelp
+    in liftInputT $ outputStr $ unlines $ map formatCmd cmds
+  where help = "Display help message"
 
 commands :: [Command]
 commands = [ helloCmd
            , roughCalCmd
            , dumpRoughCmd
            , exitCmd
+           , helpCmd
            ]
 
 prompt :: TrackerUI Bool
