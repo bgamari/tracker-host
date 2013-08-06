@@ -6,7 +6,7 @@ module Tracker.Monad ( TrackerT
                      , runTrackerT
                      , liftThrough
                        -- * Convenient re-exports
-                     , MonadIO
+                     , MonadIO, liftIO
                      ) where
 
 import Control.Monad.Reader
