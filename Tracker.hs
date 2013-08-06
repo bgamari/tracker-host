@@ -43,6 +43,7 @@ parseFrames a =
     runGet (V.replicateM (BS.length a `div` 32) frame) $ BSL.fromStrict a
   where frame = do stage <- sequenceA $ pure getInt16le :: Get (Stage Sample)
                    psd <- sequenceA $ pure getInt16le   :: Get (Psd Sample)
+                   _ <- getInt16le
                    return (stage, psd)
 
 scanAround :: V3 Word16 -> V3 Word16 -> V3 Int -> Maybe RasterScan
