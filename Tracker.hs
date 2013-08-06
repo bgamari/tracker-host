@@ -81,7 +81,7 @@ pathAcquire :: Tracker -> Word32 -> [V3 Word16]
             -> IO (V.Vector (Stage Sample, Psd Sample))
 pathAcquire t freq path = do
     setFeedbackMode t NoFeedback
-    setAdcTriggerMode t TriggerManual
+    setAdcTriggerMode t TriggerOff
     clearPath t
     -- First fill up path queue
     points <- primePath t $ batchBy maxPathPoints path
@@ -91,7 +91,6 @@ pathAcquire t freq path = do
     mapM_ queuePoints $ points
     frames <- wait framesAsync
     stopAdcStream t
-    setAdcTriggerMode t TriggerOff
     return frames
   where queuePoints :: [V3 Word16] -> IO ()
         queuePoints = untilTrue . enqueuePoints t . V.fromList
