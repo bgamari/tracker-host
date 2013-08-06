@@ -26,28 +26,6 @@ unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
 
 command :: String -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd [name] help args (\a->action a >> return True)
-        
-readParse :: Read a => [String] -> Maybe a
-readParse [] = Nothing
-readParse (a:_) =
-    case reads a of
-      []           -> Nothing
-      (value,_):_  -> Just value
-
-setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
-        -> Lens' TrackerState a -> [Command]
-setting name help parse format l = [getter, setter]
-  where getter = Cmd ["get",name] ("Get "++help) "" $ \args->do
-                   use l >>= showValue >> return True
-        setter = Cmd ["set",name] ("Set "++help) "VALUE" $ \args->do
-                   case parse args of
-                     Just value -> do l .= value
-                                      showValue value
-                                      return True
-                     Nothing    -> do liftInputT $ outputStrLn
-                                                 $ "Invalid value: "++unwords args
-                                      return True
-        showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
 exitCmd :: Command
 exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False
@@ -92,6 +70,28 @@ helpCmd = command "help" help "[CMD]" $ \args->
 
 stageTuple :: Iso' (Stage a) (a,a,a)
 stageTuple = iso (\(Stage x y z)->(x,y,z)) (\(x,y,z)->Stage x y z)
+
+readParse :: Read a => [String] -> Maybe a
+readParse [] = Nothing
+readParse (a:_) =
+    case reads a of
+      []           -> Nothing
+      (value,_):_  -> Just value
+
+setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
+        -> Lens' TrackerState a -> [Command]
+setting name help parse format l = [getter, setter]
+  where getter = Cmd ["get",name] ("Get "++help) "" $ \args->
+                   use l >>= showValue >> return True
+        setter = Cmd ["set",name] ("Set "++help) "VALUE" $ \args->
+                   case parse args of
+                     Just value -> do l .= value
+                                      showValue value
+                                      return True
+                     Nothing    -> do liftInputT $ outputStrLn
+                                                 $ "Invalid value: "++unwords args
+                                      return True
+        showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
 settings :: [Command] 
 settings = concat 
