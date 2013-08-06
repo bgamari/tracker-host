@@ -28,4 +28,6 @@ executable tracker-host
                        usb ==1.2.*,
                        mtl ==2.1.*,
                        lens ==3.9.*,
-                       distributive ==0.3.*
+                       distributive ==0.3.*,
+                       optimization ==0.1.*,
+                       ad ==3.4

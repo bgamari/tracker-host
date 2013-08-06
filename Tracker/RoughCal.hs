@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, RankNTypes #-}
 
 module Tracker.RoughCal ( roughScan
                         , roughCenter
@@ -13,6 +13,9 @@ import Data.Traversable
 import Control.Lens
 import Data.Distributive
 import Linear
+import Optimization.LineSearch
+import Optimization.LineSearch.ConjugateGradient
+import Numeric.AD
 
 import Tracker.Types
 import Tracker.Raster
@@ -68,5 +71,9 @@ residual v f = sum $ fmap (\(x,y)->(f x - y)^2) v
 roughCenter :: V.Vector (Sensors Sample) -> Stage Sample
 roughCenter scan = undefined
 
-minimize :: (f a -> a) -> f a -> [f a]
-minimize = undefined
+minimize :: (Traversable f, Additive f, Metric f, RealFloat a)
+         => (forall a. f a -> a) -> f a -> [f a]
+minimize f x0 = conjGrad search beta df x0
+  where beta = fletcherReeves
+        search = armijoSearch 0.1 1 2 f
+        df = grad f
