@@ -31,7 +31,7 @@ unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
 
 command :: String -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd [name] help args (\a->action a >> return True)
-
+        
 exitCmd :: Command
 exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False
 
@@ -66,7 +66,10 @@ helpCmd = command "help" help "[CMD]" $ \args->
         formatCmd :: Command -> String
         formatCmd c = take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ')
                       ++ c^.cmdHelp
-    in liftInputT $ outputStr $ unlines $ map formatCmd cmds
+    in liftInputT $ outputStr
+       $ case cmds of
+           []  -> "No matching commands\n"
+           _   -> unlines $ map formatCmd cmds
   where help = "Display help message"
 
 commands :: [Command]
