@@ -39,7 +39,7 @@ setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
 setting name help parse format l = [getter, setter]
   where getter = Cmd ["get",name] ("Get "++help) "" $ \args->do
                    use l >>= showValue >> return True
-        setter = Cmd ["set",name] ("Set "++help) "value" $ \args->do
+        setter = Cmd ["set",name] ("Set "++help) "VALUE" $ \args->do
                    case parse args of
                      Just value -> do l .= value
                                       showValue value
