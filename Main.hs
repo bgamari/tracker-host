@@ -95,10 +95,12 @@ stageTuple = iso (\(Stage x y z)->(x,y,z)) (\(x,y,z)->Stage x y z)
 
 settings :: [Command] 
 settings = concat 
-    [ setting "rough.size" "rough calibration field size in points"
+    [ setting "rough.size" "rough calibration field size in code-points"
             readParse show (roughScan . T.scanSize . stageTuple)   
-    , setting "rough.center" "rough calibration field center"
+    , setting "rough.center" "rough calibration field center in code-points"
             readParse show (roughScan . T.scanCenter . stageTuple)
+    , setting "rough.points" "number of points in rough calibration scan"
+            readParse show (roughScan . T.scanPoints . stageTuple)
     ]
 
 commands :: [Command]
