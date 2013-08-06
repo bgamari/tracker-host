@@ -15,16 +15,11 @@ import qualified Data.Vector as V
 import Linear
 import System.Console.Haskeline
 import Data.Binary.Get
-import Control.Lens
+import Control.Lens hiding (setting)
 
 import qualified Tracker as T
 import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 import TrackerUI.Types
-
-roughScan :: T.RasterScan
-roughScan =
-    maybe (error "Invalid scan") id
-    $ T.scanAround (pure 0x7fff) (pure 0x1000) (V3 20 20 2)
 
 unitStageGains :: Stage (Stage Int32)
 unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
@@ -53,7 +48,15 @@ setting name help parse format l = [getter, setter]
                                                  $ "Invalid value: "++unwords args
                                       return True
         showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
-  
+
+v3Tuple :: Iso' (V3 a) (a,a,a)
+v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
+
+roughScanSizeCmd :: [Command]
+roughScanSizeCmd =
+    setting "rough.size" "rough calibration field size in points"
+            readParse show (roughScan . T.scanSize . v3Tuple)   
+
 exitCmd :: Command
 exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False
 
@@ -64,7 +67,8 @@ helloCmd = command "hello" help ""
 
 roughCalCmd :: Command
 roughCalCmd = command "rough-cal" help "" $ \args->do
-    scan <- liftTracker $ T.roughScan 1000 roughScan
+    rs <- use roughScan
+    scan <- liftTracker $ T.roughScan 1000 rs
     lastRoughCal .= Just scan
   where help = "Perform rough calibration"
 
@@ -101,6 +105,7 @@ commands = [ helloCmd
            , exitCmd
            , helpCmd
            ]
+           ++ roughScanSizeCmd
 
 prompt :: TrackerUI Bool
 prompt = do

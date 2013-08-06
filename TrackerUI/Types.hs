@@ -8,18 +8,22 @@ import Control.Applicative
 import qualified Data.Vector as V
 import System.Console.Haskeline
 import Control.Lens
+import Linear
 
 import qualified Tracker as T
 import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 
 data TrackerState
     = TrackerState { _lastRoughCal :: Maybe (V.Vector (Sensors Sample))
+                   , _roughScan    :: T.RasterScan
                    }
 makeLenses ''TrackerState
            
 defaultTrackerState :: TrackerState           
 defaultTrackerState =
     TrackerState { _lastRoughCal = Nothing
+                 , _roughScan    = maybe (error "Invalid scan") id
+                                 $ T.scanAround (pure 0x7fff) (pure 0x1000) (V3 20 20 2)
                  }
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)

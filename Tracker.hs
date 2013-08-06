@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}                
+{-# LANGUAGE RecordWildCards, TemplateHaskell #-}                
 
 module Tracker
     ( TrackerT
@@ -7,6 +7,7 @@ module Tracker
       -- Raster scanning
     , roughScan
     , RasterScan(..)
+    , scanStart, scanSize, scanPoints
       -- * Types
     , module Tracker.Types
     , Sensors(..)
@@ -29,6 +30,7 @@ import Control.Monad.IO.Class
 import Control.Applicative
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
+import Control.Lens
 
 import Tracker.Monad
 import Tracker.Types
@@ -54,24 +56,25 @@ sumDiffToPsd :: Num a => Psd (SumDiff a) -> Psd (Diode a)
 sumDiffToPsd = fmap diode
   where diode :: Num a => SumDiff a -> Diode a
         diode (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
+            
+data RasterScan = RasterScan { _scanStart  :: V3 Word16
+                             , _scanSize   :: V3 Word16
+                             , _scanPoints :: V3 Int
+                             }
+                deriving (Show, Eq)
+makeLenses ''RasterScan     
   
 scanAround :: V3 Word16 -> V3 Word16 -> V3 Int -> Maybe RasterScan
 scanAround center size npts
   | any id $ (>) <$> scanStart <*> scanEnd = Nothing
   | otherwise =
-    Just $ RasterScan { scanStart  = scanStart
-                      , scanSize   = size
-                      , scanPoints = npts
+    Just $ RasterScan { _scanStart  = scanStart
+                      , _scanSize   = size
+                      , _scanPoints = npts
                       }
   where scanStart = center ^-^ halfSize
         scanEnd   = center ^+^ halfSize
         halfSize  = fmap (`div` 2) size
-            
-data RasterScan = RasterScan { scanStart  :: V3 Word16
-                             , scanSize   :: V3 Word16
-                             , scanPoints :: V3 Int
-                             }
-                deriving (Show, Eq)
 
 batchBy :: Int -> [a] -> [[a]]
 batchBy _ [] = []
@@ -86,10 +89,10 @@ data Sensors a = Sensors { stage :: !(Stage a)
 roughScan :: MonadIO m
           => Word32 -> RasterScan -> TrackerT m (V.Vector (Sensors Sample))
 roughScan freq (RasterScan {..}) =
-    let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
+    let step = ((/) <$> fmap realToFrac _scanSize <*> fmap realToFrac _scanPoints)
         path = map (fmap round)
-               $ rasterScan (realToFrac <$> scanStart) step scanPoints
-               -- $ rasterSine (realToFrac <$> scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
+               $ rasterScan (realToFrac <$> _scanStart) step _scanPoints
+               -- $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
 roughCenter :: V.Vector (Stage Sample, Psd Sample) -> Stage Sample
