@@ -22,6 +22,6 @@ main = do
     T.echo t "Hello World!" >>= print
     --T.setStageGains $ 
     T.setFeedbackFreq t 1000
-    T.setAdcFreq t 100
-    T.roughScan t 1000 roughScan >>= V.mapM_ print
+    T.setAdcFreq t 5000
+    T.roughScan t 1000 roughScan >>= V.mapM_ (putStrLn . show . fst)
     T.close t
