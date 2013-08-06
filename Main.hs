@@ -41,7 +41,6 @@ main = either error (const $ return ()) =<< go
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
                            T.setAdcFreq 5000
-                           T.roughScan 1000 roughScan >>= V.mapM_ (liftIO . putStrLn . show . fst)
           while $ prompt
     
 while :: Monad m => m Bool -> m ()
@@ -59,5 +58,14 @@ prompt = do
                    return True
       _         -> return True
 
-commands :: [(String, [String] -> TrackerUI ())]
-commands = [ ("hello", const $ liftInputT $ outputStrLn "hello") ]
+type Handler = [String] -> TrackerUI ()
+
+roughCal :: Handler
+roughCal args = do
+    scan <- liftTracker $ T.roughScan 1000 roughScan
+    V.forM_ scan (liftIO . putStrLn . show . fst)
+
+commands :: [(String, Handler)]
+commands = [ ("hello",         const $ liftInputT $ outputStrLn "hello")
+           , ("rough-cal",     roughCal)
+           ]
