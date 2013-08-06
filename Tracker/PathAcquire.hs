@@ -18,7 +18,7 @@ batchBy _ [] = []
 batchBy n xs = batch : batchBy n rest
   where (batch,rest) = splitAt n xs
 
-pathAcquire :: MonadIO m => Word32 -> [V3 Word16]
+pathAcquire :: MonadIO m => Word32 -> [Stage Word16]
             -> TrackerT m (V.Vector (Sensors Sample))
 pathAcquire freq path = do
     setFeedbackMode NoFeedback
@@ -34,10 +34,10 @@ pathAcquire freq path = do
     stopAdcStream
     return frames
 
-queuePoints :: MonadIO m => [V3 Word16] -> TrackerT m ()
+queuePoints :: MonadIO m => [Stage Word16] -> TrackerT m ()
 queuePoints = untilTrue . enqueuePoints . V.fromList
 
-primePath :: MonadIO m => [[V3 Word16]] -> TrackerT m [[V3 Word16]]
+primePath :: MonadIO m => [[Stage Word16]] -> TrackerT m [[Stage Word16]]
 primePath (points:rest) = do
     success <- enqueuePoints $ V.fromList points
     if success then primePath rest

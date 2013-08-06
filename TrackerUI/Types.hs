@@ -16,7 +16,7 @@ import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 
 data TrackerState
     = TrackerState { _lastRoughCal :: Maybe (V.Vector (Sensors Sample))
-                   , _roughScan    :: T.RasterScan V3 Word16
+                   , _roughScan    :: T.RasterScan Stage Word16
                    }
 makeLenses ''TrackerState
            
@@ -24,7 +24,7 @@ defaultTrackerState :: TrackerState
 defaultTrackerState =
     TrackerState { _lastRoughCal = Nothing
                  , _roughScan    = maybe (error "Invalid scan") id
-                                 $ T.scanAround (pure 0x7fff) (pure 0x1000) (V3 20 20 2)
+                                 $ T.scanAround (pure 0x7fff) (pure 0x1000) (Stage 20 20 2)
                  }
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)

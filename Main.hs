@@ -49,13 +49,13 @@ setting name help parse format l = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
-v3Tuple :: Iso' (V3 a) (a,a,a)
-v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
+stageTuple :: Iso' (Stage a) (a,a,a)
+stageTuple = iso (\(Stage x y z)->(x,y,z)) (\(x,y,z)->Stage x y z)
 
 roughScanSizeCmd :: [Command]
 roughScanSizeCmd =
     setting "rough.size" "rough calibration field size in points"
-            readParse show (roughScan . T.scanSize . v3Tuple)   
+            readParse show (roughScan . T.scanSize . stageTuple)   
 
 exitCmd :: Command
 exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False

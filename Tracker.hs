@@ -37,7 +37,7 @@ import Tracker.Raster
 import Tracker.Sensors
 
 roughScan :: MonadIO m
-          => Word32 -> RasterScan V3 Word16 -> TrackerT m (V.Vector (Sensors Sample))
+          => Word32 -> RasterScan Stage Word16 -> TrackerT m (V.Vector (Sensors Sample))
 roughScan freq (RasterScan {..}) =
     let step = ((/) <$> fmap realToFrac _scanSize <*> fmap realToFrac _scanPoints)
         path = map (fmap round)

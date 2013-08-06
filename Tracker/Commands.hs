@@ -109,7 +109,7 @@ clearPath = do
     writeCommand 0x40 $ return ()
     readAck "clearPath"
 
-enqueuePoints :: MonadIO m => V.Vector (V3 Word16) -> TrackerT m Bool
+enqueuePoints :: MonadIO m => V.Vector (Stage Word16) -> TrackerT m Bool
 enqueuePoints points 
   | V.length points > maxPathPoints = return False
   | otherwise = do
