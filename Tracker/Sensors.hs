@@ -16,6 +16,7 @@ import Control.Lens
 import Linear
 import Tracker.Types
 
+-- | This is the form we will work the samples in
 data Sensors a = Sensors { _stage :: !(Stage a)
                          , _psd   :: !(Psd (Diode a))
                          }

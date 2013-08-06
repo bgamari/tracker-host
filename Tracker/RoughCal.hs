@@ -1,10 +1,18 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Tracker.RoughCal ( roughScan
                         , roughCenter
                         ) where
-                        
-import qualified Data.Vector as V    
-import Data.Word    
+
+import Prelude hiding (product)
+import Control.Applicative
+import qualified Data.Vector as V
+import Data.Word
+import Data.Foldable
+import Data.Traversable
 import Control.Lens
+import Data.Distributive
+import Linear
 
 import Tracker.Types
 import Tracker.Raster
@@ -21,5 +29,41 @@ roughScan freq s =
         --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
-roughCenter :: V.Vector (Stage Sample, Psd Sample) -> Stage Sample
+data Gaussian f a = Gaussian { mean :: !(f a)
+                             , variance :: !(f a) -- | Diagonal covariance
+                             }
+                  deriving (Show, Eq)
+
+data Model f a = Model { offset :: !a
+                       , amp :: !a
+                       , particle :: !(Gaussian f a)
+                       }
+               deriving (Show, Eq)
+
+gaussian :: (Foldable f, Metric f, Applicative f, Distributive f, Traversable f, RealFloat a)
+         => Gaussian f a -> f a -> a
+gaussian (Gaussian {..}) x =
+    1 / sqrt (2*pi) / detVar^2 * exp ((y *! invVar) `dot` y / 2)
+  where y = x ^-^ mean
+        invVar = kronecker $ fmap recip variance
+        detVar = product variance
+  
+model :: (Foldable f, Metric f, Applicative f, Distributive f, Traversable f, RealFloat a)
+      => Model f a -> f a -> a
+model (Model {..}) x = amp * gaussian particle x + offset
+
+guessModel :: RealFloat a => V.Vector (Stage a, a) -> Model Stage a
+guessModel scan =
+    Model { offset = snd $ V.head scan
+          , amp = 100
+          , particle = Gaussian { mean = pure 0x7fff
+                                , variance = pure 0x1000
+                                }
+          }
+
+-- | Determine the center of the particle
+roughCenter :: V.Vector (Sensors Sample) -> Stage Sample
 roughCenter scan = undefined
+
+minimize :: (f a -> a) -> f a -> [f a]
+minimize = undefined
