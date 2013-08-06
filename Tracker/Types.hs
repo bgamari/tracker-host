@@ -7,6 +7,7 @@ import Data.Foldable
 import Data.Traversable
 import Control.Applicative       
 import Linear       
+import Control.Lens
 
 -- | An ADC sample       
 type Sample = Int16
@@ -27,8 +28,10 @@ instance Applicative SumDiff where
 instance Additive SumDiff where zero = pure 0
 
 -- | Values associated with the anode and cathode of a diode
-data Diode a = Diode { anode, cathode :: !a }
+data Diode a = Diode { _anode, _cathode :: !a }
              deriving (Show, Functor, Foldable, Traversable)
+
+makeLenses ''Diode
      
 instance Applicative Diode where
     pure x = Diode x x
