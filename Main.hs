@@ -3,6 +3,7 @@
 import Data.Maybe
 import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.State
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Binary.Get
@@ -17,14 +18,21 @@ import Tracker (TrackerT, Stage(..), Psd(..))
 import Linear
 import System.Console.Haskeline
  
-newtype TrackerUI a = TUI {runTrackerUI :: InputT (TrackerT IO) a}
-                    deriving ( Functor, Applicative, Monad, MonadIO )
+data TrackerState = TrackerState
+
+newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)
+                    deriving ( Functor, Applicative, Monad, MonadIO
+                             , MonadState TrackerState )
         
 liftInputT :: InputT (TrackerT IO) a -> TrackerUI a
-liftInputT = TUI
+liftInputT = TUI . lift
 
 liftTracker :: TrackerT IO a -> TrackerUI a
-liftTracker = TUI . lift
+liftTracker = TUI . lift . lift
+
+runTrackerUI :: TrackerUI a -> IO (Either String a)
+runTrackerUI (TUI a) = T.withTracker $ runInputT defaultSettings $ evalStateT a state0
+  where state0 = TrackerState
 
 roughScan :: T.RasterScan
 roughScan =
@@ -36,7 +44,7 @@ unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
 
 main :: IO ()    
 main = either error (const $ return ()) =<< go
-  where go = T.withTracker $ runInputT defaultSettings $ runTrackerUI $ do
+  where go = runTrackerUI $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
