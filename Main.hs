@@ -63,9 +63,14 @@ type Handler = [String] -> TrackerUI ()
 roughCal :: Handler
 roughCal args = do
     scan <- liftTracker $ T.roughScan 1000 roughScan
-    V.forM_ scan (liftIO . putStrLn . show . fst)
+    V.forM_ scan (liftIO . putStrLn . show . T.stage)
+
+roughCalH :: Handler
+roughCalH args = do
+    scan <- liftTracker $ T.roughScan 1000 roughScan
+    V.forM_ scan (liftIO . putStrLn . show . T.stage)
 
 commands :: [(String, Handler)]
 commands = [ ("hello",         const $ liftInputT $ outputStrLn "hello")
-           , ("rough-cal",     roughCal)
+           , ("rough-cal",     roughCalH)
            ]

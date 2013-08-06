@@ -3,11 +3,14 @@
 module Tracker
     ( TrackerT
     , withTracker
-    , readData
     , scanAround
+      -- Raster scanning
     , roughScan
     , RasterScan(..)
+      -- * Types
     , module Tracker.Types
+    , Sensors(..)
+      -- * Hardware commands
     , module Tracker.Commands
     ) where
 
@@ -36,18 +39,22 @@ import Tracker.Raster
 getInt16le :: Get Int16
 getInt16le = fromIntegral `fmap` getWord16le
 
-parseSamples :: BS.ByteString -> V.Vector Sample
-parseSamples a = 
-    runGet (V.replicateM (BS.length a `div` 2) getInt16le) $ BSL.fromStrict a
-
-parseFrames :: BS.ByteString -> V.Vector (Stage Sample, Psd Sample)
+parseFrames :: BS.ByteString -> V.Vector (Stage Sample, Psd (SumDiff Sample))
 parseFrames a = 
     runGet (V.replicateM (BS.length a `div` 32) frame) $ BSL.fromStrict a
   where frame = do stage <- sequenceA $ pure getInt16le :: Get (Stage Sample)
-                   psd <- sequenceA $ pure getInt16le   :: Get (Psd Sample)
+                   xDiff <- getInt16le
+                   yDiff <- getInt16le
+                   xSum  <- getInt16le
+                   ySum  <- getInt16le
                    _ <- getInt16le
-                   return (stage, psd)
+                   return (stage, Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff))
 
+sumDiffToPsd :: Num a => Psd (SumDiff a) -> Psd (Diode a)
+sumDiffToPsd = fmap diode
+  where diode :: Num a => SumDiff a -> Diode a
+        diode (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
+  
 scanAround :: V3 Word16 -> V3 Word16 -> V3 Int -> Maybe RasterScan
 scanAround center size npts
   | any id $ (>) <$> scanStart <*> scanEnd = Nothing
@@ -71,8 +78,13 @@ batchBy _ [] = []
 batchBy n xs = batch : batchBy n rest
   where (batch,rest) = splitAt n xs
 
+data Sensors a = Sensors { stage :: !(Stage a)
+                         , psd   :: !(Psd (Diode a))
+                         }
+               deriving (Show)
+               
 roughScan :: MonadIO m
-          => Word32 -> RasterScan -> TrackerT m (V.Vector (Stage Sample, Psd Sample))
+          => Word32 -> RasterScan -> TrackerT m (V.Vector (Sensors Sample))
 roughScan freq (RasterScan {..}) =
     let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
         path = map (fmap round)
@@ -80,8 +92,11 @@ roughScan freq (RasterScan {..}) =
                -- $ rasterSine (realToFrac <$> scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
+roughCenter :: V.Vector (Stage Sample, Psd Sample) -> Stage Sample
+roughCenter scan = undefined
+
 pathAcquire :: MonadIO m => Word32 -> [V3 Word16]
-            -> TrackerT m (V.Vector (Stage Sample, Psd Sample))
+            -> TrackerT m (V.Vector (Sensors Sample))
 pathAcquire freq path = do
     setFeedbackMode NoFeedback
     setAdcTriggerMode TriggerOff
@@ -109,9 +124,11 @@ pathAcquire freq path = do
         untilTrue m = m >>= \success->when (not success)
                                       $ liftIO (threadDelay 10000) >> untilTrue m
 
-        readFrames :: [V.Vector Frame] -> TrackerT IO (V.Vector (Stage Sample, Psd Sample))
-        readFrames frames = do
+        readFrames :: [V.Vector (Sensors Sample)]
+                   -> TrackerT IO (V.Vector (Sensors Sample))
+        readFrames accum = do
             d <- readData
             case d of 
-                Just d' -> readFrames (parseFrames d' : frames)
-                Nothing -> return $ V.concat (reverse frames)
+                Just d' -> let d'' = V.map (\(stage,sumDiff)->Sensors stage (sumDiffToPsd sumDiff)) $ parseFrames d'
+                           in readFrames (d'' : accum)
+                Nothing -> return $ V.concat (reverse accum)
