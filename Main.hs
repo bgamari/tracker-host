@@ -60,11 +60,6 @@ prompt = do
 
 type Handler = [String] -> TrackerUI ()
 
-roughCal :: Handler
-roughCal args = do
-    scan <- liftTracker $ T.roughScan 1000 roughScan
-    V.forM_ scan (liftIO . putStrLn . show . T.stage)
-
 roughCalH :: Handler
 roughCalH args = do
     scan <- liftTracker $ T.roughScan 1000 roughScan
