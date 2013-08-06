@@ -4,7 +4,7 @@ module Tracker.RoughCal ( roughScan
                         , roughCenter
                         ) where
 
-import Prelude hiding (product)
+import Prelude hiding (product, sum)
 import Control.Applicative
 import qualified Data.Vector as V
 import Data.Word
@@ -60,6 +60,9 @@ guessModel scan =
                                 , variance = pure 0x1000
                                 }
           }
+
+residual :: (Num a) => V.Vector (f a, a) -> (f a -> a) -> a
+residual v f = sum $ fmap (\(x,y)->(f x - y)^2) v
 
 -- | Determine the center of the particle
 roughCenter :: V.Vector (Sensors Sample) -> Stage Sample
