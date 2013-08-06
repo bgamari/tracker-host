@@ -25,7 +25,7 @@ defaultTrackerState =
     TrackerState { _lastRoughCal = Nothing
                  , _roughScan    = RasterScan { _scanCenter = pure 0x7fff
                                               , _scanSize   = pure 0x1000
-                                              , _scanPoints = Stage 20 20 2
+                                              , _scanPoints = Stage $ V3 20 20 2
                                               }
                  }
 

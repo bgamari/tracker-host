@@ -22,7 +22,7 @@ import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 import TrackerUI.Types
 
 unitStageGains :: Stage (Stage Int32)
-unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
+unitStageGains = kronecker $ Stage $ V3 1 1 1
 
 command :: String -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd [name] help args (\a->action a >> return True)
@@ -69,7 +69,7 @@ helpCmd = command "help" help "[CMD]" $ \args->
   where help = "Display help message"
 
 stageTuple :: Iso' (Stage a) (a,a,a)
-stageTuple = iso (\(Stage x y z)->(x,y,z)) (\(x,y,z)->Stage x y z)
+stageTuple = iso (\(Stage (V3 x y z))->(x,y,z)) (\(x,y,z)->Stage $ V3 x y z)
 
 readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing

@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFoldable, DeriveFunctor, DeriveTraversable, TemplateHaskell #-}
 
 module Tracker.Types where
        
@@ -12,16 +12,10 @@ import Linear
 type Sample = Int16
 
 -- | A stage position
-data Stage a = Stage !a !a !a
-             deriving (Show, Functor, Foldable, Traversable)
+newtype Stage a = Stage {unStage :: V3 a}
+             deriving ( Show, Functor, Foldable, Traversable
+                      , Applicative, Additive, Metric, R1, R2, R3)
 
-instance Applicative Stage where
-    pure x = Stage x x x
-    Stage a b c <*> Stage x y z = Stage (a x) (b y) (c z)
-
-instance Additive Stage where zero = pure 0
-instance Metric Stage
-    
 -- | A sum-difference sample
 data SumDiff a = SumDiff { sdSum, sdDiff :: !a }
                deriving (Show, Functor, Foldable, Traversable)
