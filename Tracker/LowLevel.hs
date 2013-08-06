@@ -36,13 +36,13 @@ findDevice ctx vid pid = do
                     return $ deviceVendorId desc == vid && deviceProductId desc == pid
 
 -- | Open the tracker device
-withTracker :: MonadIO m => TrackerT m a -> m (Maybe a)
+withTracker :: MonadIO m => TrackerT m a -> m (Either String a)
 withTracker m = do
     ctx <- liftIO newCtx
     devices <- liftIO $ findDevice ctx trackerVendor trackerProduct
     case toList devices of
-      []     -> return Nothing
-      dev:_  -> Just `liftM` withTracker' (V.head devices) m
+      []     -> return $ Left "No device found"
+      dev:_  -> Right `liftM` withTracker' dev m
     
 withTracker' :: MonadIO m => Device -> TrackerT m a -> m a
 withTracker' device m = do

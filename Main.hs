@@ -35,13 +35,13 @@ unitStageGains :: Stage (Stage Int32)
 unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
 
 main :: IO ()    
-main = maybe (error "Couldn't open Tracker") (const $ return ()) =<< go
+main = either error (const $ return ()) =<< go
   where go = T.withTracker $ runInputT defaultSettings $ runTrackerUI $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
                            T.setAdcFreq 5000
-                           --T.roughScan t 1000 roughScan >>= V.mapM_ (putStrLn . show . fst)
+                           T.roughScan 1000 roughScan >>= V.mapM_ (liftIO . putStrLn . show . fst)
           while $ prompt
     
 while :: Monad m => m Bool -> m ()
@@ -52,6 +52,7 @@ prompt = do
     line <- liftInputT $ getInputLine "> "
     case maybe ["exit"] words line of
       "exit":_                                      -> return False
+      "quit":_                                      -> return False
       cmd:rest | Just action <- lookup cmd commands -> action rest >> return True
                | otherwise                          -> do
                    liftInputT $ outputStrLn $ "Unknown command: "++cmd
