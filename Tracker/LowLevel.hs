@@ -65,7 +65,7 @@ showByteString = concatMap (flip showHex " " . fromIntegral) . BS.unpack
 writeCommand :: MonadIO m => Word8 -> Put -> TrackerT m ()
 writeCommand cmd payload = withDevice $ \h->liftIO $ do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
-    putStrLn $ "> "++showByteString (BS.take 4 frame)
+    --putStrLn $ "   > "++showByteString (BS.take 4 frame)
     (size, status) <- writeBulk h cmdOutEndpt frame cmdTimeout
     case status of
         TimedOut  -> error "Command write timed out"
@@ -74,7 +74,7 @@ writeCommand cmd payload = withDevice $ \h->liftIO $ do
 readReply :: MonadIO m => TrackerT m (Maybe ByteString)
 readReply = withDeviceIO $ \h->do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
-    putStrLn $ "< "++showByteString (BS.take 4 d)
+    --putStrLn $ "   < "++showByteString (BS.take 4 d)
     let cmd = BS.head d
         statusCode = BS.head $ BS.drop 1 d
     case status of
