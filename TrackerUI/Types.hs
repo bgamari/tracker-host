@@ -36,7 +36,7 @@ runTrackerUI :: TrackerUI a -> IO (Either String a)
 runTrackerUI (TUI a) =
     T.withTracker $ runInputT defaultSettings $ evalStateT a defaultTrackerState
 
-data Command = Cmd { _cmdName   :: String
+data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: String
                    , _cmdArgs   :: String
                    , _cmdAction :: [String] -> TrackerUI Bool

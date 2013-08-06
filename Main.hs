@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings, PatternGuards #-}
 
 import Data.Maybe
+import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
@@ -14,7 +15,7 @@ import qualified Data.Vector as V
 import Linear
 import System.Console.Haskeline
 import Data.Binary.Get
-import Control.Lens       
+import Control.Lens
 
 import qualified Tracker as T
 import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
@@ -29,10 +30,10 @@ unitStageGains :: Stage (Stage Int32)
 unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
 
 command :: String -> String -> String -> ([String] -> TrackerUI ()) -> Command
-command name help args action = Cmd name help args (\a->action a >> return True)
+command name help args action = Cmd [name] help args (\a->action a >> return True)
 
 exitCmd :: Command
-exitCmd = Cmd "exit" "Exit the program" "" $ const $ return False
+exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False
 
 helloCmd :: Command
 helloCmd = command "hello" help ""
@@ -57,10 +58,14 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
 
 helpCmd :: Command
 helpCmd = command "help" help "[CMD]" $ \args->
-    let cmdFilter = maybe id (\fc->filter (\c->c^.cmdName == fc)) $ listToMaybe args
+    let cmdFilter :: [Command] -> [Command]
+        cmdFilter = case args of
+                      [] -> id
+                      _  -> filter (\c->(c^.cmdName) `isPrefixOf` args)
         cmds = cmdFilter commands
         formatCmd :: Command -> String
-        formatCmd c = take 40 (c^.cmdName++" "++c^.cmdArgs++repeat ' ')++c^.cmdHelp
+        formatCmd c = take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ')
+                      ++ c^.cmdHelp
     in liftInputT $ outputStr $ unlines $ map formatCmd cmds
   where help = "Display help message"
 
@@ -74,15 +79,16 @@ commands = [ helloCmd
 
 prompt :: TrackerUI Bool
 prompt = do
-    line <- liftInputT $ getInputLine "> "
-    case maybe ["exit"] words line of
-      cmd:rest | Just c <- lookupCmd cmd  -> c^.cmdAction $ rest
-               | otherwise                -> do
-                   liftInputT $ outputStrLn $ "Unknown command: "++cmd
-                   return True
-      _ | otherwise                       -> return True
-  where lookupCmd :: String -> Maybe Command
-        lookupCmd cmd = lookup cmd $ map (\c->(c^.cmdName, c)) commands
+    input <- maybe ["exit"] words <$> liftInputT (getInputLine "> ")
+    let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
+    case cmds of
+      cmd:[]  -> do let Just rest = stripPrefix (cmd^.cmdName) input
+                    cmd^.cmdAction $ rest
+      []      -> do liftInputT $ outputStrLn $ "Unknown command: "++unwords input
+                    return True
+      _:_     -> do let matches = intercalate ", " $ map (\c->unwords $ c^.cmdName) cmds
+                    liftInputT $ outputStrLn $ "Ambiguous command: matches "++matches
+                    return True
 
 main :: IO ()
 main = either error (const $ return ()) =<< go
