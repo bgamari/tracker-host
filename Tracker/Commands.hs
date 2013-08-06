@@ -103,7 +103,9 @@ setFeedbackMode tracker mode = do
 maxPathPoints = 80 :: Int
 
 clearPath :: Tracker -> IO ()
-clearPath tracker = writeCommand tracker 0x40 $ return ()
+clearPath tracker = do
+    writeCommand tracker 0x40 $ return ()
+    readAck tracker "clearPath"
 
 enqueuePoints :: Tracker -> V.Vector (V3 Word16) -> IO Bool
 enqueuePoints tracker points 
@@ -115,4 +117,6 @@ enqueuePoints tracker points
       maybe False (const True) `fmap` readReply tracker
 
 startPath :: Tracker -> Word32 -> IO ()
-startPath tracker freq = writeCommand tracker 0x42 $ putWord32le freq
+startPath tracker freq = do
+    writeCommand tracker 0x42 $ putWord32le freq
+    readAck tracker "startPath"
