@@ -49,14 +49,6 @@ setting name help parse format l = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
-stageTuple :: Iso' (Stage a) (a,a,a)
-stageTuple = iso (\(Stage x y z)->(x,y,z)) (\(x,y,z)->Stage x y z)
-
-roughScanSizeCmd :: [Command]
-roughScanSizeCmd =
-    setting "rough.size" "rough calibration field size in points"
-            readParse show (roughScan . T.scanSize . stageTuple)   
-
 exitCmd :: Command
 exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False
 
@@ -98,14 +90,24 @@ helpCmd = command "help" help "[CMD]" $ \args->
            _   -> unlines $ map formatCmd cmds
   where help = "Display help message"
 
+stageTuple :: Iso' (Stage a) (a,a,a)
+stageTuple = iso (\(Stage x y z)->(x,y,z)) (\(x,y,z)->Stage x y z)
+
+settings :: [Command] 
+settings = concat 
+    [ setting "rough.size" "rough calibration field size in points"
+            readParse show (roughScan . T.scanSize . stageTuple)   
+    , setting "rough.center" "rough calibration field center"
+            readParse show (roughScan . T.scanCenter . stageTuple)
+    ]
+
 commands :: [Command]
 commands = [ helloCmd
            , roughCalCmd
            , dumpRoughCmd
            , exitCmd
            , helpCmd
-           ]
-           ++ roughScanSizeCmd
+           ] ++ settings
 
 prompt :: TrackerUI Bool
 prompt = do

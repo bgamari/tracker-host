@@ -3,11 +3,10 @@
 module Tracker
     ( TrackerT
     , withTracker
-    , scanAround
       -- Raster scanning
     , roughScan
     , RasterScan(..)
-    , scanStart, scanSize, scanPoints
+    , scanCenter, scanStart, scanSize, scanPoints
       -- * Types
     , module Tracker.Types
     , Sensors(..)
@@ -38,11 +37,10 @@ import Tracker.Sensors
 
 roughScan :: MonadIO m
           => Word32 -> RasterScan Stage Word16 -> TrackerT m (V.Vector (Sensors Sample))
-roughScan freq (RasterScan {..}) =
-    let step = ((/) <$> fmap realToFrac _scanSize <*> fmap realToFrac _scanPoints)
-        path = map (fmap round)
-               $ rasterScan (realToFrac <$> _scanStart) step _scanPoints
-               -- $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
+roughScan freq s =
+    let s' = fmap realToFrac s :: RasterScan Stage Double
+        path = map (fmap round) $ rasterScan s'
+        --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
 roughCenter :: V.Vector (Stage Sample, Psd Sample) -> Stage Sample

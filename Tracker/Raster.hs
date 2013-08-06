@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell #-}
 
-module Tracker.Raster ( RasterScan(..), scanStart, scanSize, scanPoints
-                      , scanAround
+module Tracker.Raster ( RasterScan(..)
+                      , scanStart, scanEnd, scanCenter, scanSize, scanPoints
                       , rasterScan
                       , rasterSine
                       ) where
@@ -13,26 +13,20 @@ import Data.Foldable
 import Linear
 import Control.Lens
     
-data RasterScan f a = RasterScan { _scanStart  :: f a
+data RasterScan f a = RasterScan { _scanCenter :: f a
                                  , _scanSize   :: f a
                                  , _scanPoints :: f Int
                                  }
-makeLenses ''RasterScan     
+makeLenses ''RasterScan
 
--- | Construct a scan around the given center with the given size           
-scanAround :: (Additive f, Foldable f, Applicative f, Integral a, Ord a)
-           => f a -> f a -> f Int -> Maybe (RasterScan f a)
-scanAround center size npts
-  | any id $ (>) <$> scanStart <*> scanEnd = Nothing
-  | otherwise =
-    Just $ RasterScan { _scanStart  = scanStart
-                      , _scanSize   = size
-                      , _scanPoints = npts
-                      }
-  where scanStart = center ^-^ halfSize
-        scanEnd   = center ^+^ halfSize
-        halfSize  = fmap (`div` 2) size
+instance Functor f => Functor (RasterScan f) where
+    fmap f (RasterScan c s p) = RasterScan (fmap f c) (fmap f s) p
 
+scanStart :: (Additive f, Fractional a) => Getter (RasterScan f a) (f a)
+scanStart = to $ \s->s^.scanCenter ^-^ s^.scanSize ^/ 2
+
+scanEnd :: (Additive f, Fractional a) => Getter (RasterScan f a) (f a)
+scanEnd = to $ \s->s^.scanCenter ^+^ s^.scanSize ^/ 2
 
 newtype FlipList a = FList {getFlipList :: [a]}
                    deriving (Functor, Foldable, Traversable)
@@ -47,10 +41,11 @@ rasterScan' :: (Traversable f) => f Int -> [f Int]
 rasterScan' = getFlipList . traverse (\n->FList [0..n-1])
 
 rasterScan :: (RealFrac a, Additive f, Applicative f, Traversable f)
-           => f a -> f a -> f Int -> [f a]
-rasterScan start step npts =
-    map (\n->start ^+^ ((*) <$> step <*> fmap realToFrac n))
-    $ rasterScan' npts
+           => RasterScan f a -> [f a]
+rasterScan s =
+    map (\n->s^.scanStart ^+^ ((*) <$> step <*> fmap realToFrac n))
+    $ rasterScan' $ s^.scanPoints
+  where step = (/) <$> s^.scanSize <*> fmap realToFrac (s^.scanPoints)
 
 rasterSine :: (RealFloat a, Foldable f, Applicative f)
            => f a -> f a -> f a -> Int -> [f a]
