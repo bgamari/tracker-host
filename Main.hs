@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, PatternGuards, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings, PatternGuards, GeneralizedNewtypeDeriving, TemplateHaskell #-}
 
 import Data.Maybe
 import Control.Monad
@@ -14,11 +14,15 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
        
 import qualified Tracker as T
-import Tracker (TrackerT, Stage(..), Psd(..))
+import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 import Linear
 import System.Console.Haskeline
+import Control.Lens
  
-data TrackerState = TrackerState
+data TrackerState
+    = TrackerState { _lastRoughCal :: Maybe (V.Vector (Sensors Sample))
+                   }
+makeLenses ''TrackerState
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)
                     deriving ( Functor, Applicative, Monad, MonadIO
@@ -32,7 +36,8 @@ liftTracker = TUI . lift . lift
 
 runTrackerUI :: TrackerUI a -> IO (Either String a)
 runTrackerUI (TUI a) = T.withTracker $ runInputT defaultSettings $ evalStateT a state0
-  where state0 = TrackerState
+  where state0 = TrackerState { _lastRoughCal = Nothing
+                              }
 
 roughScan :: T.RasterScan
 roughScan =
@@ -71,9 +76,19 @@ type Handler = [String] -> TrackerUI ()
 roughCalH :: Handler
 roughCalH args = do
     scan <- liftTracker $ T.roughScan 1000 roughScan
-    V.forM_ scan (liftIO . putStrLn . show . T.stage)
+    lastRoughCal .= Just scan
+    
+dumpRoughCalH :: Handler
+dumpRoughCalH args = do
+    let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
+    scan <- use lastRoughCal
+    case scan of
+        Nothing -> liftInputT $ outputStrLn "No rough calibration done."
+        Just s  -> liftIO $ writeFile fname
+                          $ unlines $ map (show . T.stage) $ V.toList s
 
 commands :: [(String, Handler)]
 commands = [ ("hello",         const $ liftInputT $ outputStrLn "hello")
            , ("rough-cal",     roughCalH)
+           , ("dump-rough",    dumpRoughCalH)
            ]
