@@ -63,32 +63,43 @@ prompt :: TrackerUI Bool
 prompt = do
     line <- liftInputT $ getInputLine "> "
     case maybe ["exit"] words line of
-      "exit":_                                      -> return False
-      "quit":_                                      -> return False
-      cmd:rest | Just action <- lookup cmd commands -> action rest >> return True
-               | otherwise                          -> do
+      "exit":_                                 -> return False
+      "quit":_                                 -> return False
+      cmd:rest | Just action <- lookupCmd cmd  -> action rest >> return True
+               | otherwise                     -> do
                    liftInputT $ outputStrLn $ "Unknown command: "++cmd
                    return True
       _         -> return True
+  where lookupCmd :: String -> Maybe ([String] -> TrackerUI ())
+        lookupCmd cmd = lookup cmd $ map (\(c,_,a)->(c,a)) commands
 
-type Handler = [String] -> TrackerUI ()
+type Command = (String, String, [String] -> TrackerUI ())
 
-roughCalH :: Handler
-roughCalH args = do
+command :: String -> String -> ([String] -> TrackerUI ()) -> Command
+command cmd help action = (cmd, help, action)
+
+helloCmd :: Command
+helloCmd = command "hello" help $ const $ liftInputT $ outputStrLn "hello world!"
+  where help = "Print hello world!"
+    
+roughCalCmd :: Command
+roughCalCmd = command "rough-cal" help $ \args->do
     scan <- liftTracker $ T.roughScan 1000 roughScan
     lastRoughCal .= Just scan
+  where help = "Perform rough calibration"
     
-dumpRoughCalH :: Handler
-dumpRoughCalH args = do
+dumpRoughCmd :: Command
+dumpRoughCmd = command "dump-rough" help $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     scan <- use lastRoughCal
     case scan of
         Nothing -> liftInputT $ outputStrLn "No rough calibration done."
         Just s  -> liftIO $ writeFile fname
                           $ unlines $ map (show . T.stage) $ V.toList s
+  where help = "Dump last rough calibration"
 
-commands :: [(String, Handler)]
-commands = [ ("hello",         const $ liftInputT $ outputStrLn "hello")
-           , ("rough-cal",     roughCalH)
-           , ("dump-rough",    dumpRoughCalH)
+commands :: [Command]
+commands = [ helloCmd
+           , roughCalCmd
+           , dumpRoughCmd
            ]
