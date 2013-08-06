@@ -20,6 +20,7 @@ instance Applicative Stage where
     Stage a b c <*> Stage x y z = Stage (a x) (b y) (c z)
 
 instance Additive Stage where zero = pure 0
+instance Metric Stage
     
 -- | A sum-difference sample
 data SumDiff a = SumDiff { sdSum, sdDiff :: !a }
