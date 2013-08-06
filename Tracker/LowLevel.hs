@@ -19,6 +19,9 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
 
+import Numeric
+import Data.Foldable (toList)
+
 data Tracker = Tracker DeviceHandle
 
 trackerVendor = 0x1d50 :: VendorId
@@ -50,12 +53,16 @@ close (Tracker h) = closeDevice h
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
-cmdTimeout = 100
-dataTimeout = 1000
+cmdTimeout = 10000
+dataTimeout = 10000
+
+showByteString :: BS.ByteString -> String
+showByteString = concatMap (flip showHex " " . fromIntegral) . BS.unpack
 
 writeCommand :: Tracker -> Word8 -> Put -> IO ()
 writeCommand (Tracker h) cmd payload = do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
+    putStrLn $ "> "++showByteString (BS.take 4 frame)
     (size, status) <- writeBulk h cmdOutEndpt frame cmdTimeout
     case status of
         TimedOut  -> error "Command write timed out"
@@ -64,6 +71,7 @@ writeCommand (Tracker h) cmd payload = do
 readReply :: Tracker -> IO (Maybe ByteString)
 readReply (Tracker h) = do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
+    putStrLn $ "< "++showByteString (BS.take 4 d)
     let cmd = BS.head d
         statusCode = BS.head $ BS.drop 1 d
     case status of
