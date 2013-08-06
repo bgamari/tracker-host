@@ -39,12 +39,16 @@ open :: IO (Maybe Tracker)
 open = do
     ctx <- newCtx
     devices <- findDevice ctx trackerVendor trackerProduct
-    if V.null devices
-      then return Nothing
-      else do h <- openDevice $ V.head devices
-              setConfig h (Just 1)
-              claimInterface h 0
-              return $ Just $ Tracker h
+    case toList devices of
+      []     -> return Nothing
+      dev:_  -> Just <$> open' (V.head devices)
+    
+open' :: Device -> IO Tracker
+open' device = do
+    h <- openDevice device
+    setConfig h (Just 1)
+    claimInterface h 0
+    return $ Tracker h
 
 -- | Close the tracker device
 close :: Tracker -> IO ()
