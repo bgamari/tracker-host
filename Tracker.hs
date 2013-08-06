@@ -1,9 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}                
 
 module Tracker
-    ( Tracker
-    , open
-    , close
+    ( TrackerT
+    , withTracker
     , readData
     , scanAround
     , roughScan
@@ -23,10 +22,12 @@ import Data.Traversable
 import Data.Foldable       
 import Linear
 import Control.Monad (when)
+import Control.Monad.IO.Class
 import Control.Applicative
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 
+import Tracker.Monad
 import Tracker.Types
 import Tracker.LowLevel
 import Tracker.Commands
@@ -70,45 +71,47 @@ batchBy _ [] = []
 batchBy n xs = batch : batchBy n rest
   where (batch,rest) = splitAt n xs
 
-roughScan :: Tracker -> Word32 -> RasterScan -> IO (V.Vector (Stage Sample, Psd Sample))
-roughScan t freq (RasterScan {..}) =
+roughScan :: MonadIO m
+          => Word32 -> RasterScan -> TrackerT m (V.Vector (Stage Sample, Psd Sample))
+roughScan freq (RasterScan {..}) =
     let step = ((/) <$> fmap realToFrac scanSize <*> fmap realToFrac scanPoints)
         path = map (fmap round)
                $ rasterScan (realToFrac <$> scanStart) step scanPoints
                -- $ rasterSine (realToFrac <$> scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
-    in pathAcquire t freq path
+    in pathAcquire freq path
 
-pathAcquire :: Tracker -> Word32 -> [V3 Word16]
-            -> IO (V.Vector (Stage Sample, Psd Sample))
-pathAcquire t freq path = do
-    setFeedbackMode t NoFeedback
-    setAdcTriggerMode t TriggerOff
-    clearPath t
+pathAcquire :: MonadIO m => Word32 -> [V3 Word16]
+            -> TrackerT m (V.Vector (Stage Sample, Psd Sample))
+pathAcquire freq path = do
+    setFeedbackMode NoFeedback
+    setAdcTriggerMode TriggerOff
+    clearPath
     -- First fill up path queue
-    points <- primePath t $ batchBy maxPathPoints path
-    startAdcStream t
-    startPath t freq
-    framesAsync <- async $ readFrames []
+    points <- primePath $ batchBy maxPathPoints path
+    startAdcStream
+    startPath freq
+    framesAsync <- liftThrough async $ readFrames []
     mapM_ queuePoints $ points
-    frames <- wait framesAsync
-    stopAdcStream t
+    frames <- liftIO $ wait framesAsync
+    stopAdcStream
     return frames
-  where queuePoints :: [V3 Word16] -> IO ()
-        queuePoints = untilTrue . enqueuePoints t . V.fromList
+  where queuePoints :: MonadIO m => [V3 Word16] -> TrackerT m ()
+        queuePoints = untilTrue . enqueuePoints . V.fromList
 
-        primePath :: Tracker -> [[V3 Word16]] -> IO [[V3 Word16]]
-        primePath t (points:rest) = do
-            success <- enqueuePoints t $ V.fromList points
-            if success then primePath t rest
+        primePath :: MonadIO m => [[V3 Word16]] -> TrackerT m [[V3 Word16]]
+        primePath (points:rest) = do
+            success <- enqueuePoints $ V.fromList points
+            if success then primePath rest
                        else return rest
 
 
-        untilTrue :: IO Bool -> IO ()
-        untilTrue m = m >>= \success->when (not success) $ threadDelay 10000 >> untilTrue m
+        untilTrue :: MonadIO m => m Bool -> m ()
+        untilTrue m = m >>= \success->when (not success)
+                                      $ liftIO (threadDelay 10000) >> untilTrue m
 
-        readFrames :: [V.Vector Frame] -> IO (V.Vector (Stage Sample, Psd Sample))
+        readFrames :: [V.Vector Frame] -> TrackerT IO (V.Vector (Stage Sample, Psd Sample))
         readFrames frames = do
-            d <- readData t
+            d <- readData
             case d of 
                 Just d' -> readFrames (parseFrames d' : frames)
                 Nothing -> return $ V.concat (reverse frames)

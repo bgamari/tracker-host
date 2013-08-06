@@ -1,7 +1,8 @@
-{-# LANGUAGE OverloadedStrings, PatternGuards #-}
+{-# LANGUAGE OverloadedStrings, PatternGuards, GeneralizedNewtypeDeriving #-}
 
 import Data.Maybe
 import Control.Monad
+import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Binary.Get
@@ -12,10 +13,19 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
        
 import qualified Tracker as T
-import Tracker (Tracker, Stage(..), Psd(..))
+import Tracker (TrackerT, Stage(..), Psd(..))
 import Linear
 import System.Console.Haskeline
  
+newtype TrackerUI a = TUI {runTrackerUI :: InputT (TrackerT IO) a}
+                    deriving ( Functor, Applicative, Monad, MonadIO )
+        
+liftInputT :: InputT (TrackerT IO) a -> TrackerUI a
+liftInputT = TUI
+
+liftTracker :: TrackerT IO a -> TrackerUI a
+liftTracker = TUI . lift
+
 roughScan :: T.RasterScan
 roughScan =
     maybe (error "Invalid scan") id
@@ -25,28 +35,28 @@ unitStageGains :: Stage (Stage Int32)
 unitStageGains = Stage (Stage 1 0 0) (Stage 0 1 0) (Stage 0 0 1)
 
 main :: IO ()    
-main = runInputT defaultSettings $ do
-    t <- fromJust (error "Couldn't open Tracker") <$> liftIO T.open
-    liftIO $ do T.echo t "Hello World!" >>= print
-                T.setStageGains t unitStageGains
-                T.setFeedbackFreq t 1000
-                T.setAdcFreq t 5000
-                --T.roughScan t 1000 roughScan >>= V.mapM_ (putStrLn . show . fst)
-    while $ prompt t
-    liftIO $ T.close t
+main = maybe (error "Couldn't open Tracker") (const $ return ()) =<< go
+  where go = T.withTracker $ runInputT defaultSettings $ runTrackerUI $ do
+          liftTracker $ do T.echo "Hello World!" >>= liftIO . print
+                           T.setStageGains unitStageGains
+                           T.setFeedbackFreq 1000
+                           T.setAdcFreq 5000
+                           --T.roughScan t 1000 roughScan >>= V.mapM_ (putStrLn . show . fst)
+          while $ prompt
     
 while :: Monad m => m Bool -> m ()
 while m = m >>= \a->when a (while m)
 
-prompt :: Tracker -> InputT IO Bool
-prompt t = do
-    line <- getInputLine "> "
+prompt :: TrackerUI Bool
+prompt = do
+    line <- liftInputT $ getInputLine "> "
     case maybe ["exit"] words line of
       "exit":_                                      -> return False
       cmd:rest | Just action <- lookup cmd commands -> action rest >> return True
-               | otherwise                          -> do outputStrLn $ "Unknown command: "++cmd
-                                                          return True
-      _                                             -> return True
+               | otherwise                          -> do
+                   liftInputT $ outputStrLn $ "Unknown command: "++cmd
+                   return True
+      _         -> return True
 
-commands :: [(String, [String] -> InputT IO ())]
-commands = [ ("hello", const $ outputStrLn "hello") ]
+commands :: [(String, [String] -> TrackerUI ())]
+commands = [ ("hello", const $ liftInputT $ outputStrLn "hello") ]

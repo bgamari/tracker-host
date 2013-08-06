@@ -1,7 +1,6 @@
 module Tracker.LowLevel
-    ( Tracker
-    , open
-    , close
+    ( TrackerT
+    , withTracker
     , writeCommand
     , readReply
     , parseReply
@@ -11,6 +10,8 @@ module Tracker.LowLevel
 
 import System.USB
 import Control.Applicative
+import Control.Monad.IO.Class
+import Control.Monad (liftM)
 import Data.Word
 import Data.Binary.Put
 import Data.Binary.Get
@@ -22,7 +23,7 @@ import qualified Data.Vector as V
 import Numeric
 import Data.Foldable (toList)
 
-data Tracker = Tracker DeviceHandle
+import Tracker.Monad
 
 trackerVendor = 0x1d50 :: VendorId
 trackerProduct = 0x7777 :: ProductId
@@ -35,24 +36,22 @@ findDevice ctx vid pid = do
                     return $ deviceVendorId desc == vid && deviceProductId desc == pid
 
 -- | Open the tracker device
-open :: IO (Maybe Tracker)
-open = do
-    ctx <- newCtx
-    devices <- findDevice ctx trackerVendor trackerProduct
+withTracker :: MonadIO m => TrackerT m a -> m (Maybe a)
+withTracker m = do
+    ctx <- liftIO newCtx
+    devices <- liftIO $ findDevice ctx trackerVendor trackerProduct
     case toList devices of
       []     -> return Nothing
-      dev:_  -> Just <$> open' (V.head devices)
+      dev:_  -> Just `liftM` withTracker' (V.head devices) m
     
-open' :: Device -> IO Tracker
-open' device = do
-    h <- openDevice device
-    setConfig h (Just 1)
-    claimInterface h 0
-    return $ Tracker h
-
--- | Close the tracker device
-close :: Tracker -> IO ()
-close (Tracker h) = closeDevice h
+withTracker' :: MonadIO m => Device -> TrackerT m a -> m a
+withTracker' device m = do
+    h <- liftIO $ openDevice device
+    liftIO $ setConfig h (Just 1)
+    liftIO $ claimInterface h 0
+    a <- runTrackerT m h
+    liftIO $ closeDevice h
+    return a
 
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
@@ -63,8 +62,8 @@ dataTimeout = 100
 showByteString :: BS.ByteString -> String
 showByteString = concatMap (flip showHex " " . fromIntegral) . BS.unpack
 
-writeCommand :: Tracker -> Word8 -> Put -> IO ()
-writeCommand (Tracker h) cmd payload = do
+writeCommand :: MonadIO m => Word8 -> Put -> TrackerT m ()
+writeCommand cmd payload = withDevice $ \h->liftIO $ do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
     putStrLn $ "> "++showByteString (BS.take 4 frame)
     (size, status) <- writeBulk h cmdOutEndpt frame cmdTimeout
@@ -72,8 +71,8 @@ writeCommand (Tracker h) cmd payload = do
         TimedOut  -> error "Command write timed out"
         Completed -> return ()
 
-readReply :: Tracker -> IO (Maybe ByteString)
-readReply (Tracker h) = do
+readReply :: MonadIO m => TrackerT m (Maybe ByteString)
+readReply = withDeviceIO $ \h->do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
     putStrLn $ "< "++showByteString (BS.take 4 d)
     let cmd = BS.head d
@@ -84,23 +83,23 @@ readReply (Tracker h) = do
           | statusCode == 0x06 -> return $ Just $ BS.drop 2 d
           | otherwise          -> return Nothing
                        
-readAck :: Tracker -> String -> IO ()
-readAck tracker when = do
-    a <- readReply tracker
+readAck :: MonadIO m => String -> TrackerT m ()
+readAck when = do
+    a <- readReply
     case a of
         Just _  -> return ()
         Nothing -> error $ "Ack expected: "++when
 
-parseReply :: Tracker -> Get a -> IO (Maybe a)
-parseReply tracker parser = do
-     reply <- readReply tracker
+parseReply :: MonadIO m => Get a -> TrackerT m (Maybe a)
+parseReply parser = do
+     reply <- readReply
      return $ case reply of
          Nothing    -> Nothing
          Just reply -> either (const Nothing) (\(_,_,a)->Just a)
                      $ runGetOrFail parser $ BSL.fromStrict reply
 
-readData :: Tracker -> IO (Maybe ByteString)
-readData (Tracker h) = do
+readData :: MonadIO m => TrackerT m (Maybe ByteString)
+readData = withDeviceIO $ \h->do
     (d, status) <- readBulk h dataInEndpt 512 dataTimeout
     case status of
         TimedOut  -> return Nothing

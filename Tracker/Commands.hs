@@ -13,6 +13,8 @@ import Data.Foldable
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import qualified Data.Vector as V       
+import Control.Monad (liftM)
+import Tracker.Monad
 import Tracker.LowLevel
 import Tracker.Types
 import Linear
@@ -23,100 +25,100 @@ import Linear
 putInt32le :: Int32 -> Put
 putInt32le = putWord32le . fromIntegral
 
-echo :: Tracker -> ByteString -> IO (Maybe ByteString)
-echo tracker payload = do
-    writeCommand tracker 0x0 $ do putWord8 (fromIntegral $ BS.length payload)
-                                  putByteString payload
-    parseReply tracker $ do length <- getWord8
-                            getByteString $ fromIntegral length
+echo :: MonadIO m => ByteString -> TrackerT m (Maybe ByteString)
+echo payload = do
+    writeCommand 0x0 $ do putWord8 (fromIntegral $ BS.length payload)
+                          putByteString payload
+    parseReply $ do length <- getWord8
+                    getByteString $ fromIntegral length
 
-setStageGains :: Tracker -> Stage (Stage Int32) -> IO ()
-setStageGains tracker gains = do
-    writeCommand tracker 0x10 $ mapM_ (mapM_ putInt32le) gains
-    readAck tracker "setStageGains"
+setStageGains :: MonadIO m => Stage (Stage Int32) -> TrackerT m ()
+setStageGains gains = do
+    writeCommand 0x10 $ mapM_ (mapM_ putInt32le) gains
+    readAck "setStageGains"
 
-setStageSetpoint :: Tracker -> Stage Int32 -> IO ()
-setStageSetpoint tracker setpoint = do
-    writeCommand tracker 0x11 $ mapM_ putInt32le setpoint
-    readAck tracker "setStageSetpoint"
+setStageSetpoint :: MonadIO m => Stage Int32 -> TrackerT m ()
+setStageSetpoint setpoint = do
+    writeCommand 0x11 $ mapM_ putInt32le setpoint
+    readAck "setStageSetpoint"
 
-setPsdGains :: Tracker -> Psd (Stage Int32) -> IO ()
-setPsdGains tracker gains = do
-    writeCommand tracker 0x12 $ mapM_ (mapM_ putInt32le) gains
-    readAck tracker "setPsdGains"
+setPsdGains :: MonadIO m => Psd (Stage Int32) -> TrackerT m ()
+setPsdGains gains = do
+    writeCommand 0x12 $ mapM_ (mapM_ putInt32le) gains
+    readAck "setPsdGains"
 
-setPsdSetpoint :: Tracker -> Psd Int32 -> IO ()
-setPsdSetpoint tracker setpoint = do
-    writeCommand tracker 0x13 $ mapM_ putInt32le setpoint
-    readAck tracker "setPsdSetpoint"
+setPsdSetpoint :: MonadIO m => Psd Int32 -> TrackerT m ()
+setPsdSetpoint setpoint = do
+    writeCommand 0x13 $ mapM_ putInt32le setpoint
+    readAck "setPsdSetpoint"
 
-setMaxError :: Tracker -> Word32 -> IO ()
-setMaxError tracker maxError = do
-    writeCommand tracker 0x14 $ putWord32le maxError
-    readAck tracker "setMaxError"
+setMaxError :: MonadIO m => Word32 -> TrackerT m ()
+setMaxError maxError = do
+    writeCommand 0x14 $ putWord32le maxError
+    readAck "setMaxError"
 
-setOutputGains :: Tracker -> Stage Int32 -> IO ()
-setOutputGains tracker gains = do
-    writeCommand tracker 0x13 $ mapM_ putInt32le gains
-    readAck tracker "setOutputGains"
+setOutputGains :: MonadIO m => Stage Int32 -> TrackerT m ()
+setOutputGains gains = do
+    writeCommand 0x13 $ mapM_ putInt32le gains
+    readAck "setOutputGains"
 
-setAdcFreq :: Tracker -> Word32 -> IO ()
-setAdcFreq tracker freq = do
-    writeCommand tracker 0x20 $ putWord32le freq
-    readAck tracker "setAdcFreq"
+setAdcFreq :: MonadIO m => Word32 -> TrackerT m ()
+setAdcFreq freq = do
+    writeCommand 0x20 $ putWord32le freq
+    readAck "setAdcFreq"
 
 data TriggerMode = TriggerOff
                  | TriggerAuto
                  | TriggerManual
                  deriving (Show, Eq, Bounded, Enum)
 
-setAdcTriggerMode :: Tracker -> TriggerMode -> IO ()
-setAdcTriggerMode tracker mode = do
-    writeCommand tracker 0x21 $ putWord32le (fromIntegral $ fromEnum mode)
-    readAck tracker "setAdcTriggerMode"
+setAdcTriggerMode :: MonadIO m => TriggerMode -> TrackerT m ()
+setAdcTriggerMode mode = do
+    writeCommand 0x21 $ putWord32le (fromIntegral $ fromEnum mode)
+    readAck "setAdcTriggerMode"
 
-startAdcStream :: Tracker -> IO ()
-startAdcStream tracker = do
-    writeCommand tracker 0x22 $ return ()
-    readAck tracker "startAdcStream"
+startAdcStream :: MonadIO m => TrackerT m ()
+startAdcStream = do
+    writeCommand 0x22 $ return ()
+    readAck "startAdcStream"
 
-stopAdcStream :: Tracker -> IO ()
-stopAdcStream tracker = do
-    writeCommand tracker 0x23 $ return ()
-    readAck tracker "stopAdcStream"
+stopAdcStream :: MonadIO m => TrackerT m ()
+stopAdcStream = do
+    writeCommand 0x23 $ return ()
+    readAck "stopAdcStream"
 
-setFeedbackFreq :: Tracker -> Word32 -> IO ()
-setFeedbackFreq tracker freq = do
-    writeCommand tracker 0x30 $ putWord32le freq
-    readAck tracker "setFeedbackFreq"
+setFeedbackFreq :: MonadIO m => Word32 -> TrackerT m ()
+setFeedbackFreq freq = do
+    writeCommand 0x30 $ putWord32le freq
+    readAck "setFeedbackFreq"
 
 data FeedbackMode = NoFeedback
                   | PsdFeedback
                   | StageFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
 
-setFeedbackMode :: Tracker -> FeedbackMode -> IO ()
-setFeedbackMode tracker mode = do
-    writeCommand tracker 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
-    readAck tracker "setFeedbackMode"
+setFeedbackMode :: MonadIO m => FeedbackMode -> TrackerT m ()
+setFeedbackMode mode = do
+    writeCommand 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
+    readAck "setFeedbackMode"
 
 maxPathPoints = 80 :: Int
 
-clearPath :: Tracker -> IO ()
-clearPath tracker = do
-    writeCommand tracker 0x40 $ return ()
-    readAck tracker "clearPath"
+clearPath :: MonadIO m => TrackerT m ()
+clearPath = do
+    writeCommand 0x40 $ return ()
+    readAck "clearPath"
 
-enqueuePoints :: Tracker -> V.Vector (V3 Word16) -> IO Bool
-enqueuePoints tracker points 
+enqueuePoints :: MonadIO m => V.Vector (V3 Word16) -> TrackerT m Bool
+enqueuePoints points 
   | V.length points > maxPathPoints = return False
   | otherwise = do
-      writeCommand tracker 0x41 $ do
+      writeCommand 0x41 $ do
           putWord8 $ fromIntegral $ V.length points
           mapM_ (mapM_ putWord16le) points
-      maybe False (const True) `fmap` readReply tracker
+      maybe False (const True) `liftM` readReply
 
-startPath :: Tracker -> Word32 -> IO ()
-startPath tracker freq = do
-    writeCommand tracker 0x42 $ putWord32le freq
-    readAck tracker "startPath"
+startPath :: MonadIO m => Word32 -> TrackerT m ()
+startPath freq = do
+    writeCommand 0x42 $ putWord32le freq
+    readAck "startPath"
