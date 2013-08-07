@@ -5,6 +5,7 @@ module Tracker.Types where
 import Data.Int
 import Data.Foldable
 import Data.Traversable
+import Data.Distributive (Distributive)
 import Control.Applicative       
 import Linear       
 import Control.Lens
@@ -15,7 +16,7 @@ type Sample = Int16
 -- | A stage position
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
-                      , Applicative, Additive, Metric, R1, R2, R3)
+                      , Applicative, Additive, Metric, Distributive, R1, R2, R3)
 
 -- | A sum-difference sample
 data SumDiff a = SumDiff { sdSum, sdDiff :: !a }
@@ -39,5 +40,6 @@ instance Applicative Diode where
 
 instance Additive Diode where zero = pure 0
 
-newtype Psd a = Psd {getPsd :: V2 a}
-              deriving (Show, Functor, Foldable, Traversable, Applicative, Additive)
+newtype Psd a = Psd {unPsd :: V2 a}
+              deriving ( Show, Functor, Foldable, Traversable, Applicative
+                       , Additive, Metric, R1, R2)
