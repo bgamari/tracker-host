@@ -122,7 +122,7 @@ enqueuePoints points
         Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
         otherwise                   -> return Nothing
 
-startPath :: MonadIO m => Word32 -> TrackerT m ()
-startPath freq = do
-    writeCommand 0x42 $ putWord32le freq
+startPath :: MonadIO m => Word32 -> Bool -> TrackerT m ()
+startPath freq syncAdc = do
+    writeCommand 0x42 $ putWord32le freq >> putWord8 (if syncAdc then 1 else 0)
     readAck "startPath"

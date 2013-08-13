@@ -29,7 +29,7 @@ pathAcquire freq path = do
     -- First fill up path queue
     points <- primePath $ batchBy maxPathPoints path
     startAdcStream
-    startPath freq
+    startPath freq False
     framesAsync <- liftThrough async $ readFrames []
     mapM_ queuePoints $ points
     frames <- liftIO $ wait framesAsync
