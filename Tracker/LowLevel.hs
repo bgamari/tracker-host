@@ -62,11 +62,15 @@ dataTimeout = 100
 showByteString :: BS.ByteString -> String
 showByteString = concatMap (flip showHex " " . fromIntegral) . BS.unpack
 
+debugOut :: MonadIO m => String -> m ()
+--debugOut = liftIO . putStrLn
+debugOut _ = return ()
+
 writeCommand :: MonadIO m => Word8 -> Put -> TrackerT m ()
-writeCommand cmd payload = withDevice $ \h->liftIO $ do
+writeCommand cmd payload = withDeviceIO $ \h->do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
-    --putStrLn $ "   > "++showByteString (BS.take 4 frame)
-    (size, status) <- writeBulk h cmdOutEndpt frame cmdTimeout
+    debugOut $ "   > "++showByteString (BS.take 4 frame)
+    (size, status) <- liftIO $ writeBulk h cmdOutEndpt frame cmdTimeout
     case status of
         TimedOut  -> error "Command write timed out"
         Completed -> return ()
@@ -74,7 +78,7 @@ writeCommand cmd payload = withDevice $ \h->liftIO $ do
 readReply :: MonadIO m => TrackerT m (Maybe ByteString)
 readReply = withDeviceIO $ \h->do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
-    --putStrLn $ "   < "++showByteString (BS.take 4 d)
+    debugOut $ "   < "++showByteString (BS.take 4 d)
     let cmd = BS.head d
         statusCode = BS.head $ BS.drop 1 d
     case status of
