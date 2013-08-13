@@ -13,6 +13,7 @@ import Control.Applicative
 import Control.Monad.IO.Class
 import Control.Monad (liftM)
 import Data.Word
+import Data.List (intercalate)
 import Data.Binary.Put
 import Data.Binary.Get
 import Data.ByteString (ByteString)
@@ -60,7 +61,9 @@ cmdTimeout = 100
 dataTimeout = 100
 
 showByteString :: BS.ByteString -> String
-showByteString = concatMap (flip showHex " " . fromIntegral) . BS.unpack
+showByteString = intercalate " " . map (pad 2 . flip showHex "" . fromIntegral) . BS.unpack
+  where pad :: Int -> String -> String
+        pad n = reverse . take n . (++repeat '0') . reverse
 
 debugOut :: MonadIO m => String -> m ()
 --debugOut = liftIO . putStrLn
