@@ -13,14 +13,16 @@ import Control.Lens
 -- | An ADC sample       
 type Sample = Int16
 
--- | A stage position
+-- | The stage coordinate frame
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
-                      , Applicative, Additive, Metric, Distributive, R1, R2, R3)
+                      , Applicative, Additive, Metric, Distributive
+                      , R1, R2, R3)
 
 -- | A sum-difference sample
-data SumDiff a = SumDiff { sdSum, sdDiff :: !a }
+data SumDiff a = SumDiff { _sdSum, _sdDiff :: !a }
                deriving (Show, Functor, Foldable, Traversable)
+makeLenses ''SumDiff
 
 instance Applicative SumDiff where
     pure x = SumDiff x x
@@ -40,6 +42,19 @@ instance Applicative Diode where
 
 instance Additive Diode where zero = pure 0
 
+-- | The position-sensitive detector frame
 newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
                        , Additive, Metric, R1, R2)
+
+-- | This is the form we will work the samples in
+data Sensors a = Sensors { _stage :: !(Stage a)
+                         , _psd   :: !(Psd (SumDiff a))
+                         }
+               deriving (Show)
+makeLenses ''Sensors
+
+sumDiffDiode :: Num a => Iso' (SumDiff a) (Diode a)
+sumDiffDiode = iso to from
+    where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
+          from (Diode an cat) = SumDiff (an - cat) (an + cat)

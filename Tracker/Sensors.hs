@@ -16,13 +16,6 @@ import Control.Lens
 import Linear
 import Tracker.Types
 
--- | This is the form we will work the samples in
-data Sensors a = Sensors { _stage :: !(Stage a)
-                         , _psd   :: !(Psd (Diode a))
-                         }
-               deriving (Show)
-makeLenses ''Sensors
-
 getInt16le :: Get Int16
 getInt16le = fromIntegral `fmap` getWord16le
 
@@ -36,9 +29,4 @@ parseFrames a =
                    ySum  <- getInt16le
                    _ <- getInt16le
                    let sumDiff = Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff)
-                   return $ Sensors stage (sumDiffToPsd sumDiff)
-
-sumDiffToPsd :: Num a => Psd (SumDiff a) -> Psd (Diode a)
-sumDiffToPsd = fmap diode
-  where diode :: Num a => SumDiff a -> Diode a
-        diode (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
+                   return $ Sensors stage sumDiff

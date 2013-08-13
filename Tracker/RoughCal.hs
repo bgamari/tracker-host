@@ -5,7 +5,8 @@ module Tracker.RoughCal ( roughScan
                         , roughCenter
                         ) where
 
-import Prelude hiding (product, sum)
+import Prelude hiding (product, sum, sequenceA, foldr)
+import Data.Function (on)
 import Control.Applicative
 import qualified Data.Vector as V
 import Data.Word
@@ -18,8 +19,6 @@ import Linear
 import Optimization.LineSearch
 import Optimization.LineSearch.ConjugateGradient
 import Numeric.AD
-import Numeric.AD.Types
-import Numeric.AD.Internal.Classes (Lifted)
 
 import Tracker.Types
 import Tracker.Raster
@@ -87,11 +86,12 @@ guessModel scan =
 residual :: (Num a) => V.Vector (f a, a) -> (f a -> a) -> a
 residual v f = sum $ fmap (\(x,y)->(f x - y)^2) v
 
--- | Determine the center of the particle
-roughCenter :: (RealFloat a) => V.Vector (Sensors a) -> Model Stage a
-roughCenter scan =
+{-         
+-- | Determine the center of the particle via fitting
+roughFit :: (RealFloat a) => V.Vector (Sensors a) -> Model Stage a
+roughFit scan =
     let x0 = guessModel fitData
-        fitData = fmap (\s->(s^.stage, s^.psd^._x^.anode)) scan
+        fitData = fmap (\s->(s^.stage, s^.psd^._x^.diff)) scan
         fitData' :: (Lifted s, RealFloat a) => V.Vector (Stage (AD s a), AD s a)
         fitData' = fmap (\(a,b)->(fmap realToFrac a, realToFrac b)) fitData
         beta = fletcherReeves
@@ -100,3 +100,27 @@ roughCenter scan =
         f :: (Lifted s, RealFloat a) => Model Stage (AD s a) -> AD s a
         f m = residual fitData' $ model m
     in head $ drop 10 $ conjGrad search beta (grad f) (fmap realToFrac x0)
+-}
+
+roughCenter :: V.Vector (Sensors Word16) -> Stage Word16
+roughCenter v =
+    let psds :: Psd (V.Vector (SumDiff Word16))
+        psds = sequenceA $ fmap (^. psd) v
+        psdDiff :: Psd (V.Vector Word16)
+        psdDiff = fmap (fmap (^. sdDiff)) psds
+        maxPos :: Psd (Stage Word16)
+        maxPos = mapped %~ ( fst
+                           . maximumBy (compare `on` snd)
+                           . V.zip (fmap (^. stage) v)
+                           )
+                $ psdDiff
+        minPos :: Psd (Stage Word16)
+        minPos = mapped %~ ( fst
+                           . minimumBy (compare `on` snd)
+                           . V.zip (fmap (^. stage) v)
+                           )
+                $ psdDiff
+        hi = foldr (^+^) zero
+             $ (^+^) <$> maxPos <*> minPos
+            :: Stage Word16
+    in (`div` 4) <$> hi
