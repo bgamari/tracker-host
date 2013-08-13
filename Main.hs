@@ -38,7 +38,8 @@ helloCmd = command "hello" help ""
 roughCalCmd :: Command
 roughCalCmd = command "rough-cal" help "" $ \args->do
     rs <- use roughScan
-    scan <- liftTracker $ T.roughScan 1000 rs
+    freq <- use roughScanFreq
+    scan <- liftTracker $ T.roughScan freq rs
     lastRoughCal .= Just scan
   where help = "Perform rough calibration"
 
@@ -101,6 +102,8 @@ settings = concat
             readParse show (roughScan . T.scanCenter . stageTuple)
     , setting "rough.points" "number of points in rough calibration scan"
             readParse show (roughScan . T.scanPoints . stageTuple)
+    , setting "rough.freq" "update frequency of rough calibration scan"
+            readParse show roughScanFreq
     ]
 
 commands :: [Command]

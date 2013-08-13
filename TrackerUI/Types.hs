@@ -15,18 +15,20 @@ import qualified Tracker as T
 import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample, RasterScan(..))
 
 data TrackerState
-    = TrackerState { _lastRoughCal :: Maybe (V.Vector (Sensors Sample))
-                   , _roughScan    :: T.RasterScan Stage Word16
+    = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
+                   , _roughScanFreq  :: Word32
+                   , _roughScan      :: T.RasterScan Stage Word16
                    }
 makeLenses ''TrackerState
            
 defaultTrackerState :: TrackerState           
 defaultTrackerState =
-    TrackerState { _lastRoughCal = Nothing
-                 , _roughScan    = RasterScan { _scanCenter = pure 0x7fff
-                                              , _scanSize   = pure 0x1000
-                                              , _scanPoints = Stage $ V3 20 20 2
-                                              }
+    TrackerState { _lastRoughCal  = Nothing
+                 , _roughScanFreq = 1000
+                 , _roughScan     = RasterScan { _scanCenter = pure 0x7fff
+                                               , _scanSize   = pure 0x1000
+                                               , _scanPoints = Stage $ V3 20 20 2
+                                               }
                  }
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)
