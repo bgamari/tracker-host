@@ -1,6 +1,8 @@
 module Tracker.PathAcquire ( pathAcquire ) where
 
-import Control.Monad (when)
+import Control.Applicative
+import Control.Monad (when, liftM)
+import Data.Maybe (fromMaybe)
 import Data.Word
 import qualified Data.Vector as V
 import Control.Concurrent.Async
@@ -34,18 +36,20 @@ pathAcquire freq path = do
     stopAdcStream
     return frames
 
-queuePoints :: MonadIO m => [Stage Word16] -> TrackerT m ()
-queuePoints = untilTrue . enqueuePoints . V.fromList
+queuePoints :: MonadIO m => [Stage Word16] -> TrackerT m Bool
+queuePoints points = go
+  where go = do r <- enqueuePoints $ V.fromList points
+                case r of
+                  Just running -> return running
+                  Nothing      -> liftIO (threadDelay 10000) >> go
 
 primePath :: MonadIO m => [[Stage Word16]] -> TrackerT m [[Stage Word16]]
 primePath (points:rest) = do
-    success <- enqueuePoints $ V.fromList points
-    if success then primePath rest
-               else return rest
-
-untilTrue :: MonadIO m => m Bool -> m ()
-untilTrue m = m >>= \success->when (not success)
-                              $ liftIO (threadDelay 10000) >> untilTrue m
+    r <- enqueuePoints $ V.fromList points
+    case r of
+      Just running -> if running then error "primePath: Attempted to prime while already running"
+                                 else primePath rest
+      Nothing      -> return rest
 
 readFrames :: [V.Vector (Sensors Sample)]
            -> TrackerT IO (V.Vector (Sensors Sample))

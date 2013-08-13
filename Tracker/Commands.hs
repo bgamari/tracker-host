@@ -109,14 +109,18 @@ clearPath = do
     writeCommand 0x40 $ return ()
     readAck "clearPath"
 
-enqueuePoints :: MonadIO m => V.Vector (Stage Word16) -> TrackerT m Bool
+enqueuePoints :: MonadIO m => V.Vector (Stage Word16) -> TrackerT m (Maybe Bool)
 enqueuePoints points 
-  | V.length points > maxPathPoints = return False
+  | V.length points > maxPathPoints = return Nothing
   | otherwise = do
       writeCommand 0x41 $ do
           putWord8 $ fromIntegral $ V.length points
           mapM_ (mapM_ putWord16le) points
-      maybe False (const True) `liftM` readReply
+      r <- readReply
+      case r of 
+        Nothing                     -> return Nothing
+        Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
+        otherwise                   -> return Nothing
 
 startPath :: MonadIO m => Word32 -> TrackerT m ()
 startPath freq = do
