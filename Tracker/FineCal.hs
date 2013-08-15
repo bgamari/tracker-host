@@ -1,6 +1,9 @@
 {-# LANGUAGE TemplateHaskell, RankNTypes #-}                
 
-module Tracker.FineCal (fineCal) where
+module Tracker.FineCal ( fineCal
+                       , FineScan(..)
+                       , fineScanRange, fineScanCenter, fineScanPoints, fineScanFreq
+                       ) where
 
 import Data.Traversable as T
 import Control.Applicative
@@ -18,13 +21,13 @@ import Tracker.Types
 import Tracker.Monad
 import Tracker.PathAcquire
 
-data FineCal = FineCal { _fineScanRange   :: Stage Word16
-                       , _fineScanCenter  :: Stage Word16
-                       , _fineScanPoints  :: Int
-                       , _fineScanFreq    :: Word32
-                       }
-             deriving (Show)
-makeLenses ''FineCal
+data FineScan = FineScan { _fineScanRange   :: Stage Word16
+                         , _fineScanCenter  :: Stage Word16
+                         , _fineScanPoints  :: Int
+                         , _fineScanFreq    :: Word32
+                         }
+              deriving (Show)
+makeLenses ''FineScan
 
 isoMatrix :: (Element a)
           => f a -> [ReifiedLens' (f a) a]
@@ -68,17 +71,17 @@ thinSvd' xs =
     in feedbackGainsFromMatrix $ LA.linearSolveLS stages psds
     
 fineCal :: (Applicative m, MonadIO m)
-        => FineCal -> TrackerT m (Psd (Stage Double))
-fineCal fineCal = do
-    points <- fineScan fineCal
+        => FineScan -> TrackerT m (Psd (Stage Double))
+fineCal fs = do
+    points <- fineScan fs
     let ps' = fmap (fmap (realToFrac)) points
               :: V.Vector (Sensors Double)
     return $ thinSvd' ps'
    
 fineScan :: (Applicative m, MonadIO m)
-         => FineCal -> TrackerT m (V.Vector (Sensors Int16))
-fineScan fineCal = do
+         => FineScan -> TrackerT m (V.Vector (Sensors Int16))
+fineScan fs = do
     path <- liftIO $ withSystemRandom $ asGenIO $ \mwc->do
         let point = T.sequence $ pure (uniform mwc)
-        replicateM (fineCal ^. fineScanPoints) (Stage <$> point)
-    pathAcquire (fineCal^.fineScanFreq) path
+        replicateM (fs ^. fineScanPoints) (Stage <$> point)
+    pathAcquire (fs^.fineScanFreq) path
