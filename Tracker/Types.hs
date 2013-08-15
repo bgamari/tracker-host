@@ -51,7 +51,7 @@ newtype Psd a = Psd {unPsd :: V2 a}
 data Sensors a = Sensors { _stage :: !(Stage a)
                          , _psd   :: !(Psd (SumDiff a))
                          }
-               deriving (Show)
+               deriving (Show, Functor)
 makeLenses ''Sensors
 
 sumDiffDiode :: Num a => Iso' (SumDiff a) (Diode a)
