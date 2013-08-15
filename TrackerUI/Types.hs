@@ -12,12 +12,15 @@ import Control.Lens
 import Linear
 
 import qualified Tracker as T
-import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample, RasterScan(..))
+import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
+               , RasterScan(..), FineScan(..))
 
 data TrackerState
     = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
-                   , _roughScan      :: T.RasterScan Stage Word16
+                   , _roughScan      :: RasterScan Stage Word16
+                   , _fineScan       :: FineScan
+                   , _feedbackGains  :: Psd (Stage Double)
                    }
 makeLenses ''TrackerState
            
@@ -29,6 +32,12 @@ defaultTrackerState =
                                                , _scanSize   = pure 0x1000
                                                , _scanPoints = Stage $ V3 20 20 2
                                                }
+                 , _fineScan      = FineScan { _fineScanRange  = pure 0x500
+                                             , _fineScanCenter = pure 0x7fff
+                                             , _fineScanPoints = 500
+                                             , _fineScanFreq   = 1000
+                                             }
+                 , _feedbackGains = pure $ pure 0
                  }
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)

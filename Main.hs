@@ -53,6 +53,14 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
                           $ unlines $ map (show . (^. T.stage)) $ V.toList s
   where help = "Dump last rough calibration"
 
+fineCalCmd :: Command
+fineCalCmd = command "fine-cal" help "" $ \args->do
+    fs <- use fineScan
+    gains <- liftTracker $ T.fineCal fs
+    feedbackGains .= gains
+    return ()
+  where help = "Perform fine calibration"
+  
 helpCmd :: Command
 helpCmd = command "help" help "[CMD]" $ \args->
     let cmdFilter :: [Command] -> [Command]
