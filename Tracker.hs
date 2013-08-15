@@ -16,6 +16,8 @@ module Tracker
     , module Tracker.Sensors
       -- * Rough feedback calibration
     , module Tracker.RoughCal
+      -- * Fine feedback calibration
+    , module Tracker.FineCal
     ) where
 
 import Tracker.Monad
