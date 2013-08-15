@@ -1,0 +1,13 @@
+# tracker-host
+
+Host software for 
+
+## Installation
+
+    $ sudo apt-get install libgsl0-dev libncurses5-dev liblapack-dev
+    $ sudo apt-get install ghc cabal
+    $ git clone git://github.com/bgamari/tracker-host
+    $ cd tracker-host
+    $ cabal update
+    $ cabal install
+
