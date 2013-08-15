@@ -29,4 +29,5 @@ executable tracker-host
                        mtl ==2.1.*,
                        lens ==3.9.*,
                        distributive ==0.3.*,
-                       mwc-random ==0.12.*
+                       mwc-random ==0.12.*,
+                       hmatrix
