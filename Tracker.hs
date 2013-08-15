@@ -24,6 +24,7 @@ import Tracker.Commands
 import Tracker.Raster
 import Tracker.Sensors
 import Tracker.RoughCal
+import Tracker.FineCal
 import Tracker.LowLevel (withTracker)
 
 
