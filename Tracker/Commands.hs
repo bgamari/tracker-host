@@ -99,7 +99,7 @@ data FeedbackMode = NoFeedback
 
 setFeedbackMode :: MonadIO m => FeedbackMode -> TrackerT m ()
 setFeedbackMode mode = do
-    writeCommand 0x30 $ putWord32le (fromIntegral $ fromEnum mode)
+    writeCommand 0x31 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck "setFeedbackMode"
 
 maxPathPoints = 80 :: Int
