@@ -37,6 +37,13 @@ helloCmd = command "hello" help ""
     $ const $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
 
+setRawPositionCmd :: Command
+setRawPositionCmd = command "set-pos" help "" $ \args->
+    case args of 
+      x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from stageTuple
+      otherwise                       -> liftInputT $ outputStrLn "expected position"
+  where help = "Set raw stage position"
+  
 roughCalCmd :: Command
 roughCalCmd = command "rough-cal" help "" $ \args->do
     rs <- use roughScan
@@ -100,12 +107,15 @@ helpCmd = command "help" help "[CMD]" $ \args->
 stageTuple :: Iso' (Stage a) (a,a,a)
 stageTuple = iso (\(Stage (V3 x y z))->(x,y,z)) (\(x,y,z)->Stage $ V3 x y z)
 
-readParse :: Read a => [String] -> Maybe a
-readParse [] = Nothing
-readParse (a:_) =
+readMaybe :: Read a => String -> Maybe a
+readMaybe a =          
     case reads a of
       []           -> Nothing
       (value,_):_  -> Just value
+
+readParse :: Read a => [String] -> Maybe a
+readParse [] = Nothing
+readParse (a:_) = readMaybe a
 
 setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
         -> Lens' TrackerState a -> [Command]
@@ -136,6 +146,7 @@ settings = concat
 
 commands :: [Command]
 commands = [ helloCmd
+           , setRawPositionCmd
            , roughCalCmd
            , dumpRoughCmd
            , fineCalCmd
