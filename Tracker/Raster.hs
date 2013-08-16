@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, StandaloneDeriving, FlexibleContexts #-}
 
 module Tracker.Raster ( RasterScan(..)
                       , scanStart, scanEnd, scanCenter, scanSize, scanPoints
@@ -17,6 +17,7 @@ data RasterScan f a = RasterScan { _scanCenter :: f a
                                  , _scanSize   :: f a
                                  , _scanPoints :: f Int
                                  }
+deriving instance (Show (f a), Show (f Int)) => Show (RasterScan f a)
 makeLenses ''RasterScan
 
 instance Functor f => Functor (RasterScan f) where
