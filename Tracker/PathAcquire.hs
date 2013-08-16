@@ -22,6 +22,9 @@ batchBy n xs = batch : batchBy n rest
 
 pathAcquire :: MonadIO m => Word32 -> [Stage Word16]
             -> TrackerT m (V.Vector (Sensors Sample))
+pathAcquire _ [] = do
+    liftIO $ putStrLn "pathAcquire: Tried to acquire on empty path"
+    return V.empty
 pathAcquire freq path = do
     setFeedbackMode NoFeedback
     setAdcTriggerMode TriggerOff
@@ -44,6 +47,7 @@ queuePoints points = go
                   Nothing      -> liftIO (threadDelay 10000) >> go
 
 primePath :: MonadIO m => [[Stage Word16]] -> TrackerT m [[Stage Word16]]
+primePath [] = return []
 primePath (points:rest) = do
     r <- enqueuePoints $ V.fromList points
     case r of
