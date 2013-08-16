@@ -62,7 +62,9 @@ psdsToMatrix v = LA.buildMatrix (V.length v) 4 f
           where x = v V.! i
 
 feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (Stage a)
-feedbackGainsFromMatrix = undefined
+feedbackGainsFromMatrix m =
+    Psd $ V2 (Stage $ V3 (m LA.@@> (0,0)) (m LA.@@> (0,1)) (m LA.@@> (0,2)))
+        (Stage $ V3 (m LA.@@> (1,0)) (m LA.@@> (1,1)) (m LA.@@> (1,2)))
 
 thinSvd' :: (Field a, Element a) => V.Vector (Sensors a) -> Psd (Stage a)
 thinSvd' xs = 
