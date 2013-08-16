@@ -2,9 +2,12 @@
 
 module TrackerUI.Types where
 
+import Data.List (isPrefixOf, stripPrefix)
+import Data.Maybe (mapMaybe)
 import Data.Word
 import Control.Monad.State
 import Control.Applicative
+import Debug.Trace
 
 import qualified Data.Vector as V
 import System.Console.Haskeline
@@ -50,13 +53,38 @@ liftInputT = TUI . lift
 liftTracker :: TrackerT IO a -> TrackerUI a
 liftTracker = TUI . lift . lift
 
-runTrackerUI :: TrackerUI a -> IO (Either String a)
-runTrackerUI (TUI a) =
-    T.withTracker $ runInputT defaultSettings $ evalStateT a defaultTrackerState
-
 data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: String
                    , _cmdArgs   :: String
                    , _cmdAction :: [String] -> TrackerUI Bool
                    }
 makeLenses ''Command
+
+completeCommand :: MonadIO m => [Command] -> CompletionFunc m
+completeCommand commands (left, right) = do
+    let tokens = words (reverse left)++if ' ' == head left then [""] else []
+    return (left, completions [(c^.cmdName, c) | c <- commands] tokens)
+  where completions :: [([String], Command)] -> [String] -> [Completion]
+        completions cmds [] = [ Completion (c ^. _1 . _head) "" True | c <- cmds ]
+        completions cmds [token] =
+            let matching = mapMaybe (\c->case stripPrefix token (c ^. _1 . _head) of
+                                           Just x   -> Just $ c & _1 . _head .~ x
+                                           Nothing  -> Nothing
+                                    )
+                         $ filter (\c->not $ c ^. _1 . to null)
+                         $ cmds
+            in [ Completion (c ^. _1 . _head) "" True | c <- matching ]
+        completions cmds (token:tokens) =
+            let matching = filter (\c->token == (c ^. _1 . _head))
+                         $ filter (\c->not $ c ^. _1 . to null)
+                         $ cmds
+            in completions (matching & mapped . _1 %~ tail) tokens
+    
+runTrackerUI :: [Command] -> TrackerUI a -> IO (Either String a)
+runTrackerUI commands (TUI a) =
+    T.withTracker $ runInputT settings $ evalStateT a defaultTrackerState
+  where settings = Settings { complete    = completeCommand commands
+                            , historyFile = Just "~/.tracker.history"
+                            , autoAddHistory = True
+                            }
+

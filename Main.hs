@@ -140,7 +140,7 @@ prompt = do
 
 main :: IO ()
 main = either error (const $ return ()) =<< go
-  where go = runTrackerUI $ do
+  where go = runTrackerUI commands $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
