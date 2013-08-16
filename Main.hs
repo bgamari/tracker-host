@@ -95,6 +95,12 @@ readSensorsCmd = command "read-sensors" help "" $ \args->do
     liftTracker $ T.setAdcTriggerMode T.TriggerOff
   where help = "Read sensors values"
   
+resetCmd :: Command
+resetCmd = command "reset" help "" $ \args->do
+    liftTracker $ T.reset
+    -- TODO: Quit or reconnect
+  where help = "Perform hardware reset"
+  
 helpCmd :: Command
 helpCmd = command "help" help "[CMD]" $ \args->
     let cmdFilter :: [Command] -> [Command]
@@ -159,6 +165,7 @@ commands = [ helloCmd
            , dumpRoughCmd
            , fineCalCmd
            , readSensorsCmd
+           , resetCmd
            , exitCmd
            , helpCmd
            ] ++ settings
