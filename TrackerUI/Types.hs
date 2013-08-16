@@ -7,7 +7,6 @@ import Data.Maybe (mapMaybe)
 import Data.Word
 import Control.Monad.State
 import Control.Applicative
-import Debug.Trace
 
 import qualified Data.Vector as V
 import System.Console.Haskeline
