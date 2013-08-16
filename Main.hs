@@ -43,7 +43,13 @@ setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->
       x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from stageTuple
       otherwise                       -> liftInputT $ outputStrLn "expected position"
   where help = "Set raw stage position"
-  
+
+centerCmd :: Command
+centerCmd = command "center" help "" $ \args->
+    liftTracker $ T.setRawPosition $ Stage $ V3 c c c
+  where c = 0xffff `div` 2
+        help = "Set stage at center position"
+
 roughCalCmd :: Command
 roughCalCmd = command "rough-cal" help "" $ \args->do
     rs <- use roughScan
@@ -146,6 +152,7 @@ settings = concat
 
 commands :: [Command]
 commands = [ helloCmd
+           , centerCmd
            , setRawPositionCmd
            , roughCalCmd
            , dumpRoughCmd
