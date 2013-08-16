@@ -64,8 +64,9 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     scan <- use lastRoughCal
     case scan of
         Nothing -> liftInputT $ outputStrLn "No rough calibration done."
-        Just s  -> liftIO $ writeFile fname
-                          $ unlines $ map showSensors $ V.toList s
+        Just s  -> do liftIO $ writeFile fname
+                             $ unlines $ map showSensors $ V.toList s
+                      liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
         showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
                                            (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
