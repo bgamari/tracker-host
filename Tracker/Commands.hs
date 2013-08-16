@@ -32,6 +32,9 @@ echo payload = do
     parseReply $ do length <- getWord8
                     getByteString $ fromIntegral length
 
+reset :: MonadIO m => TrackerT m ()
+reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
+
 setStageGains :: MonadIO m => Stage (Stage Int32) -> TrackerT m ()
 setStageGains gains = do
     writeCommand 0x10 $ mapM_ (mapM_ putInt32le) gains
