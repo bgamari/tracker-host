@@ -8,6 +8,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
+import Numeric
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -61,6 +62,10 @@ fineCalCmd = command "fine-cal" help "" $ \args->do
     fs <- use fineScan
     gains <- liftTracker $ T.fineCal fs
     feedbackGains .= gains
+    let showF = showSigned (showEFloat (Just 2)) 1
+    liftIO $ putStrLn "Feedback gains = "
+    liftIO $ putStrLn $ unlines $ F.toList
+           $ fmap (F.foldMap (\x->showF x "\t")) gains
     return ()
   where help = "Perform fine calibration"
   
