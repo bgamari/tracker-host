@@ -121,6 +121,7 @@ commands :: [Command]
 commands = [ helloCmd
            , roughCalCmd
            , dumpRoughCmd
+           , fineCalCmd
            , exitCmd
            , helpCmd
            ] ++ settings
