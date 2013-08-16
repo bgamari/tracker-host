@@ -38,7 +38,7 @@ helloCmd = command "hello" help ""
   where help = "Print hello world!"
 
 setRawPositionCmd :: Command
-setRawPositionCmd = command "set-pos" help "" $ \args->
+setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->
     case args of 
       x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from stageTuple
       otherwise                       -> liftInputT $ outputStrLn "expected position"
