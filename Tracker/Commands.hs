@@ -102,6 +102,10 @@ setFeedbackMode mode = do
     writeCommand 0x31 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck "setFeedbackMode"
 
+setRawPosition :: MonadIO m => Stage Word16 -> TrackerT m ()
+setRawPosition pos = do
+    writeCommand 0x32 $ mapM_ putWord16le pos
+
 maxPathPoints = 80 :: Int
 
 clearPath :: MonadIO m => TrackerT m ()
