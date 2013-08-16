@@ -64,15 +64,15 @@ completeCommand commands (left, right) = do
     let tokens = words (reverse left)++if ' ' == head left then [""] else []
     return (left, completions [(c^.cmdName, c) | c <- commands] tokens)
   where completions :: [([String], Command)] -> [String] -> [Completion]
-        completions cmds [] = [ Completion (c ^. _1 . _head) "" True | c <- cmds ]
+        completions cmds [] = [ Completion (c ^. _1 . _head) (c ^. _1 . _head) True | c <- cmds ]
         completions cmds [token] =
             let matching = mapMaybe (\c->case stripPrefix token (c ^. _1 . _head) of
-                                           Just x   -> Just $ c & _1 . _head .~ x
+                                           Just x   -> Just $ c & _1 .~ (x, c ^. _1 . _head)
                                            Nothing  -> Nothing
                                     )
                          $ filter (\c->not $ c ^. _1 . to null)
                          $ cmds
-            in [ Completion (c ^. _1 . _head) "" True | c <- matching ]
+            in [ Completion (c ^. _1 . _1) (c ^. _1 . _2) True | c <- matching ]
         completions cmds (token:tokens) =
             let matching = filter (\c->token == (c ^. _1 . _head))
                          $ filter (\c->not $ c ^. _1 . to null)
