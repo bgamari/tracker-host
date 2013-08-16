@@ -69,6 +69,18 @@ fineCalCmd = command "fine-cal" help "" $ \args->do
     return ()
   where help = "Perform fine calibration"
   
+readSensorsCmd :: Command
+readSensorsCmd = command "read-sensors" help "" $ \args->do
+    liftTracker $ T.setAdcTriggerMode T.TriggerAuto
+    let printSensors s = putStr $ unlines 
+            [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
+            , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
+            ]
+          where showSInt = showSigned showInt 0
+    liftTracker $ T.adcAcquire $ \s->liftIO (printSensors s) >> return False
+    liftTracker $ T.setAdcTriggerMode T.TriggerOff
+  where help = "Read sensors values"
+  
 helpCmd :: Command
 helpCmd = command "help" help "[CMD]" $ \args->
     let cmdFilter :: [Command] -> [Command]
@@ -127,6 +139,7 @@ commands = [ helloCmd
            , roughCalCmd
            , dumpRoughCmd
            , fineCalCmd
+           , readSensorsCmd
            , exitCmd
            , helpCmd
            ] ++ settings
