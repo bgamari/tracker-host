@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, PatternGuards, RankNTypes #-}
 
+import qualified Data.Foldable as F
 import Data.Maybe
 import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Monad
@@ -50,8 +51,10 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     case scan of
         Nothing -> liftInputT $ outputStrLn "No rough calibration done."
         Just s  -> liftIO $ writeFile fname
-                          $ unlines $ map (show . (^. T.stage)) $ V.toList s
+                          $ unlines $ map showSensors $ V.toList s
   where help = "Dump last rough calibration"
+        showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
+                                           (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 fineCalCmd :: Command
 fineCalCmd = command "fine-cal" help "" $ \args->do
