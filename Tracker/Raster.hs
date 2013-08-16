@@ -39,7 +39,7 @@ instance Applicative FlipList where
       where FList rest = FList fs <*> FList (reverse xs)
 
 rasterScan' :: (Traversable f) => f Int -> [f Int]
-rasterScan' = getFlipList . traverse (\n->FList [0..n-1])
+rasterScan' = getFlipList . traverse (\n->FList [0..n])
 
 rasterScan :: (RealFrac a, Additive f, Applicative f, Traversable f)
            => RasterScan f a -> [f a]
