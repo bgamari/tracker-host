@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, StandaloneDeriving, FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, StandaloneDeriving, FlexibleContexts, RankNTypes #-}
 
 module Tracker.Raster ( RasterScan(..)
                       , scanStart, scanEnd, scanCenter, scanSize, scanPoints
@@ -43,14 +43,15 @@ instance Monad FlipList where
     FList xs >>= k  = FList $ foldr (\(f,a) l->l ++ f (getFlipList $ k a)) []
                             $ zip (cycle [id,reverse]) xs
 
-rasterScan' :: (Traversable f) => f Int -> [f Int]
-rasterScan' = getFlipList . traverse (\n->FList [0..n])
+rasterScan' :: (Functor f)
+            => (forall t a. Applicative t => f (t a) -> t (f a)) -> f Int -> [f Int]
+rasterScan' sequence = getFlipList . sequence . fmap (\n->FList [0..n])
 
-rasterScan :: (RealFrac a, Additive f, Applicative f, Traversable f)
-           => RasterScan f a -> [f a]
-rasterScan s =
+rasterScan :: (RealFrac a, Additive f, Applicative f)
+           => (forall t a. Applicative t => f (t a) -> t (f a)) -> RasterScan f a -> [f a]
+rasterScan sequenceA s =
     map (\n->s^.scanStart ^+^ ((*) <$> step <*> fmap realToFrac n))
-    $ rasterScan' $ s^.scanPoints
+    $ rasterScan' sequenceA $ s^.scanPoints
   where step = (/) <$> s^.scanSize <*> fmap realToFrac (s^.scanPoints)
 
 rasterSine :: (RealFloat a, Foldable f, Applicative f)

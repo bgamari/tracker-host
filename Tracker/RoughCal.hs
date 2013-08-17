@@ -27,7 +27,8 @@ roughScan :: MonadIO m
           => Word32 -> RasterScan Stage Word16 -> TrackerT m (V.Vector (Sensors Sample))
 roughScan freq s =
     let s' = fmap realToFrac s :: RasterScan Stage Double
-        path = map (fmap round) $ rasterScan s'
+        path = map (fmap round) $ rasterScan sequenceStage s'
+        sequenceStage s = (\x y z->Stage $ V3 x y z) <$> (s ^. _z) <*> (s ^. _x)  <*> (s ^. _y)
         --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
