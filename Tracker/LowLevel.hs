@@ -72,7 +72,7 @@ debugOut _ = return ()
 writeCommand :: MonadIO m => Word8 -> Put -> TrackerT m ()
 writeCommand cmd payload = withDeviceIO $ \h->do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
-    debugOut $ "   > "++showByteString (BS.take 16 frame)
+    debugOut $ "   > "++showByteString (BS.take 200 frame)
     (size, status) <- liftIO $ writeBulk h cmdOutEndpt frame cmdTimeout
     case status of
         TimedOut  -> error "Command write timed out"
@@ -81,7 +81,7 @@ writeCommand cmd payload = withDeviceIO $ \h->do
 readReply :: MonadIO m => TrackerT m (Maybe ByteString)
 readReply = withDeviceIO $ \h->do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
-    debugOut $ "   < "++showByteString (BS.take 4 d)
+    debugOut $ "   < "++showByteString (BS.take 32 d)
     let cmd = BS.head d
         statusCode = BS.head $ BS.drop 1 d
     case status of
@@ -108,7 +108,7 @@ parseReply parser = do
 readData :: MonadIO m => TrackerT m (Maybe ByteString)
 readData = withDeviceIO $ \h->do
     (d, status) <- readBulk h dataInEndpt 512 dataTimeout
-    debugOut $ "   % "++showByteString (BS.take 16 d)
+    debugOut $ "   % "++showByteString (BS.take 32 d)
     case status of
         TimedOut  -> return Nothing
         Completed -> return $ Just d
