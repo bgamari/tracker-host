@@ -6,7 +6,7 @@ module Tracker.Raster ( RasterScan(..)
                       , rasterSine
                       ) where
 
-import Prelude hiding (maximum, any)
+import Prelude hiding (maximum, any, foldr)
 import Control.Applicative
 import Data.Traversable
 import Data.Foldable
@@ -38,6 +38,11 @@ instance Applicative FlipList where
     FList (f:fs) <*> FList xs = FList $ map f xs ++ rest
       where FList rest = FList fs <*> FList (reverse xs)
 
+instance Monad FlipList where
+    return x = FList [x]
+    FList xs >>= k  = FList $ foldr (\(f,a) l->l ++ f (getFlipList $ k a)) []
+                            $ zip (cycle [id,reverse]) xs
+
 rasterScan' :: (Traversable f) => f Int -> [f Int]
 rasterScan' = getFlipList . traverse (\n->FList [0..n])
 
@@ -54,3 +59,4 @@ rasterSine center amp period n =
     map (\i->f $ realToFrac i / realToFrac n * t) [0..n-1]
   where t = maximum period
         f t = (\c a p->c + a/2 * sin (2*pi*t/p)) <$> center <*> amp <*> period
+
