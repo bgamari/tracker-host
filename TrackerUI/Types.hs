@@ -53,7 +53,7 @@ liftTracker :: TrackerT IO a -> TrackerUI a
 liftTracker = TUI . lift . lift
 
 data Command = Cmd { _cmdName   :: [String]
-                   , _cmdHelp   :: String
+                   , _cmdHelp   :: Maybe String
                    , _cmdArgs   :: String
                    , _cmdAction :: [String] -> TrackerUI Bool
                    }

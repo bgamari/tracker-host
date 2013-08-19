@@ -27,10 +27,10 @@ unitStageGains :: Stage (Stage Int32)
 unitStageGains = kronecker $ Stage $ V3 1 1 1
 
 command :: String -> String -> String -> ([String] -> TrackerUI ()) -> Command
-command name help args action = Cmd [name] help args (\a->action a >> return True)
+command name help args action = Cmd [name] (Just help) args (\a->action a >> return True)
 
 exitCmd :: Command
-exitCmd = Cmd ["exit"] "Exit the program" "" $ const $ return False
+exitCmd = Cmd ["exit"] (Just "Exit the program") "" $ const $ return False
 
 helloCmd :: Command
 helloCmd = command "hello" help ""
@@ -108,13 +108,14 @@ helpCmd = command "help" help "[CMD]" $ \args->
                       [] -> id
                       _  -> filter (\c->(c^.cmdName) `isPrefixOf` args)
         cmds = cmdFilter commands
-        formatCmd :: Command -> String
-        formatCmd c = take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ')
-                      ++ c^.cmdHelp
+        formatCmd :: Command -> Maybe String
+        formatCmd c = case c ^. cmdHelp of 
+                         Just help -> Just $ take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ') ++ help
+                         Nothing   -> Nothing
     in liftInputT $ outputStr
        $ case cmds of
            []  -> "No matching commands\n"
-           _   -> unlines $ map formatCmd cmds
+           _   -> unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
 
 stage :: Iso' (Stage a) (V3 a)
@@ -133,12 +134,12 @@ readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
 readParse (a:_) = readMaybe a
 
-setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
-        -> Lens' TrackerState a -> [Command]
-setting name help parse format l = [getter, setter]
-  where getter = Cmd ["get",name] ("Get "++help) "" $ \args->
+setting' :: String -> Maybe String -> ([String] -> Maybe a) -> (a -> String)
+         -> Lens' TrackerState a -> [Command]
+setting' name help parse format l = [getter, setter]
+  where getter = Cmd ["get",name] (("Get "++) <$> help) "" $ \args->
                    use l >>= showValue >> return True
-        setter = Cmd ["set",name] ("Set "++help) "VALUE" $ \args->
+        setter = Cmd ["set",name] (("Set "++) <$> help) "VALUE" $ \args->
                    case parse args of
                      Just value -> do l .= value
                                       showValue value
@@ -148,12 +149,16 @@ setting name help parse format l = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
+setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
+        -> Lens' TrackerState a -> [Command]
+setting name help parse format l = setting' name (Just help) parse format l
+
 r3Setting :: (Show a, Read a) => String -> String -> Lens' TrackerState (V3 a) -> [Command]
 r3Setting name help l =
-       setting name help readParse show (l . v3Tuple)
-    ++ setting (name++".x") "" readParse show (l . _x)
-    ++ setting (name++".y") "" readParse show (l . _y)
-    ++ setting (name++".z") "" readParse show (l . _z)
+       setting' name         (Just help) readParse show (l . v3Tuple)
+    ++ setting' (name++".x") Nothing     readParse show (l . _x)
+    ++ setting' (name++".y") Nothing     readParse show (l . _y)
+    ++ setting' (name++".z") Nothing     readParse show (l . _z)
 
 settings :: [Command] 
 settings = concat 
