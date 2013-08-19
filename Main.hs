@@ -40,7 +40,7 @@ helloCmd = command "hello" help ""
 setRawPositionCmd :: Command
 setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->
     case args of 
-      x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from stageTuple
+      x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from (stage . v3Tuple)
       otherwise                       -> liftInputT $ outputStrLn "expected position"
   where help = "Set raw stage position"
 
@@ -117,8 +117,11 @@ helpCmd = command "help" help "[CMD]" $ \args->
            _   -> unlines $ map formatCmd cmds
   where help = "Display help message"
 
-stageTuple :: Iso' (Stage a) (a,a,a)
-stageTuple = iso (\(Stage (V3 x y z))->(x,y,z)) (\(x,y,z)->Stage $ V3 x y z)
+stage :: Iso' (Stage a) (V3 a)
+stage = iso (\(Stage v)->v) Stage
+
+v3Tuple :: Iso' (V3 a) (a,a,a)
+v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
 
 readMaybe :: Read a => String -> Maybe a
 readMaybe a =          
@@ -145,14 +148,21 @@ setting name help parse format l = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
+r3Setting :: (Show a, Read a) => String -> String -> Lens' TrackerState (V3 a) -> [Command]
+r3Setting name help l =
+       setting name help readParse show (l . v3Tuple)
+    ++ setting (name++".x") "" readParse show (l . _x)
+    ++ setting (name++".y") "" readParse show (l . _y)
+    ++ setting (name++".z") "" readParse show (l . _z)
+
 settings :: [Command] 
 settings = concat 
-    [ setting "rough.size" "rough calibration field size in code-points"
-            readParse show (roughScan . T.scanSize . stageTuple)   
-    , setting "rough.center" "rough calibration field center in code-points"
-            readParse show (roughScan . T.scanCenter . stageTuple)
-    , setting "rough.points" "number of points in rough calibration scan"
-            readParse show (roughScan . T.scanPoints . stageTuple)
+    [ r3Setting "rough.size" "rough calibration field size in code-points"
+            (roughScan . T.scanSize . stage)
+    , r3Setting "rough.center" "rough calibration field center in code-points"
+            (roughScan . T.scanCenter . stage)
+    , r3Setting "rough.points" "number of points in rough calibration scan"
+            (roughScan . T.scanPoints . stage)
     , setting "rough.freq" "update frequency of rough calibration scan"
             readParse show roughScanFreq
     ]
