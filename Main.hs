@@ -9,6 +9,7 @@ import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
 import Numeric
+import Control.Concurrent.STM
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -86,13 +87,13 @@ fineCalCmd = command "fine-cal" help "" $ \args->do
 readSensorsCmd :: Command
 readSensorsCmd = command "read-sensors" help "" $ \args->do
     liftTracker $ T.setAdcTriggerMode T.TriggerAuto
-    let printSensors s = putStr $ unlines 
+    let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
             ]
           where showSInt = showSigned showInt 0
-    -- FIXME
-    --liftTracker $ T.adcAcquire $ \s->liftIO (printSensors s) >> return False
+    s <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
+    liftInputT $ outputStr $ showSensors $ V.head s
     liftTracker $ T.setAdcTriggerMode T.TriggerOff
   where help = "Read sensors values"
   
