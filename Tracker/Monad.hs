@@ -13,6 +13,7 @@ module Tracker.Monad ( TrackerT
                      , MonadIO, liftIO
                      ) where
 
+import Control.Monad.Morph
 import Control.Monad.Reader
 import Control.Monad.IO.Class
 import Control.Applicative
@@ -72,3 +73,6 @@ liftThrough :: MonadIO m => (IO a -> IO b) -> TrackerT IO a -> TrackerT m b
 liftThrough f (TrackerT a) = TrackerT $ do
     r <- ask
     liftIO $ f $ runReaderT a r
+    
+instance MFunctor TrackerT where
+    hoist f (TrackerT m) = TrackerT $ ReaderT $ \r->f $ runReaderT m r

@@ -24,6 +24,7 @@ executable tracker-host
                        vector ==0.10.*,
                        bytestring ==0.10.*,
                        linear ==1.1.*,
+                       mmorph,
                        haskeline ==0.7.*,
                        async ==2.0.*,
                        usb ==1.2.*,
