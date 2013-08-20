@@ -16,7 +16,7 @@ cabal-version:       >=1.8
 
 executable tracker-host
   main-is:             Main.hs
-  -- other-modules:       
+  ghc-options:         -threaded
   build-depends:       base ==4.6.*,
                        transformers ==0.3.*,
                        binary ==0.7.*,
