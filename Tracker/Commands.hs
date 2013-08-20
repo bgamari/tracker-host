@@ -132,7 +132,11 @@ enqueuePoints points
         otherwise                   -> return Nothing
 
 isPathRunning :: MonadIO m => TrackerT m Bool
-isPathRunning = fromJust (error "Unexpected nack") `liftM` enqueuePoints V.empty
+isPathRunning = do
+    s <- enqueuePoints V.empty
+    case s of
+      Just a  -> return a
+      Nothing -> error "isPathRunning: Unexpected nack"
 
 startPath :: MonadIO m => Word32 -> Bool -> TrackerT m ()
 startPath freq syncAdc = do
