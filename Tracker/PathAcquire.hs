@@ -5,13 +5,11 @@ import Control.Monad (when, liftM)
 import Data.Maybe (fromMaybe)
 import Data.Word
 import qualified Data.Vector as V
-import Control.Concurrent.Async
 import Control.Concurrent (threadDelay)
+import Control.Concurrent.STM (TChan, STM, atomically, tryReadTChan)
 import Linear
 
 import Tracker.LowLevel
-import Tracker.Sensors
-import Tracker.Monad
 import Tracker.Commands
 import Tracker.Types
 
@@ -31,13 +29,24 @@ pathAcquire freq path = do
     clearPath
     -- First fill up path queue
     points <- primePath $ batchBy maxPathPoints path
-    startAdcStream
     startPath freq False
-    framesAsync <- liftThrough async $ readFrames []
+    queue <- getSensorQueue
     mapM_ queuePoints $ points
-    frames <- liftIO $ wait framesAsync
-    stopAdcStream
+    waitUntilPathFinished
+    frames <- V.concat `liftM` liftIO (atomically $ readAllTChan queue)
     return frames
+
+waitUntilPathFinished :: MonadIO m => TrackerT m ()
+waitUntilPathFinished = do
+    done <- isPathRunning
+    when (not done) $ liftIO (threadDelay 10000) >> waitUntilPathFinished
+
+readAllTChan :: TChan a -> STM [a]
+readAllTChan c = go []
+  where go xs = do a <- tryReadTChan c
+                   case a of
+                     Just x  -> go (x:xs)
+                     Nothing -> return $ reverse xs
 
 queuePoints :: MonadIO m => [Stage Word16] -> TrackerT m Bool
 queuePoints points = go
@@ -55,10 +64,3 @@ primePath (points:rest) = do
                                  else primePath rest
       Nothing      -> return rest
 
-readFrames :: [V.Vector (Sensors Sample)]
-           -> TrackerT IO (V.Vector (Sensors Sample))
-readFrames accum = do
-    d <- readData
-    case d of
-        Just d' -> readFrames (parseFrames d' : accum)
-        Nothing -> return $ V.concat (reverse accum)

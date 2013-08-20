@@ -18,7 +18,7 @@ import System.Random.MWC
 import Numeric.LinearAlgebra as LA
 
 import Tracker.Types
-import Tracker.Monad
+import Tracker.LowLevel
 import Tracker.PathAcquire
 
 data FineScan = FineScan { _fineScanRange   :: Stage Word16

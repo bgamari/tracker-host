@@ -1,14 +1,29 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFoldable, DeriveFunctor, DeriveTraversable, TemplateHaskell #-}
 
-module Tracker.Types where
+module Tracker.Types ( Sample
+                     , Stage(..)
+                       -- * Modelling position sensitive photodiode
+                     , SumDiff(SumDiff)
+                     , sdSum, sdDiff
+                     , Diode(Diode)
+                     , anode, cathode
+                     , Psd(Psd, unPsd)
+                     , sumDiffDiode
+                       -- * Sensor inputs
+                     , Sensors(Sensors)
+                     , stage, psd
+                       -- * Convenient re-exports
+                     , MonadIO, liftIO
+                     ) where
        
 import Data.Int
 import Data.Foldable
 import Data.Traversable
-import Data.Distributive (Distributive)
 import Control.Applicative       
+import Data.Distributive (Distributive)
 import Linear       
 import Control.Lens
+import Control.Monad.IO.Class
 
 -- | An ADC sample       
 type Sample = Int16
@@ -47,7 +62,7 @@ newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
                        , Additive, Metric, R1, R2)
 
--- | This is the form we will work the samples in
+-- | Stage and PSD input
 data Sensors a = Sensors { _stage :: !(Stage a)
                          , _psd   :: !(Psd (SumDiff a))
                          }
@@ -58,3 +73,4 @@ sumDiffDiode :: Num a => Iso' (SumDiff a) (Diode a)
 sumDiffDiode = iso to from
     where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
           from (Diode an cat) = SumDiff (an - cat) (an + cat)
+    

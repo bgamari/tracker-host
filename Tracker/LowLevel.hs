@@ -1,11 +1,15 @@
+{-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving #-}
+               
 module Tracker.LowLevel
     ( TrackerT
     , withTracker
+    , getSensorQueue
     , writeCommand
     , readReply
     , parseReply
     , readAck
-    , readData
+      -- * Convenient re-exports
+    , MonadIO
     ) where
 
 import System.USB
@@ -13,7 +17,10 @@ import Control.Applicative
 import Control.Monad.IO.Class
 import Control.Monad (liftM)
 import Data.Word
+import Data.Int
+import Data.Traversable
 import Data.List (intercalate)
+import Data.Foldable (toList)
 import Data.Binary.Put
 import Data.Binary.Get
 import Data.ByteString (ByteString)
@@ -21,10 +28,38 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
 
+import Control.Monad.Morph
+import Control.Monad.Reader
+import System.Console.Haskeline.MonadException
+import Control.Monad.Trans.Class
+import Control.Concurrent.STM
+import Control.Concurrent.Async
 import Numeric
-import Data.Foldable (toList)
+import Control.Lens
+import Linear
+import Tracker.Types
 
-import Tracker.Monad
+type SensorQueue = TChan (V.Vector (Sensors Int16))
+       
+data Env = Env { _device         :: DeviceHandle
+               , _sensorQueue    :: SensorQueue
+               }
+makeLenses ''Env
+     
+newtype TrackerT m a = TrackerT {getTrackerT :: ReaderT Env m a}
+                     deriving ( Functor, Applicative, Monad , MonadIO, MonadException )
+        
+instance MonadTrans TrackerT where
+    lift = TrackerT . lift
+
+instance MFunctor TrackerT where
+    hoist f (TrackerT m) = TrackerT $ ReaderT $ \r->f $ runReaderT m r
+
+-- | This is required for async which is monomorphic in IO            
+liftThrough :: MonadIO m => (IO a -> IO b) -> TrackerT IO a -> TrackerT m b
+liftThrough f (TrackerT a) = TrackerT $ do
+    r <- ask
+    liftIO $ f $ runReaderT a r
 
 trackerVendor = 0x1d50 :: VendorId
 trackerProduct = 0x7777 :: ProductId
@@ -35,6 +70,21 @@ findDevice ctx vid pid = do
   where go :: Device -> IO Bool
         go dev = do desc <- getDeviceDesc dev
                     return $ deviceVendorId desc == vid && deviceProductId desc == pid
+
+withDevice :: Monad m => (DeviceHandle -> m a) -> TrackerT m a
+withDevice f = TrackerT (view device) >>= lift . f
+
+withDeviceIO :: MonadIO m => (DeviceHandle -> IO a) -> TrackerT m a
+withDeviceIO f = TrackerT (view device) >>= liftIO . f
+
+runTrackerT :: MonadIO m => TrackerT m a -> DeviceHandle -> m a
+runTrackerT (TrackerT m) h = do
+    queue <- liftIO $ newBroadcastTChanIO
+    let env = Env h queue
+    thread <- liftIO $ async $ runReaderT (getTrackerT sensorListen) env
+    r <- runReaderT m env
+    liftIO $ cancel thread
+    return r
 
 -- | Open the tracker device
 withTracker :: MonadIO m => TrackerT m a -> m (Either String a)
@@ -53,6 +103,32 @@ withTracker' device m = do
     a <- runTrackerT m h
     liftIO $ closeDevice h
     return a
+
+getSensorQueue :: MonadIO m => TrackerT m SensorQueue
+getSensorQueue = TrackerT (view sensorQueue) >>= liftIO . atomically . dupTChan
+    
+getInt16le :: Get Int16
+getInt16le = fromIntegral `fmap` getWord16le
+
+parseFrames :: BS.ByteString -> V.Vector (Sensors Sample)
+parseFrames a =
+    runGet (V.replicateM (BS.length a `div` 32) frame) $ BSL.fromStrict a
+  where frame = do stage <- sequenceA $ pure getInt16le :: Get (Stage Sample)
+                   xDiff <- getInt16le
+                   yDiff <- getInt16le
+                   xSum  <- getInt16le
+                   ySum  <- getInt16le
+                   _ <- getInt16le
+                   let sumDiff = Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff)
+                   return $ Sensors stage sumDiff
+
+sensorListen :: MonadIO m => TrackerT m ()
+sensorListen = forever $ do
+    d <- readData
+    queue <- TrackerT $ view sensorQueue
+    case d of
+        Just d' -> liftIO $ atomically $ writeTChan queue $ parseFrames d'
+        Nothing -> return ()
 
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out

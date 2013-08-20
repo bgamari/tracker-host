@@ -6,6 +6,7 @@ import Prelude hiding (mapM_)
 import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
+import Data.Maybe
 import Data.Word
 import Data.Int
 import Data.Traversable
@@ -14,7 +15,7 @@ import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import qualified Data.Vector as V       
 import Control.Monad (liftM)
-import Tracker.Monad
+import Control.Monad.IO.Class
 import Tracker.LowLevel
 import Tracker.Types
 import Linear
@@ -129,6 +130,9 @@ enqueuePoints points
         Nothing                     -> return Nothing
         Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
         otherwise                   -> return Nothing
+
+isPathRunning :: MonadIO m => TrackerT m Bool
+isPathRunning = fromJust (error "Unexpected nack") `liftM` enqueuePoints V.empty
 
 startPath :: MonadIO m => Word32 -> Bool -> TrackerT m ()
 startPath freq syncAdc = do

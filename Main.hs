@@ -91,7 +91,8 @@ readSensorsCmd = command "read-sensors" help "" $ \args->do
             , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
             ]
           where showSInt = showSigned showInt 0
-    liftTracker $ T.adcAcquire $ \s->liftIO (printSensors s) >> return False
+    -- FIXME
+    --liftTracker $ T.adcAcquire $ \s->liftIO (printSensors s) >> return False
     liftTracker $ T.setAdcTriggerMode T.TriggerOff
   where help = "Read sensors values"
   
@@ -205,6 +206,7 @@ main = either error (const $ return ()) =<< go
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
                            T.setAdcFreq 5000
+                           T.startAdcStream
           while $ prompt
 
 while :: Monad m => m Bool -> m ()

@@ -18,8 +18,6 @@ import Linear
 
 import Tracker.Types
 import Tracker.Raster
-import Tracker.Sensors
-import Tracker.Monad
 import Tracker.PathAcquire
 import Tracker.LowLevel
 
