@@ -20,6 +20,7 @@ executable tracker-host
   build-depends:       base ==4.6.*,
                        transformers ==0.3.*,
                        binary ==0.7.*,
+                       stm >=2.4,
                        vector ==0.10.*,
                        bytestring ==0.10.*,
                        linear ==1.1.*,
