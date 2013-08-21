@@ -14,6 +14,7 @@ import System.IO
 import Tracker.Types
 import Linear
 import Control.Applicative
+import Control.Error.Util (tryIO)
 import Control.Monad.Trans.Either
 import Control.Monad.Trans
 import Data.List (stripPrefix)
@@ -59,6 +60,9 @@ setGain pa (Ch n) (CP v) = do
     readReply pa
     
 
-open :: FilePath -> IO PreAmp
+open :: FilePath -> EitherT String IO PreAmp
 open port = do
-    PreAmp <$> hOpenSerial port defaultSerialSettings { commSpeed = CS115200 }
+    r <- runEitherT $ tryIO $ hOpenSerial port defaultSerialSettings { commSpeed = CS115200 }
+    case r of
+      Left err   -> left $ show err
+      Right a    -> return $ PreAmp a
