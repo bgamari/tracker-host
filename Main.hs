@@ -119,21 +119,36 @@ helpCmd = command "help" help "[CMD]" $ \args->
            _   -> lift $ liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
   
+openPreAmp :: Command
+openPreAmp = command "open-preamp" help "DEVICE" $ \args->do
+    device <- tryHead "expected device" args
+    pa <- PreAmp.open device
+    preAmp .= Just pa
+  where help = "Open pre-amplifier device"
+
 preAmpCmds :: [Command]
-preAmpCmds =
-    [ cmd (_x.sdSum) "xsum"
-    , cmd (_x.sdDiff) "xdiff"
-    , cmd (_y.sdSum) "ysum"
-    , cmd (_y.sdDiff) "ydiff"
-    ]
-  where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> Command
-        cmd proj name = Cmd ["set", "amp."++name++".gain"] help "[GAIN]" $ \args -> do
-            pa <- use preAmp >>= tryJust "No pre-amplifier open"
-            let ch = PreAmp.channels ^. proj
-            gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
-            PreAmp.setGain pa ch $ fromIntegral gain
-            return True
-          where help = Just "Set pre-amplifier gain"
+preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
+                    , cmd (_x.sdDiff) "xdiff"
+                    , cmd (_y.sdSum) "ysum"
+                    , cmd (_y.sdDiff) "ydiff"
+                    ]
+             ++ [ openPreAmp ]
+  where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> [Command]
+        cmd proj name = 
+            [ Cmd ["set", "amp."++name++".gain"] 
+                  (Just "Set pre-amplifier gain") "[GAIN]" $ \args -> do
+                pa <- use preAmp >>= tryJust "No pre-amplifier open"
+                gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
+                PreAmp.setGain pa ch $ fromIntegral gain
+                return True
+            , Cmd ["set", "amp."++name++".offset"] 
+                  (Just "Set pre-amplifier offset") "[OFFSET]" $ \args -> do
+                pa <- use preAmp >>= tryJust "No pre-amplifier open"
+                offset <- tryHead "expected offset" args >>= tryRead "invalid offset"
+                PreAmp.setOffset pa ch $ fromIntegral offset
+                return True
+            ]
+          where ch = PreAmp.channels ^. proj
 
 stageV3 :: Iso' (Stage a) (V3 a)
 stageV3 = iso (\(Stage v)->v) Stage
