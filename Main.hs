@@ -31,7 +31,7 @@ import PreAmp.Optimize
 unitStageGains :: Stage (Stage Int32)
 unitStageGains = kronecker $ Stage $ V3 1 1 1
 
-command :: String -> String -> String -> ([String] -> TrackerUI ()) -> Command
+command :: String -> String -> String -> ([String] -> EitherT String TrackerUI ()) -> Command
 command name help args action = Cmd [name] (Just help) args (\a->action a >> return True)
 
 exitCmd :: Command
@@ -39,24 +39,23 @@ exitCmd = Cmd ["exit"] (Just "Exit the program") "" $ const $ return False
 
 helloCmd :: Command
 helloCmd = command "hello" help ""
-    $ const $ liftInputT $ outputStrLn "hello world!"
+    $ const $ lift $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
 
 setRawPositionCmd :: Command
-setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->
-    case args of 
-      x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
-      otherwise                       -> liftInputT $ outputStrLn "expected position"
+setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->do
+    pos <- tryHead "expected position" args >>= tryRead "invalid position"
+    lift $ liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
 centerCmd :: Command
 centerCmd = command "center" help "" $ \args->
-    liftTracker $ T.setRawPosition $ Stage $ V3 c c c
+    lift $ liftTracker $ T.setRawPosition $ Stage $ V3 c c c
   where c = 0xffff `div` 2
         help = "Set stage at center position"
 
 roughCalCmd :: Command
-roughCalCmd = command "rough-cal" help "" $ \args->do
+roughCalCmd = command "rough-cal" help "" $ \args->lift $ do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTracker $ T.roughScan freq rs
@@ -66,18 +65,15 @@ roughCalCmd = command "rough-cal" help "" $ \args->do
 dumpRoughCmd :: Command
 dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
-    scan <- use lastRoughCal
-    case scan of
-        Nothing -> liftInputT $ outputStrLn "No rough calibration done."
-        Just s  -> do liftIO $ writeFile fname
-                             $ unlines $ map showSensors $ V.toList s
-                      liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
+    s <- use lastRoughCal >>= tryJust "No rough calibration."
+    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    lift $ liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
         showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
                                            (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 fineCalCmd :: Command
-fineCalCmd = command "fine-cal" help "" $ \args->do
+fineCalCmd = command "fine-cal" help "" $ \args->lift $ do
     fs <- use fineScan
     gains <- liftTracker $ T.fineCal fs
     feedbackGains .= gains
@@ -89,7 +85,7 @@ fineCalCmd = command "fine-cal" help "" $ \args->do
   where help = "Perform fine calibration"
   
 readSensorsCmd :: Command
-readSensorsCmd = command "read-sensors" help "" $ \args->do
+readSensorsCmd = command "read-sensors" help "" $ \args->lift $ do
     liftTracker $ T.setAdcTriggerMode T.TriggerAuto
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
@@ -103,7 +99,7 @@ readSensorsCmd = command "read-sensors" help "" $ \args->do
   
 resetCmd :: Command
 resetCmd = command "reset" help "" $ \args->do
-    liftTracker $ T.reset
+    lift $ liftTracker $ T.reset
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
   
@@ -118,16 +114,11 @@ helpCmd = command "help" help "[CMD]" $ \args->
         formatCmd c = case c ^. cmdHelp of 
                          Just help -> Just $ take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ') ++ help
                          Nothing   -> Nothing
-    in liftInputT $ outputStr
-       $ case cmds of
-           []  -> "No matching commands\n"
-           _   -> unlines $ mapMaybe formatCmd cmds
+    in case cmds of
+           []  -> left "No matching commands"
+           _   -> lift $ liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
   
-withPreAmp :: (PreAmp -> TrackerUI ()) -> TrackerUI ()
-withPreAmp m =
-    use preAmp >>= maybe (liftInputT $ outputStrLn "Pre-amplifier not open") m
-
 preAmpCmds :: [Command]
 preAmpCmds =
     [ cmd (_x.sdSum) "xsum"
@@ -136,16 +127,12 @@ preAmpCmds =
     , cmd (_y.sdDiff) "ydiff"
     ]
   where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> Command
-        cmd proj name = 
-            Cmd ["set", "amp."++name++".gain"] help "[GAIN]"
-            $ \args -> do
-              withPreAmp $ \pa->do
-                let ch = PreAmp.channels ^. proj
-                case args of
-                  x:_ | Just gain <- readZ x   -> void $ either error id
-                                                  <$> runEitherT (PreAmp.setGain pa ch $ fromIntegral gain)
-                  otherwise                    -> liftInputT $ outputStrLn "Invalid gain"
-              return True
+        cmd proj name = Cmd ["set", "amp."++name++".gain"] help "[GAIN]" $ \args -> do
+            pa <- use preAmp >>= tryJust "No pre-amplifier open"
+            let ch = PreAmp.channels ^. proj
+            gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
+            PreAmp.setGain pa ch $ fromIntegral gain
+            return True
           where help = Just "Set pre-amplifier gain"
 
 stageV3 :: Iso' (Stage a) (V3 a)
@@ -174,10 +161,10 @@ setting' name help parse format l = [getter, setter]
                      Just value -> do l .= value
                                       showValue value
                                       return True
-                     Nothing    -> do liftInputT $ outputStrLn
-                                                 $ "Invalid value: "++unwords args
+                     Nothing    -> do lift $ liftInputT $ outputStrLn
+                                           $ "Invalid value: "++unwords args
                                       return True
-        showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
+        showValue value = lift $ liftInputT $ outputStrLn $ name++" = "++format value 
 
 setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
         -> Lens' TrackerState a -> [Command]
@@ -221,7 +208,11 @@ prompt = do
     let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
     case cmds of
       cmd:[]  -> do let Just rest = stripPrefix (cmd^.cmdName) input
-                    cmd^.cmdAction $ rest
+                    r <- runEitherT $ cmd^.cmdAction $ rest
+                    case r of
+                      Left err   -> do liftInputT $ outputStrLn $ "error: "++err
+                                       return True
+                      Right a    -> return a
       []      -> do liftInputT $ outputStrLn $ "Unknown command: "++unwords input
                     return True
       _:_     -> do let matches = intercalate ", " $ map (\c->unwords $ c^.cmdName) cmds

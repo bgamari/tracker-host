@@ -6,6 +6,7 @@ import Data.List (isPrefixOf, stripPrefix)
 import Data.Maybe (mapMaybe)
 import Data.Word
 import Control.Monad.State
+import Control.Monad.Trans.Either
 import Control.Applicative
 
 import qualified Data.Vector as V
@@ -58,7 +59,7 @@ liftTracker = TUI . lift . lift
 data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: Maybe String
                    , _cmdArgs   :: String
-                   , _cmdAction :: [String] -> TrackerUI Bool
+                   , _cmdAction :: [String] -> EitherT String TrackerUI Bool
                    }
 makeLenses ''Command
 
