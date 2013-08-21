@@ -25,6 +25,7 @@ import Control.Lens hiding (setting)
 import qualified Tracker as T
 import Tracker.Types
 import TrackerUI.Types
+import Plot
 import PreAmp       
 import PreAmp.Optimize
 
@@ -97,6 +98,10 @@ readSensorsCmd = command "read-sensors" help "" $ \args->lift $ do
     liftTracker $ T.setAdcTriggerMode T.TriggerOff
   where help = "Read sensors values"
   
+startPlotCmd :: Command
+startPlotCmd = command "start-plot" help "" $ \args->lift $ liftTracker startPlot
+  where help = "Start plot view"
+
 resetCmd :: Command
 resetCmd = command "reset" help "" $ \args->do
     lift $ liftTracker $ T.reset
@@ -212,6 +217,7 @@ commands = [ helloCmd
            , dumpRoughCmd
            , fineCalCmd
            , readSensorsCmd
+           , startPlotCmd
            , resetCmd
            , exitCmd
            , helpCmd
