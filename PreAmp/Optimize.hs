@@ -15,7 +15,7 @@ import Control.Monad
 import qualified Data.Vector as V
 
 -- | A lens that focuses on a PSD channel
-type PsdLens = forall a. ReifiedLens' (Psd (SumDiff a)) a
+type PsdLens = forall a. Lens' (Psd (SumDiff a)) a
 
 readLastTChan :: TChan a -> STM a
 readLastTChan tchan = do
@@ -43,11 +43,11 @@ sweepOffset :: (MonadIO m)
             => PreAmp -> PsdLens -> GainOffset -> TrackerT m (Maybe GainOffset)
 sweepOffset pa channel go = do
     let xs = map (\o->go & offset .~ o) [minBound..]
-        paCh = PreAmp.channels ^. reflectLens channel
+        paCh = PreAmp.channels ^. channel
     ys <- mapM (sampleConfig pa paCh) xs
-    case minimumBy (compare `on` (\y->y^._2.reflectLens channel)) $ zip xs ys of
-        (x,y) | y^.reflectLens channel < 1000  -> return $ Just x
-        _                                      -> return $ Nothing
+    case minimumBy (compare `on` (\y->y^._2.channel)) $ zip xs ys of
+        (x,y) | y^.channel < 1000  -> return $ Just x
+        _                          -> return $ Nothing
 
 optimize :: (MonadIO m)
          => PreAmp -> Sample -> PsdLens -> TrackerT m ()
