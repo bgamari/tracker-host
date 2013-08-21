@@ -2,12 +2,14 @@
 
 module Tracker.Types ( Sample
                      , Stage(..)
+                     , mkStage
                        -- * Modelling position sensitive photodiode
                      , SumDiff(SumDiff)
                      , sdSum, sdDiff
                      , Diode(Diode)
                      , anode, cathode
                      , Psd(Psd, unPsd)
+                     , mkPsd
                      , sumDiffDiode
                        -- * Sensor inputs
                      , Sensors(Sensors)
@@ -33,6 +35,9 @@ newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
                       , Applicative, Additive, Metric, Distributive
                       , R1, R2, R3)
+        
+mkStage :: a -> a -> a -> Stage a
+mkStage x y z = Stage $ V3 x y z
 
 -- | A sum-difference sample
 data SumDiff a = SumDiff { _sdSum, _sdDiff :: !a }
@@ -61,6 +66,9 @@ instance Additive Diode where zero = pure 0
 newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
                        , Additive, Metric, R1, R2)
+
+mkPsd :: a -> a -> Psd a
+mkPsd x y = Psd $ V2 x y
 
 -- | Stage and PSD input
 data Sensors a = Sensors { _stage :: !(Stage a)

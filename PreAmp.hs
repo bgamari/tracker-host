@@ -1,4 +1,7 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module PreAmp ( PreAmp
+              , CodePoint
               , open
               , Channel
               , channels
@@ -11,10 +14,18 @@ import System.IO
 import Tracker.Types
 import Linear
 import Control.Applicative
+import Data.Word
 
 newtype PreAmp = PreAmp Handle
 
 newtype Channel = Ch Int
+
+newtype CodePoint = CP Word8
+                  deriving (Enum, Num, Ord, Eq)
+
+instance Bounded CodePoint where
+    minBound = CP 0
+    maxBound = CP 255
 
 channels = Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff)
 
@@ -23,13 +34,13 @@ xDiff = Ch 1
 ySum  = Ch 2
 yDiff = Ch 3
 
-setOffset :: PreAmp -> Channel -> Int -> IO ()
-setOffset (PreAmp h) (Ch n) v = do
+setOffset :: PreAmp -> Channel -> CodePoint -> IO ()
+setOffset (PreAmp h) (Ch n) (CP v) = do
     hPutStr h $ show n++"o="++show v++"\r\n"
     hGetLine h >>= print
 
-setGain :: PreAmp -> Channel -> Int -> IO ()
-setGain (PreAmp h) (Ch n) v = do
+setGain :: PreAmp -> Channel -> CodePoint -> IO ()
+setGain (PreAmp h) (Ch n) (CP v) = do
     hPutStr h $ show n++"g="++show v++"\r\n"
     hGetLine h >>= print
 
