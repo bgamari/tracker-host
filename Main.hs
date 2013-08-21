@@ -5,11 +5,13 @@ import Data.Maybe
 import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Either
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
 import Numeric
 import Control.Concurrent.STM
+import Control.Error.Safe
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -21,7 +23,7 @@ import Data.Binary.Get
 import Control.Lens hiding (setting)
 
 import qualified Tracker as T
-import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
+import Tracker.Types
 import TrackerUI.Types
 import PreAmp       
 import PreAmp.Optimize
@@ -43,7 +45,7 @@ helloCmd = command "hello" help ""
 setRawPositionCmd :: Command
 setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->
     case args of 
-      x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from (stage . v3Tuple)
+      x:_ | Just pos <- readMaybe x   -> liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
       otherwise                       -> liftInputT $ outputStrLn "expected position"
   where help = "Set raw stage position"
 
@@ -121,9 +123,33 @@ helpCmd = command "help" help "[CMD]" $ \args->
            []  -> "No matching commands\n"
            _   -> unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
+  
+withPreAmp :: (PreAmp -> TrackerUI ()) -> TrackerUI ()
+withPreAmp m =
+    use preAmp >>= maybe (liftInputT $ outputStrLn "Pre-amplifier not open") m
 
-stage :: Iso' (Stage a) (V3 a)
-stage = iso (\(Stage v)->v) Stage
+preAmpCmds :: [Command]
+preAmpCmds =
+    [ cmd (_x.sdSum) "xsum"
+    , cmd (_x.sdDiff) "xdiff"
+    , cmd (_y.sdSum) "ysum"
+    , cmd (_y.sdDiff) "ydiff"
+    ]
+  where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> Command
+        cmd proj name = 
+            Cmd ["set", "amp."++name++".gain"] help "[GAIN]"
+            $ \args -> do
+              withPreAmp $ \pa->do
+                let ch = PreAmp.channels ^. proj
+                case args of
+                  x:_ | Just gain <- readZ x   -> void $ either error id
+                                                  <$> runEitherT (PreAmp.setGain pa ch $ fromIntegral gain)
+                  otherwise                    -> liftInputT $ outputStrLn "Invalid gain"
+              return True
+          where help = Just "Set pre-amplifier gain"
+
+stageV3 :: Iso' (Stage a) (V3 a)
+stageV3 = iso (\(Stage v)->v) Stage
 
 v3Tuple :: Iso' (V3 a) (a,a,a)
 v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
@@ -167,11 +193,11 @@ r3Setting name help l =
 settings :: [Command] 
 settings = concat 
     [ r3Setting "rough.size" "rough calibration field size in code-points"
-            (roughScan . T.scanSize . stage)
+            (roughScan . T.scanSize . stageV3)
     , r3Setting "rough.center" "rough calibration field center in code-points"
-            (roughScan . T.scanCenter . stage)
+            (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
-            (roughScan . T.scanPoints . stage)
+            (roughScan . T.scanPoints . stageV3)
     , setting "rough.freq" "update frequency of rough calibration scan"
             readParse show roughScanFreq
     ]
@@ -187,7 +213,7 @@ commands = [ helloCmd
            , resetCmd
            , exitCmd
            , helpCmd
-           ] ++ settings
+           ] ++ settings ++ preAmpCmds
 
 prompt :: TrackerUI Bool
 prompt = do

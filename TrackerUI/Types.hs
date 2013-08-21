@@ -14,6 +14,7 @@ import Control.Lens
 import Linear
 
 import qualified Tracker as T
+import PreAmp
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
                , RasterScan(..), FineScan(..))
 
@@ -23,6 +24,7 @@ data TrackerState
                    , _roughScan      :: RasterScan Stage Word16
                    , _fineScan       :: FineScan
                    , _feedbackGains  :: Psd (Stage Double)
+                   , _preAmp         :: Maybe PreAmp
                    }
 makeLenses ''TrackerState
            
@@ -40,6 +42,7 @@ defaultTrackerState =
                                              , _fineScanFreq   = 1000
                                              }
                  , _feedbackGains = pure $ pure 0
+                 , _preAmp        = Nothing
                  }
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)
