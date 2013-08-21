@@ -14,6 +14,9 @@ import System.IO
 import Tracker.Types
 import Linear
 import Control.Applicative
+import Control.Monad.Trans.Either
+import Control.Monad.Trans
+import Data.List (stripPrefix)
 import Data.Word
 
 newtype PreAmp = PreAmp Handle
@@ -34,15 +37,27 @@ xDiff = Ch 1
 ySum  = Ch 2
 yDiff = Ch 3
 
-setOffset :: PreAmp -> Channel -> CodePoint -> IO ()
-setOffset (PreAmp h) (Ch n) (CP v) = do
-    hPutStr h $ "="++show n++"o="++show v++"\r\n"
-    hGetLine h >>= print
+write :: MonadIO m => PreAmp -> String -> m ()
+write (PreAmp h) = liftIO . hPutStr h
 
-setGain :: PreAmp -> Channel -> CodePoint -> IO ()
-setGain (PreAmp h) (Ch n) (CP v) = do
-    hPutStr h $ "="++show n++"g"++show v++"\r\n"
-    hGetLine h >>= print
+readReply :: MonadIO m => PreAmp -> EitherT String m ()
+readReply (PreAmp h) = EitherT $ do
+    reply <- liftIO $ hGetLine h
+    return $ case reply of
+      s | Just err <- stripPrefix "!err" s  -> Left $ "Error occurred: "++err
+        | Just _ <- stripPrefix "!ok" s     -> Right ()
+        | otherwise                         -> Left $ "Unknown reponse: "++s
+
+setOffset :: MonadIO m => PreAmp -> Channel -> CodePoint -> EitherT String m ()
+setOffset pa (Ch n) (CP v) = do
+    lift $ write pa $ "="++show n++"o="++show v++"\r\n"
+    readReply pa
+
+setGain :: MonadIO m => PreAmp -> Channel -> CodePoint -> EitherT String m ()
+setGain pa (Ch n) (CP v) = do
+    lift $ write pa $ "="++show n++"g"++show v++"\r\n"
+    readReply pa
+    
 
 open :: FilePath -> IO PreAmp
 open port = do

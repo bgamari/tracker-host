@@ -9,7 +9,9 @@ import Tracker
 import Control.Lens
 import Control.Concurrent.STM
 import Control.Monad.State
+import Control.Monad.Trans.Either
 import Control.Monad.Trans.Maybe
+import Control.Monad
 import qualified Data.Vector as V
 
 -- | A lens that focuses on a PSD channel
@@ -25,12 +27,15 @@ readLastTChan tchan = do
 data GainOffset = GO { _gain, _offset :: CodePoint }
 makeLenses ''GainOffset
 
+failE :: Monad m => EitherT String m a -> m a
+failE m = either error id `liftM` runEitherT m
+
 sampleConfig :: (MonadIO m)
              => PreAmp -> Channel -> GainOffset -> TrackerT m (Psd (SumDiff Sample))
 sampleConfig pa paCh go = do
     queue <- getSensorQueue
-    liftIO $ PreAmp.setGain pa paCh (go ^. gain)
-    liftIO $ PreAmp.setOffset pa paCh (go ^. offset)
+    liftIO $ failE $ PreAmp.setGain pa paCh (go ^. gain)
+    liftIO $ failE $ PreAmp.setOffset pa paCh (go ^. offset)
     s <- liftIO $ atomically $ readLastTChan queue
     return $ s ^. to V.last . psd
 
@@ -56,5 +61,3 @@ optimize pa margin channel = do
               Nothing -> return go
     r <- runMaybeT $ step $ GO 0 0
     return ()
-
-

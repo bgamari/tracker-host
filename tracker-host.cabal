@@ -33,4 +33,6 @@ executable tracker-host
                        distributive ==0.3.*,
                        mwc-random ==0.12.*,
                        hmatrix,
-                       serialport
+                       serialport,
+                       errors,
+                       either
