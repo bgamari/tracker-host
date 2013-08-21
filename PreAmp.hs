@@ -36,12 +36,12 @@ yDiff = Ch 3
 
 setOffset :: PreAmp -> Channel -> CodePoint -> IO ()
 setOffset (PreAmp h) (Ch n) (CP v) = do
-    hPutStr h $ show n++"o="++show v++"\r\n"
+    hPutStr h $ "="++show n++"o="++show v++"\r\n"
     hGetLine h >>= print
 
 setGain :: PreAmp -> Channel -> CodePoint -> IO ()
 setGain (PreAmp h) (Ch n) (CP v) = do
-    hPutStr h $ show n++"g="++show v++"\r\n"
+    hPutStr h $ "="++show n++"g"++show v++"\r\n"
     hGetLine h >>= print
 
 open :: FilePath -> IO PreAmp
