@@ -60,9 +60,9 @@ setGain pa (Ch n) (CP v) = do
     readReply pa
     
 
-open :: FilePath -> EitherT String IO PreAmp
+open :: MonadIO m => FilePath -> EitherT String m PreAmp
 open port = do
-    r <- runEitherT $ tryIO $ hOpenSerial port defaultSerialSettings { commSpeed = CS115200 }
+    r <- liftIO $ runEitherT $ tryIO $ hOpenSerial port defaultSerialSettings { commSpeed = CS115200 }
     case r of
       Left err   -> left $ show err
       Right a    -> return $ PreAmp a
