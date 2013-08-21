@@ -23,6 +23,8 @@ import Control.Lens hiding (setting)
 import qualified Tracker as T
 import Tracker (TrackerT, Stage(..), Psd(..), Sensors, Sample)
 import TrackerUI.Types
+import PreAmp       
+import PreAmp.Optimize
 
 unitStageGains :: Stage (Stage Int32)
 unitStageGains = kronecker $ Stage $ V3 1 1 1

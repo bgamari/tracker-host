@@ -32,4 +32,5 @@ executable tracker-host
                        lens ==3.9.*,
                        distributive ==0.3.*,
                        mwc-random ==0.12.*,
-                       hmatrix
+                       hmatrix,
+                       serialport
