@@ -21,7 +21,7 @@ newtype PreAmp = PreAmp Handle
 newtype Channel = Ch Int
 
 newtype CodePoint = CP Word8
-                  deriving (Enum, Num)
+                  deriving (Enum, Num, Ord, Eq)
 
 instance Bounded CodePoint where
     minBound = CP 0
