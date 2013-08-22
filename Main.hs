@@ -10,9 +10,15 @@ import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
 import Numeric
+import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Error.Safe
 
+import Control.Monad (MonadPlus(..))
+import Control.Error.Safe
+import Control.Error.Util
+import Data.EitherR (fmapLT)
+
+import System.IO
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
@@ -63,6 +69,10 @@ roughCalCmd = command "rough-cal" help "" $ \args->lift $ do
     lastRoughCal .= Just scan
   where help = "Perform rough calibration"
 
+showSensors :: Show a => Sensors a -> String
+showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
+                                   (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
+
 dumpRoughCmd :: Command
 dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
@@ -70,8 +80,6 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
     lift $ liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
-        showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
-                                           (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 fineCalCmd :: Command
 fineCalCmd = command "fine-cal" help "" $ \args->lift $ do
@@ -102,6 +110,36 @@ startPlotCmd :: Command
 startPlotCmd = command "start-plot" help "" $ \args->lift $ liftTracker startPlot
   where help = "Start plot view"
 
+indexZ :: MonadPlus m => Int -> [a] -> m a
+indexZ 0 (x:xs) = return x
+indexZ n []     = mzero
+indexZ n (_:xs) = indexZ (n-1) xs
+
+logger :: Handle -> Int -> TChan (V.Vector (Sensors Int16)) -> IO ()       
+logger h decimation queue = forever $ do
+    v <- atomically $ readTChan queue
+    V.mapM_ (hPutStrLn h . showSensors)
+        $ V.ifilter (\i _->i `mod` decimation == 0) v
+    
+logStartCmd :: Command
+logStartCmd = command "log start" help "FILE [DECIMATION]" $ \args->do
+    use logThread >>= flip when (left "Already logging") . isJust
+    fname <- indexZ 0 args
+    let dec = fromMaybe 1 $ indexZ 1 args >>= readZ
+    h <- fmapLT show $ tryIO $ openFile fname WriteMode
+    queue <- lift $ liftTracker T.getSensorQueue
+    thread <- liftIO $ forkIO $ logger h dec queue
+    logThread .= Just thread
+  where help = "Start logging sensor samples to given file"
+
+logStopCmd :: Command
+logStopCmd = command "log stop" help "" $ \args->do
+    thread <- use logThread
+    case thread of 
+        Nothing   -> left "Not currently logging"
+        Just x    -> liftIO (killThread x) >> logThread .= Nothing
+  where help = "Stop logging of sensor samples"
+  
 resetCmd :: Command
 resetCmd = command "reset" help "" $ \args->do
     lift $ liftTracker $ T.reset

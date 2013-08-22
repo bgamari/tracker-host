@@ -9,6 +9,7 @@ import Data.Word
 import Control.Monad.State
 import Control.Monad.Trans.Either
 import Control.Applicative
+import Control.Concurrent (ThreadId)
 
 import qualified Data.Vector as V
 import System.Console.Haskeline
@@ -27,6 +28,7 @@ data TrackerState
                    , _fineScan       :: FineScan
                    , _feedbackGains  :: Psd (Stage Double)
                    , _preAmp         :: Maybe PreAmp
+                   , _logThread      :: Maybe ThreadId
                    }
 makeLenses ''TrackerState
            
@@ -45,6 +47,7 @@ defaultTrackerState =
                                              }
                  , _feedbackGains = pure $ pure 0
                  , _preAmp        = Nothing
+                 , _logThread     = Nothing
                  }
 
 newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)
