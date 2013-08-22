@@ -46,6 +46,6 @@ plotWorker npoints queue = do
 startPlot :: MonadIO m => TrackerT m ()
 startPlot = do
     queue <- getSensorQueue
-    liftIO $ forkIO $ plotWorker npoints queue
+    liftIO $ forkOS $ plotWorker npoints queue
     return ()
 
