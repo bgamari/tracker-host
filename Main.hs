@@ -38,31 +38,31 @@ import PreAmp.Optimize
 unitStageGains :: Stage (Stage Int32)
 unitStageGains = kronecker $ Stage $ V3 1 1 1
 
-command :: String -> String -> String -> ([String] -> EitherT String TrackerUI ()) -> Command
-command name help args action = Cmd [name] (Just help) args (\a->action a >> return True)
+command :: [String] -> String -> String -> ([String] -> EitherT String TrackerUI ()) -> Command
+command name help args action = Cmd name (Just help) args (\a->action a >> return True)
 
 exitCmd :: Command
 exitCmd = Cmd ["exit"] (Just "Exit the program") "" $ const $ return False
 
 helloCmd :: Command
-helloCmd = command "hello" help ""
+helloCmd = command ["hello"] help ""
     $ const $ lift $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
 
 setRawPositionCmd :: Command
-setRawPositionCmd = command "set-pos" help "(X,Y,Z)" $ \args->do
+setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     pos <- tryHead "expected position" args >>= tryRead "invalid position"
     lift $ liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
 centerCmd :: Command
-centerCmd = command "center" help "" $ \args->
+centerCmd = command ["center"] help "" $ \args->
     lift $ liftTracker $ T.setRawPosition $ Stage $ V3 c c c
   where c = 0xffff `div` 2
         help = "Set stage at center position"
 
 roughCalCmd :: Command
-roughCalCmd = command "rough-cal" help "" $ \args->lift $ do
+roughCalCmd = command ["rough-cal"] help "" $ \args->lift $ do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTracker $ T.roughScan freq rs
@@ -74,7 +74,7 @@ showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]+
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 dumpRoughCmd :: Command
-dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
+dumpRoughCmd = command ["dump-rough"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughCal >>= tryJust "No rough calibration."
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
@@ -82,7 +82,7 @@ dumpRoughCmd = command "dump-rough" help "[FILENAME]" $ \args->do
   where help = "Dump last rough calibration"
 
 fineCalCmd :: Command
-fineCalCmd = command "fine-cal" help "" $ \args->lift $ do
+fineCalCmd = command ["fine-cal"] help "" $ \args->lift $ do
     fs <- use fineScan
     gains <- liftTracker $ T.fineCal fs
     feedbackGains .= gains
@@ -94,7 +94,7 @@ fineCalCmd = command "fine-cal" help "" $ \args->lift $ do
   where help = "Perform fine calibration"
   
 readSensorsCmd :: Command
-readSensorsCmd = command "read-sensors" help "" $ \args->lift $ do
+readSensorsCmd = command ["read-sensors"] help "" $ \args->lift $ do
     liftTracker $ T.setAdcTriggerMode T.TriggerAuto
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
@@ -107,7 +107,7 @@ readSensorsCmd = command "read-sensors" help "" $ \args->lift $ do
   where help = "Read sensors values"
   
 startPlotCmd :: Command
-startPlotCmd = command "start-plot" help "" $ \args->lift $ liftTracker startPlot
+startPlotCmd = command ["start-plot"] help "" $ \args->lift $ liftTracker startPlot
   where help = "Start plot view"
 
 indexZ :: MonadPlus m => Int -> [a] -> m a
@@ -122,7 +122,7 @@ logger h decimation queue = forever $ do
         $ V.ifilter (\i _->i `mod` decimation == 0) v
     
 logStartCmd :: Command
-logStartCmd = command "log start" help "FILE [DECIMATION]" $ \args->do
+logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
     use logThread >>= flip when (left "Already logging") . isJust
     fname <- indexZ 0 args
     let dec = fromMaybe 1 $ indexZ 1 args >>= readZ
@@ -133,7 +133,7 @@ logStartCmd = command "log start" help "FILE [DECIMATION]" $ \args->do
   where help = "Start logging sensor samples to given file"
 
 logStopCmd :: Command
-logStopCmd = command "log stop" help "" $ \args->do
+logStopCmd = command ["log","stop"] help "" $ \args->do
     thread <- use logThread
     case thread of 
         Nothing   -> left "Not currently logging"
@@ -141,13 +141,13 @@ logStopCmd = command "log stop" help "" $ \args->do
   where help = "Stop logging of sensor samples"
   
 resetCmd :: Command
-resetCmd = command "reset" help "" $ \args->do
+resetCmd = command ["reset"] help "" $ \args->do
     lift $ liftTracker $ T.reset
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
   
 helpCmd :: Command
-helpCmd = command "help" help "[CMD]" $ \args->
+helpCmd = command ["help"] help "[CMD]" $ \args->
     let cmdFilter :: [Command] -> [Command]
         cmdFilter = case args of
                       [] -> id
@@ -163,7 +163,7 @@ helpCmd = command "help" help "[CMD]" $ \args->
   where help = "Display help message"
   
 openPreAmp :: Command
-openPreAmp = command "open-preamp" help "DEVICE" $ \args->do
+openPreAmp = command ["open-preamp"] help "DEVICE" $ \args->do
     device <- tryHead "expected device" args
     pa <- PreAmp.open device
     preAmp .= Just pa
