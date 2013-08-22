@@ -15,7 +15,8 @@ import Tracker
 import TrackerUI.Types
 
 import Graphics.Rendering.GLPlot
-import Graphics.UI.GLUT as GLUT hiding (Lines, Points)
+import qualified Graphics.UI.GLUT as GLUT
+import Graphics.UI.GLUT (($=), Color4(..), GLfloat)
 
 npoints = 4000
 
@@ -33,19 +34,32 @@ curves pts =
     , Curve (Color4 1 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdSum)  Points
     ]
 
+data UpDown = Up | Down
+
+roundUD :: RealFrac a => UpDown -> a -> a -> a
+roundUD ud k x 
+  | b == 0    = realToFrac (a :: Int)
+  | otherwise = realToFrac a + bump
+  where (a, b) = properFraction (x / k)
+        bump = case ud of
+              Up     ->  1
+              Down   -> -1
+
 plotWorker :: Int -> TChan (V.Vector (Sensors Int16)) -> IO ()
 plotWorker npoints queue = do
     GLUT.getArgsAndInitialize
-    actionOnWindowClose $= ContinueExectuion
+    GLUT.actionOnWindowClose $= GLUT.ContinueExectuion
     plot <- newPlot "Tracker"
     let go :: Sensors (VS.Vector Int16) -> IO ()
         go v = do
             new <- atomically $ readTChan queue
             let v' = fmap (VS.take npoints) $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
                 cs = curves v'
+                step = 100
                 (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
-                               in (minimum xs, maximum xs)
-            setLimits plot $ Rect (V2 0 (miny-100)) (V2 4000 (maxy+100))
+                               in ( roundUD Down step $ minimum xs
+                                  , roundUD Up step $ maximum xs)
+            setLimits plot $ Rect (V2 0 (miny-step)) (V2 (realToFrac npoints) (maxy+step))
             updateCurves plot cs 
             go v'
     forkIO $ go (pure VS.empty)
