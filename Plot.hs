@@ -53,7 +53,8 @@ plotWorker npoints queue = do
     let go :: Sensors (VS.Vector Int16) -> IO ()
         go v = do
             new <- atomically $ readTChan queue
-            let v' = fmap (VS.take npoints) $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
+            let v' = fmap (VS.take npoints)
+                     $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
                 cs = curves v'
                 step = 100
                 (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
