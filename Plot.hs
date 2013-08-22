@@ -15,7 +15,7 @@ import Tracker
 import TrackerUI.Types
 
 import Graphics.Rendering.GLPlot
-import Graphics.UI.GLUT as GLUT
+import Graphics.UI.GLUT as GLUT hiding (Lines, Points)
 
 npoints = 4000
 
@@ -27,10 +27,10 @@ decimate n = fmap snd . V.filter (\(i,_)->i `mod` n == 0) . V.indexed
 
 curves :: Sensors (VS.Vector Int16) -> [Curve]
 curves pts =
-    [ Curve (Color4 1 0 0 0) (fixPoints $ pts ^. psd ^. _x ^. sdDiff)
-    , Curve (Color4 0 1 1 0) (fixPoints $ pts ^. psd ^. _x ^. sdSum)
-    , Curve (Color4 0 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdDiff)
-    , Curve (Color4 1 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdSum)
+    [ Curve (Color4 1 0 0 0) (fixPoints $ pts ^. psd ^. _x ^. sdDiff) Points
+    , Curve (Color4 0 1 1 0) (fixPoints $ pts ^. psd ^. _x ^. sdSum)  Points
+    , Curve (Color4 0 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdDiff) Points
+    , Curve (Color4 1 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdSum)  Points
     ]
 
 plotWorker :: Int -> TChan (V.Vector (Sensors Int16)) -> IO ()
