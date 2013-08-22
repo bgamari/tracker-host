@@ -28,11 +28,16 @@ decimate n = fmap snd . V.filter (\(i,_)->i `mod` n == 0) . V.indexed
 
 curves :: Sensors (VS.Vector Int16) -> [Curve]
 curves pts =
-    [ Curve (Color4 1 0 0 0) (fixPoints $ pts ^. psd ^. _x ^. sdDiff) Points
-    , Curve (Color4 0 1 1 0) (fixPoints $ pts ^. psd ^. _x ^. sdSum)  Points
-    , Curve (Color4 0 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdDiff) Points
-    , Curve (Color4 1 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdSum)  Points
+    [   cColor  .~ Color4 1 0 0 0
+      $ cPoints .~ fixPoints (pts ^. psd ^. _x ^. sdDiff) $ c
+    ,   cColor  .~ Color4 0 1 1 0
+      $ cPoints .~ fixPoints (pts ^. psd ^. _x ^. sdSum) $ c
+    ,   cColor  .~ Color4 0 0 1 0
+      $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdDiff) $ c
+    ,   cColor  .~ Color4 1 0 1 0
+      $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdSum) $ c
     ]
+  where c = cStyle .~ Points $ defaultCurve
 
 data UpDown = Up | Down
 
