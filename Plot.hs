@@ -42,7 +42,11 @@ plotWorker npoints queue = do
         go v = do
             new <- atomically $ readTChan queue
             let v' = fmap (VS.take npoints) $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
-            updateCurves plot $ curves v'
+                cs = curves v'
+                (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
+                               in (minimum xs, maximum xs)
+            setLimits plot $ Rect (V2 0 (miny-100)) (V2 4000 (maxy+100))
+            updateCurves plot cs 
             go v'
     forkIO $ go (pure VS.empty)
     GLUT.mainLoop
