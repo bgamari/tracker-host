@@ -27,7 +27,11 @@ decimate n = fmap snd . V.filter (\(i,_)->i `mod` n == 0) . V.indexed
 
 curves :: Sensors (VS.Vector Int16) -> [Curve]
 curves pts =
-    [Curve (Color4 0 0 0 0) (fixPoints $ pts ^. psd ^. _x ^. sdDiff)]
+    [ Curve (Color4 1 0 0 0) (fixPoints $ pts ^. psd ^. _x ^. sdDiff)
+    , Curve (Color4 0 1 1 0) (fixPoints $ pts ^. psd ^. _x ^. sdSum)
+    , Curve (Color4 0 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdDiff)
+    , Curve (Color4 1 0 1 0) (fixPoints $ pts ^. psd ^. _y ^. sdSum)
+    ]
 
 plotWorker :: Int -> TChan (V.Vector (Sensors Int16)) -> IO ()
 plotWorker npoints queue = do
