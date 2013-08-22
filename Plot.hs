@@ -32,6 +32,7 @@ curves pts =
 plotWorker :: Int -> TChan (V.Vector (Sensors Int16)) -> IO ()
 plotWorker npoints queue = do
     GLUT.getArgsAndInitialize
+    actionOnWindowClose $= ContinueExectuion
     plot <- newPlot "Tracker"
     let go :: Sensors (VS.Vector Int16) -> IO ()
         go v = do
