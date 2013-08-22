@@ -256,6 +256,8 @@ commands = [ helloCmd
            , fineCalCmd
            , readSensorsCmd
            , startPlotCmd
+           , logStartCmd
+           , logStopCmd
            , resetCmd
            , exitCmd
            , helpCmd
