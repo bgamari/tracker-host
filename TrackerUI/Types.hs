@@ -2,7 +2,8 @@
 
 module TrackerUI.Types where
 
-import Data.List (isPrefixOf, stripPrefix)
+import Data.Function (on)
+import Data.List (isPrefixOf, stripPrefix, sortBy, nubBy)
 import Data.Maybe (mapMaybe)
 import Data.Word
 import Control.Monad.State
@@ -63,10 +64,14 @@ data Command = Cmd { _cmdName   :: [String]
                    }
 makeLenses ''Command
 
+sortNubOn :: (Eq b, Ord b) => (a -> b) -> [a] -> [a]
+sortNubOn f = nubBy ((==) `on` f) . sortBy (compare `on` f)          
+
 completeCommand :: MonadIO m => [Command] -> CompletionFunc m
 completeCommand commands (left, right) = do
     let tokens = words (reverse left)++if ' ' == head left then [""] else []
-    return (left, completions [(c^.cmdName, c) | c <- commands] tokens)
+    return ( left
+           , sortNubOn replacement $ completions [(c^.cmdName, c) | c <- commands] tokens)
   where completions :: [([String], Command)] -> [String] -> [Completion]
         completions cmds [] = [ Completion (c ^. _1 . _head) (c ^. _1 . _head) True | c <- cmds ]
         completions cmds [token] =
