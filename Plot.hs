@@ -26,8 +26,8 @@ fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
 decimate :: Int -> V.Vector a -> V.Vector a
 decimate n = fmap snd . V.filter (\(i,_)->i `mod` n == 0) . V.indexed
 
-curves :: Sensors (VS.Vector Int16) -> [Curve]
-curves pts =
+psdCurves :: Sensors (VS.Vector Int16) -> [Curve]
+psdCurves pts =
     [   cColor  .~ Color4 1 0 0 0
       $ cPoints .~ fixPoints (pts ^. psd ^. _x ^. sdDiff) $ c
     ,   cColor  .~ Color4 0 1 1 0
@@ -36,8 +36,12 @@ curves pts =
       $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdDiff) $ c
     ,   cColor  .~ Color4 1 0 1 0
       $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdSum) $ c
-
-    ,   cColor  .~ Color4 0.8 0.5 0.3 0
+    ]
+  where c = cStyle .~ Points $ defaultCurve
+    
+stageCurves :: Sensors (VS.Vector Int16) -> [Curve]
+stageCurves pts =
+    [   cColor  .~ Color4 0.8 0.5 0.3 0
       $ cPoints .~ fixPoints (pts ^. stage ^. _x) $ c
     ,   cColor  .~ Color4 0.4 0.8 0.5 0
       $ cPoints .~ fixPoints (pts ^. stage ^. _y) $ c
@@ -63,22 +67,27 @@ plotWorker npoints queue = do
     result <- GLFW.init
     when (not result) $ error "Failed to initialize GLFW"
 
-    plot <- newPlot "Tracker"
-    let go :: Sensors (VS.Vector Int16) -> IO ()
-        go v = do
-            new <- atomically $ readTChan queue
-            let v' = fmap (VS.take npoints)
-                     $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
-                cs = curves v'
-                step = 1000
+    psdPlot <- newPlot "Tracker PSD"
+    stagePlot <- newPlot "Tracker Stage"
+    let updatePlot :: Plot -> [Curve] -> IO ()
+        updatePlot plot cs = do
+            let step = 1000
                 (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
                                in ( minimum xs, maximum xs)
                                --in (-0xffff, 0xffff)
             setLimits plot $ Rect (V2 0 (miny-2000)) (V2 (realToFrac npoints) (maxy+2000))
             updateCurves plot cs 
+
+        go :: Sensors (VS.Vector Int16) -> IO ()
+        go v = do
+            new <- atomically $ readTChan queue
+            let v' = fmap (VS.take npoints)
+                     $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
+            updatePlot psdPlot $ psdCurves v'
+            updatePlot stagePlot $ stageCurves v'
             go v'
     listener <- forkIO $ go (pure VS.empty)
-    mainLoop plot
+    mainLoop [psdPlot, stagePlot]
     killThread listener
     GLFW.terminate
     return ()
