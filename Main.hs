@@ -95,7 +95,6 @@ fineCalCmd = command ["fine-cal"] help "" $ \args->lift $ do
   
 readSensorsCmd :: Command
 readSensorsCmd = command ["read-sensors"] help "" $ \args->lift $ do
-    liftTracker $ T.setAdcTriggerMode T.TriggerAuto
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
@@ -103,7 +102,6 @@ readSensorsCmd = command ["read-sensors"] help "" $ \args->lift $ do
           where showSInt = showSigned showInt 0
     s <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
     liftInputT $ outputStr $ showSensors $ V.head s
-    liftTracker $ T.setAdcTriggerMode T.TriggerOff
   where help = "Read sensors values"
   
 startPlotCmd :: Command
@@ -288,6 +286,7 @@ main = either error (const $ return ()) =<< go
                            T.setFeedbackFreq 1000
                            T.setAdcFreq 5000
                            T.startAdcStream
+                           T.setAdcTriggerMode T.TriggerAuto
           while $ prompt
 
 while :: Monad m => m Bool -> m ()
