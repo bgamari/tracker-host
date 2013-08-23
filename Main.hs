@@ -42,7 +42,7 @@ tryHead err []    = throwError err
 tryHead _   (x:_) = return x
 
 tryRead :: Read a => String -> String -> TrackerUI a
-tryRead err s = undefined
+tryRead err = maybe (throwError err) return . Safe.readZ
 
 tryJust :: String -> Maybe a -> TrackerUI a
 tryJust err Nothing  = throwError err
