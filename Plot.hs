@@ -70,8 +70,10 @@ plotWorker npoints queue = do
             setLimits plot $ Rect (V2 0 (miny-step)) (V2 (realToFrac npoints) (maxy+step))
             updateCurves plot cs 
             go v'
-    forkIO $ go (pure VS.empty)
+    listener <- forkIO $ go (pure VS.empty)
     mainLoop plot
+    killThread listener
+    GLFW.terminate
     return ()
 
 startPlot :: MonadIO m => TrackerT m ()
