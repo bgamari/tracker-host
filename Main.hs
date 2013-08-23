@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, PatternGuards, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings, PatternGuards, RankNTypes, RecordWildCards#-}
 
 import qualified Data.Foldable as F
 import Data.Maybe
@@ -27,7 +27,7 @@ import qualified Data.Vector as V
 import Linear
 import System.Console.Haskeline
 import Data.Binary.Get
-import Control.Lens hiding (setting)
+import Control.Lens hiding (setting, Setting)
 
 import qualified Tracker as T
 import Tracker.Types
@@ -219,43 +219,39 @@ readMaybe a =
 readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
 readParse (a:_) = readMaybe a
-
-setting' :: String -> Maybe String -> ([String] -> Maybe a) -> (a -> String)
-         -> Lens' TrackerState a -> [Command]
-setting' name help parse format l = [getter, setter]
-  where getter = Cmd ["get",name] (("Get "++) <$> help) "" $ \args->
-                   use l >>= showValue >> return True
-        setter = Cmd ["set",name] (("Set "++) <$> help) "VALUE" $ \args->
-                   case parse args of
-                     Just value -> do l .= value
+                                 
+settingCommands :: Setting -> [Command]
+settingCommands (Setting {..}) = [getter, setter]
+  where getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \args->
+                   use (sLens) >>= showValue >> return True
+        setter = Cmd ["set",sName] (("Set "++) <$> sHelp) "VALUE" $ \args->
+                   case sParse args of
+                     Just value -> do sLens .= value
                                       showValue value
                                       return True
                      Nothing    -> do liftInputT $ outputStrLn
                                            $ "Invalid value: "++unwords args
                                       return True
-        showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
+        showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value 
 
-setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
-        -> Lens' TrackerState a -> [Command]
-setting name help parse format l = setting' name (Just help) parse format l
-
-r3Setting :: (Show a, Read a) => String -> String -> Lens' TrackerState (V3 a) -> [Command]
+r3Setting :: (Show a, Read a) => String -> String -> Lens' TrackerState (V3 a) -> [Setting]
 r3Setting name help l =
-       setting' name         (Just help) readParse show (l . v3Tuple)
-    ++ setting' (name++".x") Nothing     readParse show (l . _x)
-    ++ setting' (name++".y") Nothing     readParse show (l . _y)
-    ++ setting' (name++".z") Nothing     readParse show (l . _z)
+     [ Setting name         (Just help) readParse show (l . v3Tuple)
+     , Setting (name++".x") Nothing     readParse show (l . _x)
+     , Setting (name++".y") Nothing     readParse show (l . _y)
+     , Setting (name++".z") Nothing     readParse show (l . _z)
+     ]
 
-settings :: [Command] 
-settings = concat 
+settings :: [Setting] 
+settings = concat
     [ r3Setting "rough.size" "rough calibration field size in code-points"
             (roughScan . T.scanSize . stageV3)
     , r3Setting "rough.center" "rough calibration field center in code-points"
             (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             (roughScan . T.scanPoints . stageV3)
-    , setting "rough.freq" "update frequency of rough calibration scan"
-            readParse show roughScanFreq
+    , [Setting "rough.freq" (Just "update frequency of rough calibration scan")
+            readParse show roughScanFreq]
     ]
 
 commands :: [Command]
@@ -274,7 +270,7 @@ commands = [ helloCmd
            , helpCmd
            , command ["start", "adc"] "Start ADC triggering" "" $ const
              $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
-           ] ++ settings ++ preAmpCmds
+           ] ++ concatMap settingCommands settings ++ preAmpCmds
 
 prompt :: TrackerUI Bool
 prompt = do

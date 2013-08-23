@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, RankNTypes, ExistentialQuantification #-}
 
 module TrackerUI.Types where
 
@@ -14,7 +14,7 @@ import Control.Concurrent (ThreadId)
 
 import qualified Data.Vector as V
 import System.Console.Haskeline
-import Control.Lens
+import Control.Lens hiding (Setting)
 import Linear
 
 import qualified Tracker as T
@@ -64,6 +64,13 @@ liftInputT = TUI . lift . lift
 
 liftTracker :: TrackerT IO a -> TrackerUI a
 liftTracker = TUI . lift . lift . lift
+
+data Setting = forall a. Setting { sName   :: String
+                                 , sHelp   :: Maybe String
+                                 , sParse  :: [String] -> Maybe a
+                                 , sFormat :: a -> String
+                                 , sLens   :: Lens' TrackerState a
+                                 }
 
 data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: Maybe String
