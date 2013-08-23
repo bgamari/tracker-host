@@ -72,9 +72,9 @@ plotWorker npoints queue = do
                 cs = curves v'
                 step = 1000
                 (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
-                               in ( roundUD Down step $ minimum xs
-                                  , roundUD Up step $ maximum xs)
-            setLimits plot $ Rect (V2 0 (miny-step)) (V2 (realToFrac npoints) (maxy+step))
+                               in ( minimum xs, maximum xs)
+                               --in (-0xffff, 0xffff)
+            setLimits plot $ Rect (V2 0 (miny-2000)) (V2 (realToFrac npoints) (maxy+2000))
             updateCurves plot cs 
             go v'
     listener <- forkIO $ go (pure VS.empty)
