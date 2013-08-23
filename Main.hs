@@ -254,6 +254,17 @@ settings = concat
             readParse show roughScanFreq]
     ]
 
+showCmd :: Command
+showCmd = command ["show"] help "PATTERN" $ \args->do
+    pattern <- tryHead "expected pattern" args
+    let matching = filter (\(Setting {..})->pattern `isPrefixOf` sName)
+                   $ filter (\(Setting {..})->isJust sHelp)
+                   $ settings
+    forM_ matching $ \(Setting {..})->do
+        value <- use sLens
+        liftInputT $ outputStrLn $ sName++" = "++sFormat value 
+  where help = "Show values of settings matching pattern"
+
 commands :: [Command]
 commands = [ helloCmd
            , centerCmd
@@ -270,6 +281,7 @@ commands = [ helloCmd
            , helpCmd
            , command ["start", "adc"] "Start ADC triggering" "" $ const
              $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
+           , showCmd
            ] ++ concatMap settingCommands settings ++ preAmpCmds
 
 prompt :: TrackerUI Bool
