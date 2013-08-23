@@ -25,6 +25,8 @@ pathAcquire _ [] = do
     return V.empty
 pathAcquire freq path = do
     setFeedbackMode NoFeedback
+    -- the firmware will enable triggering upon starting the path
+    -- disable triggering so we only see samples from after this point
     setAdcTriggerMode TriggerOff
     clearPath
     -- First fill up path queue
@@ -34,6 +36,7 @@ pathAcquire freq path = do
     mapM_ queuePoints $ points
     waitUntilPathFinished
     frames <- V.concat `liftM` liftIO (atomically $ readAllTChan queue)
+    setAdcTriggerMode TriggerAuto
     return frames
 
 waitUntilPathFinished :: MonadIO m => TrackerT m ()
