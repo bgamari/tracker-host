@@ -36,6 +36,13 @@ curves pts =
       $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdDiff) $ c
     ,   cColor  .~ Color4 1 0 1 0
       $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdSum) $ c
+
+    ,   cColor  .~ Color4 0.8 0.5 0.3 0
+      $ cPoints .~ fixPoints (pts ^. stage ^. _x) $ c
+    ,   cColor  .~ Color4 0.4 0.8 0.5 0
+      $ cPoints .~ fixPoints (pts ^. stage ^. _y) $ c
+    ,   cColor  .~ Color4 0.4 0.5 0.8 0
+      $ cPoints .~ fixPoints (pts ^. stage ^. _z) $ c
     ]
   where c = cStyle .~ Points $ defaultCurve
 
