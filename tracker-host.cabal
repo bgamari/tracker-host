@@ -37,4 +37,4 @@ executable tracker-host
                        errors,
                        either,
                        gl-plot,
-                       OpenGL, GLUT
+                       OpenGL, GLFW-b

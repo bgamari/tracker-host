@@ -15,8 +15,8 @@ import Tracker
 import TrackerUI.Types
 
 import Graphics.Rendering.GLPlot
-import qualified Graphics.UI.GLUT as GLUT
-import Graphics.UI.GLUT (($=), Color4(..), GLfloat)
+import qualified Graphics.UI.GLFW as GLFW
+import Graphics.Rendering.OpenGL.GL (GLfloat, Color4(..))
 
 npoints = 4000
 
@@ -52,8 +52,10 @@ roundUD ud k x
 
 plotWorker :: Int -> TChan (V.Vector (Sensors Int16)) -> IO ()
 plotWorker npoints queue = do
-    GLUT.getArgsAndInitialize
-    GLUT.actionOnWindowClose $= GLUT.ContinueExectuion
+    GLFW.setErrorCallback $ Just $ \err s->do error s
+    result <- GLFW.init
+    when (not result) $ error "Failed to initialize GLFW"
+
     plot <- newPlot "Tracker"
     let go :: Sensors (VS.Vector Int16) -> IO ()
         go v = do
@@ -69,7 +71,8 @@ plotWorker npoints queue = do
             updateCurves plot cs 
             go v'
     forkIO $ go (pure VS.empty)
-    GLUT.mainLoop
+    mainLoop plot
+    return ()
 
 startPlot :: MonadIO m => TrackerT m ()
 startPlot = do
