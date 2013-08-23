@@ -4,6 +4,7 @@ import qualified Data.Foldable as F
 import Data.Maybe
 import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Monad
+import Control.Monad.Error.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Either
 import Control.Monad.IO.Class
@@ -14,7 +15,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 
 import Control.Monad (MonadPlus(..))
-import Control.Error.Safe
+import qualified Control.Error.Safe as Safe
 import Control.Error.Util
 import Data.EitherR (fmapLT)
 
@@ -35,10 +36,22 @@ import Plot
 import PreAmp       
 import PreAmp.Optimize
 
+
+tryHead :: String -> [a] -> TrackerUI a
+tryHead err []    = throwError err
+tryHead _   (x:_) = return x
+
+tryRead :: Read a => String -> String -> TrackerUI a
+tryRead err s = undefined
+
+tryJust :: String -> Maybe a -> TrackerUI a
+tryJust err Nothing  = throwError err
+tryJust _   (Just a) = return a        
+
 unitStageGains :: Stage (Stage Int32)
 unitStageGains = kronecker $ Stage $ V3 1 1 1
 
-command :: [String] -> String -> String -> ([String] -> EitherT String TrackerUI ()) -> Command
+command :: [String] -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd name (Just help) args (\a->action a >> return True)
 
 exitCmd :: Command
@@ -46,23 +59,23 @@ exitCmd = Cmd ["exit"] (Just "Exit the program") "" $ const $ return False
 
 helloCmd :: Command
 helloCmd = command ["hello"] help ""
-    $ const $ lift $ liftInputT $ outputStrLn "hello world!"
+    $ const $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
 
 setRawPositionCmd :: Command
 setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     pos <- tryHead "expected position" args >>= tryRead "invalid position"
-    lift $ liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
+    liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->
-    lift $ liftTracker $ T.setRawPosition $ Stage $ V3 c c c
+    liftTracker $ T.setRawPosition $ Stage $ V3 c c c
   where c = 0xffff `div` 2
         help = "Set stage at center position"
 
 roughCalCmd :: Command
-roughCalCmd = command ["rough-cal"] help "" $ \args->lift $ do
+roughCalCmd = command ["rough-cal"] help "" $ \args->do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTracker $ T.roughScan freq rs
@@ -78,11 +91,11 @@ dumpRoughCmd = command ["dump-rough"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughCal >>= tryJust "No rough calibration."
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
-    lift $ liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
+    liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
 
 fineCalCmd :: Command
-fineCalCmd = command ["fine-cal"] help "" $ \args->lift $ do
+fineCalCmd = command ["fine-cal"] help "" $ \args->do
     fs <- use fineScan
     gains <- liftTracker $ T.fineCal fs
     feedbackGains .= gains
@@ -94,7 +107,7 @@ fineCalCmd = command ["fine-cal"] help "" $ \args->lift $ do
   where help = "Perform fine calibration"
   
 readSensorsCmd :: Command
-readSensorsCmd = command ["read-sensors"] help "" $ \args->lift $ do
+readSensorsCmd = command ["read-sensors"] help "" $ \args->do
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
@@ -105,7 +118,7 @@ readSensorsCmd = command ["read-sensors"] help "" $ \args->lift $ do
   where help = "Read sensors values"
   
 startPlotCmd :: Command
-startPlotCmd = command ["start-plot"] help "" $ \args->lift $ liftTracker startPlot
+startPlotCmd = command ["start-plot"] help "" $ \args->liftTracker startPlot
   where help = "Start plot view"
 
 indexZ :: MonadPlus m => Int -> [a] -> m a
@@ -121,11 +134,11 @@ logger h decimation queue = forever $ do
     
 logStartCmd :: Command
 logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
-    use logThread >>= flip when (left "Already logging") . isJust
-    fname <- indexZ 0 args
-    let dec = fromMaybe 1 $ indexZ 1 args >>= readZ
-    h <- fmapLT show $ tryIO $ openFile fname WriteMode
-    queue <- lift $ liftTracker T.getSensorQueue
+    use logThread >>= flip when (throwError "Already logging") . isJust
+    fname <- liftEitherT $ indexZ 0 args
+    let dec = fromMaybe 1 $ indexZ 1 args >>= Safe.readZ
+    h <- liftEitherT $ fmapLT show $ tryIO $ openFile fname WriteMode
+    queue <- liftTracker T.getSensorQueue
     thread <- liftIO $ forkIO $ logger h dec queue
     logThread .= Just thread
   where help = "Start logging sensor samples to given file"
@@ -134,13 +147,13 @@ logStopCmd :: Command
 logStopCmd = command ["log","stop"] help "" $ \args->do
     thread <- use logThread
     case thread of 
-        Nothing   -> left "Not currently logging"
+        Nothing   -> throwError "Not currently logging"
         Just x    -> liftIO (killThread x) >> logThread .= Nothing
   where help = "Stop logging of sensor samples"
   
 resetCmd :: Command
 resetCmd = command ["reset"] help "" $ \args->do
-    lift $ liftTracker $ T.reset
+    liftTracker $ T.reset
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
   
@@ -156,14 +169,14 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
                          Just help -> Just $ take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ') ++ help
                          Nothing   -> Nothing
     in case cmds of
-           []  -> left "No matching commands"
-           _   -> lift $ liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
+           []  -> throwError "No matching commands"
+           _   -> liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
   
 openPreAmp :: Command
 openPreAmp = command ["open-preamp"] help "DEVICE" $ \args->do
     device <- tryHead "expected device" args
-    pa <- PreAmp.open device
+    pa <- liftEitherT $ PreAmp.open device
     preAmp .= Just pa
   where help = "Open pre-amplifier device"
 
@@ -180,13 +193,13 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                   (Just "Set pre-amplifier gain") "[GAIN]" $ \args -> do
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
-                PreAmp.setGain pa ch $ fromIntegral gain
+                liftEitherT $ PreAmp.setGain pa ch $ fromIntegral gain
                 return True
             , Cmd ["set", "amp."++name++".offset"] 
                   (Just "Set pre-amplifier offset") "[OFFSET]" $ \args -> do
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 offset <- tryHead "expected offset" args >>= tryRead "invalid offset"
-                PreAmp.setOffset pa ch $ fromIntegral offset
+                liftEitherT $ PreAmp.setOffset pa ch $ fromIntegral offset
                 return True
             ]
           where ch = PreAmp.channels ^. proj
@@ -217,10 +230,10 @@ setting' name help parse format l = [getter, setter]
                      Just value -> do l .= value
                                       showValue value
                                       return True
-                     Nothing    -> do lift $ liftInputT $ outputStrLn
+                     Nothing    -> do liftInputT $ outputStrLn
                                            $ "Invalid value: "++unwords args
                                       return True
-        showValue value = lift $ liftInputT $ outputStrLn $ name++" = "++format value 
+        showValue value = liftInputT $ outputStrLn $ name++" = "++format value 
 
 setting :: String -> String -> ([String] -> Maybe a) -> (a -> String)
         -> Lens' TrackerState a -> [Command]
@@ -259,6 +272,8 @@ commands = [ helloCmd
            , resetCmd
            , exitCmd
            , helpCmd
+           , command ["start", "adc"] "Start ADC triggering" "" $ const
+             $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
            ] ++ settings ++ preAmpCmds
 
 prompt :: TrackerUI Bool
@@ -267,11 +282,9 @@ prompt = do
     let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
     case cmds of
       cmd:[]  -> do let Just rest = stripPrefix (cmd^.cmdName) input
-                    r <- runEitherT $ cmd^.cmdAction $ rest
-                    case r of
-                      Left err   -> do liftInputT $ outputStrLn $ "error: "++err
-                                       return True
-                      Right a    -> return a
+                    catchError (cmd^.cmdAction $ rest) $ \err->do
+                        liftInputT $ outputStrLn $ "error: "++err
+                        return True
       []      -> do liftInputT $ outputStrLn $ "Unknown command: "++unwords input
                     return True
       _:_     -> do let matches = intercalate ", " $ map (\c->unwords $ c^.cmdName) cmds

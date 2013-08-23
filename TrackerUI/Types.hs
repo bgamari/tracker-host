@@ -6,6 +6,7 @@ import Data.Function (on)
 import Data.List (isPrefixOf, stripPrefix, sortBy, nubBy)
 import Data.Maybe (mapMaybe)
 import Data.Word
+import Control.Monad.Error.Class
 import Control.Monad.State
 import Control.Monad.Trans.Either
 import Control.Applicative
@@ -50,20 +51,24 @@ defaultTrackerState =
                  , _logThread     = Nothing
                  }
 
-newtype TrackerUI a = TUI (StateT TrackerState (InputT (TrackerT IO)) a)
+newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)
                     deriving ( Functor, Applicative, Monad, MonadIO
-                             , MonadState TrackerState )
+                             , MonadState TrackerState, MonadError String
+                             )
+
+liftEitherT :: EitherT String (StateT TrackerState (InputT (TrackerT IO))) a -> TrackerUI a
+liftEitherT = TUI            
 
 liftInputT :: InputT (TrackerT IO) a -> TrackerUI a
-liftInputT = TUI . lift
+liftInputT = TUI . lift . lift
 
 liftTracker :: TrackerT IO a -> TrackerUI a
-liftTracker = TUI . lift . lift
+liftTracker = TUI . lift . lift . lift
 
 data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: Maybe String
                    , _cmdArgs   :: String
-                   , _cmdAction :: [String] -> EitherT String TrackerUI Bool
+                   , _cmdAction :: [String] -> TrackerUI Bool
                    }
 makeLenses ''Command
 
@@ -93,7 +98,10 @@ completeCommand commands (left, right) = do
     
 runTrackerUI :: [Command] -> TrackerUI a -> IO (Either String a)
 runTrackerUI commands (TUI a) =
-    T.withTracker $ runInputT settings $ evalStateT a defaultTrackerState
+    join <$> ( T.withTracker
+             $ runInputT settings
+             $ flip evalStateT defaultTrackerState
+             $ runEitherT a)
   where settings = Settings { complete    = completeCommand commands
                             , historyFile = Just "~/.tracker.history"
                             , autoAddHistory = True
