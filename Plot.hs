@@ -43,8 +43,8 @@ data UpDown = Up | Down
 
 roundUD :: RealFrac a => UpDown -> a -> a -> a
 roundUD ud k x 
-  | b == 0    = realToFrac (a :: Int)
-  | otherwise = realToFrac a + bump
+  | b == 0    = k * realToFrac (a :: Int)
+  | otherwise = k * realToFrac a + bump
   where (a, b) = properFraction (x / k)
         bump = case ud of
               Up     ->  1
@@ -63,7 +63,7 @@ plotWorker npoints queue = do
             let v' = fmap (VS.take npoints)
                      $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
                 cs = curves v'
-                step = 100
+                step = 1000
                 (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
                                in ( roundUD Down step $ minimum xs
                                   , roundUD Up step $ maximum xs)
