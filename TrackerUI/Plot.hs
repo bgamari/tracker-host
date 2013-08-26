@@ -106,7 +106,7 @@ startPlot = do
     queue <- getSensorQueue
     liftIO $ do
         config <- liftIO $ newTVarIO $ PlotConfig { _pcYSize   = Nothing
-                                                  , _pcNPoints = 4000
+                                                  , _pcNPoints = 10000
                                                   }
         worker <- forkOS $ plotWorker config queue
         return $ TrackerPlot worker config
