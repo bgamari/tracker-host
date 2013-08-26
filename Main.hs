@@ -188,6 +188,7 @@ optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
         optimize pa 1000 (_y . sdDiff)
         optimize pa 1000 (_x . sdSum)
         optimize pa 1000 (_y . sdSum)
+        return ()
   where help = "Automatically optimize pre amplifier gains and offsets"
 
 preAmpCmds :: [Command]

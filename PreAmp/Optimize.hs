@@ -25,17 +25,22 @@ readLastTChan tchan = do
              else readLastTChan tchan
 
 data GainOffset = GO { _gain, _offset :: CodePoint }
+                deriving (Show)
 makeLenses ''GainOffset
 
 failE :: Monad m => EitherT String m a -> m a
 failE m = either error id `liftM` runEitherT m
 
+setGainOffset :: MonadIO m => PreAmp -> Channel -> GainOffset -> TrackerT m ()
+setGainOffset pa paCh go = do
+    liftIO $ failE $ PreAmp.setGain pa paCh (go ^. gain)
+    liftIO $ failE $ PreAmp.setOffset pa paCh (go ^. offset)
+
 sampleConfig :: (MonadIO m)
              => PreAmp -> Channel -> GainOffset -> TrackerT m (Psd (SumDiff Sample))
 sampleConfig pa paCh go = do
+    setGainOffset pa paCh go
     queue <- getSensorQueue
-    liftIO $ failE $ PreAmp.setGain pa paCh (go ^. gain)
-    liftIO $ failE $ PreAmp.setOffset pa paCh (go ^. offset)
     s <- liftIO $ atomically $ readLastTChan queue
     return $ s ^. to V.last . psd
 
@@ -45,19 +50,24 @@ sweepOffset pa channel go = do
     let xs = map (\o->go & offset .~ o) [minBound..]
         paCh = PreAmp.channels ^. channel
     ys <- mapM (sampleConfig pa paCh) xs
-    case minimumBy (compare `on` (\y->y^._2.channel)) $ zip xs ys of
-        (x,y) | y^.channel < 1000  -> return $ Just x
-        _                          -> return $ Nothing
+    case minimumBy (compare `on` (\y->abs $ y^._2.channel)) $ zip xs ys of
+        (x,y) | abs (y^.channel) < 1000  -> do liftIO $ print (x, y^.channel, go)
+                                               return $ Just x
+        _                                -> return $ Nothing
 
 optimize :: (MonadIO m)
-         => PreAmp -> Sample -> PsdLens -> TrackerT m ()
+         => PreAmp -> Sample -> PsdLens -> TrackerT m (Maybe GainOffset)
 optimize pa margin channel = do
-    let step :: MonadIO m => GainOffset -> MaybeT (TrackerT m) GainOffset
+    let paCh = PreAmp.channels ^. channel
+        step :: MonadIO m => GainOffset -> MaybeT (TrackerT m) GainOffset
         step go = do
-            go' <- MaybeT $ sweepOffset pa channel go
-            next <- lift $ runMaybeT $ step $ gain +~ 10 $ go'
-            case next of
-              Just x  -> return x
-              Nothing -> return go
-    r <- runMaybeT $ step $ GO 0 0
-    return ()
+            if go^.gain > maxBound - 10
+              then return go
+              else do go' <- MaybeT $ sweepOffset pa channel go
+                      next <- lift $ runMaybeT $ step $ gain +~ 20 $ go'
+                      case next of
+                        Just x  -> return x
+                        Nothing -> return go
+    result <- runMaybeT $ step $ GO 1 1
+    setGainOffset pa paCh $ maybe (GO 0 0) id result
+    return result
