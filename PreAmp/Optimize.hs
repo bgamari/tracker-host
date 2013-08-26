@@ -51,8 +51,7 @@ sweepOffset pa channel go = do
         paCh = PreAmp.channels ^. channel
     ys <- mapM (sampleConfig pa paCh) xs
     case minimumBy (compare `on` (\y->abs $ y^._2.channel)) $ zip xs ys of
-        (x,y) | abs (y^.channel) < 1000  -> do liftIO $ print (x, y^.channel, go)
-                                               return $ Just x
+        (x,y) | abs (y^.channel) < 1000  -> return $ Just x
         _                                -> return $ Nothing
 
 optimize :: (MonadIO m)
