@@ -118,7 +118,7 @@ readSensorsCmd = command ["read-sensors"] help "" $ \args->do
   where help = "Read sensors values"
   
 startPlotCmd :: Command
-startPlotCmd = command ["start-plot"] help "" $ \args->do
+startPlotCmd = command ["plot", "start"] help "" $ \args->do
     plot <- use trackerPlot
     case plot of
       Nothing -> do 
