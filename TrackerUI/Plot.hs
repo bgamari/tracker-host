@@ -76,24 +76,24 @@ plotWorker configVar queue = do
 
     psdPlot <- newPlot "Tracker PSD"
     stagePlot <- newPlot "Tracker Stage"
-    config <- atomically $ readTVar configVar
-    let updatePlot :: Plot -> [Curve] -> IO ()
-        updatePlot plot cs = do
+    let updatePlot :: PlotConfig -> Plot -> [Curve] -> IO ()
+        updatePlot config plot cs = do
             let step = 1000
                 (miny, maxy) = case config^.pcYSize of
                                  Just size -> let s = realToFrac size / 2 in (-s, s)
                                  Nothing   -> let ys = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
                                               in (minimum ys-2000, maximum ys+2000)
-            setLimits plot $ Rect (V2 0 miny) (V2 (realToFrac npoints) maxy)
+            setLimits plot $ Rect (V2 0 miny) (V2 (realToFrac $ config^.pcNPoints) maxy)
             updateCurves plot cs 
 
         go :: Sensors (VS.Vector Int16) -> IO ()
         go v = do
+            config <- atomically $ readTVar configVar
             new <- atomically $ readTChan queue
             let v' = fmap (VS.take $ config^.pcNPoints)
                      $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
-            updatePlot psdPlot $ psdCurves v'
-            updatePlot stagePlot $ stageCurves v'
+            updatePlot config psdPlot $ psdCurves v'
+            updatePlot config stagePlot $ stageCurves v'
             go v'
     listener <- forkIO $ go (pure VS.empty)
     mainLoop [psdPlot, stagePlot]
