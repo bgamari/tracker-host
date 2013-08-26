@@ -148,11 +148,6 @@ plotCommands = [ startPlotCmd
                , setPlotNPointsCmd
                , setYSizeCmd
                ]
-               
-indexZ :: MonadPlus m => Int -> [a] -> m a
-indexZ 0 (x:xs) = return x
-indexZ n []     = mzero
-indexZ n (_:xs) = indexZ (n-1) xs
 
 logger :: Handle -> Int -> TChan (V.Vector (Sensors Int16)) -> IO ()       
 logger h decimation queue = forever $ do
@@ -163,8 +158,8 @@ logger h decimation queue = forever $ do
 logStartCmd :: Command
 logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
     use logThread >>= flip when (throwError "Already logging") . isJust
-    fname <- liftEitherT $ indexZ 0 args
-    let dec = fromMaybe 1 $ indexZ 1 args >>= Safe.readZ
+    fname <- liftEitherT $ Safe.tryAt "Expected filename" args 0
+    let dec = fromMaybe 1 $ Safe.atZ args 1 >>= Safe.readZ
     h <- liftEitherT $ fmapLT show $ tryIO $ openFile fname WriteMode
     queue <- liftTracker T.getSensorQueue
     thread <- liftIO $ forkIO $ logger h dec queue
@@ -249,15 +244,9 @@ stageV3 = iso (\(Stage v)->v) Stage
 v3Tuple :: Iso' (V3 a) (a,a,a)
 v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
 
-readMaybe :: Read a => String -> Maybe a
-readMaybe a =          
-    case reads a of
-      []           -> Nothing
-      (value,_):_  -> Just value
-
 readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
-readParse (a:_) = readMaybe a
+readParse (a:_) = Safe.readZ a
                                  
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
