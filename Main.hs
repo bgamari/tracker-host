@@ -127,7 +127,28 @@ startPlotCmd = command ["start-plot"] help "" $ \args->do
       Just _  -> do
         throwError $ "Plot already running"
   where help = "Start plot view"
+  
+setPlotNPointsCmd :: Command
+setPlotNPointsCmd = command ["set", "plot.npoints"] help "" $ \args->do
+    plot <- use trackerPlot >>= tryJust "No plot"
+    tryHead "Expected number of points" args >>= tryRead "Invalid number of points" >>= liftIO . setNPoints plot 
+  where help = "Set number of points in plot"
 
+setYSizeCmd :: Command
+setYSizeCmd = command ["set", "plot.ysize"] help "" $ \args->do
+    plot <- use trackerPlot >>= tryJust "No plot"
+    size <- case args of
+              []  -> return Nothing
+              x:_ -> Just <$> tryRead "Invalid size" x
+    liftIO $ setYSize plot size
+  where help = "Set Y extent"
+
+plotCommands :: [Command]
+plotCommands = [ startPlotCmd
+               , setPlotNPointsCmd
+               , setYSizeCmd
+               ]
+               
 indexZ :: MonadPlus m => Int -> [a] -> m a
 indexZ 0 (x:xs) = return x
 indexZ n []     = mzero
@@ -291,7 +312,6 @@ commands = [ helloCmd
            , dumpRoughCmd
            , fineCalCmd
            , readSensorsCmd
-           , startPlotCmd
            , logStartCmd
            , logStopCmd
            , resetCmd
@@ -300,7 +320,7 @@ commands = [ helloCmd
            , command ["start", "adc"] "Start ADC triggering" "" $ const
              $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
            , showCmd
-           ] ++ concatMap settingCommands settings ++ preAmpCmds
+           ] ++ concatMap settingCommands settings ++ preAmpCmds ++ plotCommands
 
 prompt :: TrackerUI Bool
 prompt = do
