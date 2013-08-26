@@ -332,7 +332,7 @@ main = either error (const $ return ()) =<< go
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
-                           T.setAdcFreq 5000
+                           T.setAdcFreq 10000
                            T.startAdcStream
                            T.setAdcTriggerMode T.TriggerAuto
           while $ prompt
