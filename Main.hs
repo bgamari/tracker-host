@@ -174,11 +174,21 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
   where help = "Display help message"
   
 openPreAmp :: Command
-openPreAmp = command ["open-preamp"] help "DEVICE" $ \args->do
+openPreAmp = command ["preamp", "open"] help "DEVICE" $ \args->do
     device <- tryHead "expected device" args
     pa <- liftEitherT $ PreAmp.open device
     preAmp .= Just pa
   where help = "Open pre-amplifier device"
+
+optimizePreAmp :: Command
+optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
+    pa <- tryJust "No pre-amplifier open" =<< use preAmp
+    liftTracker $ do
+        optimize pa 1000 (_x . sdDiff)
+        optimize pa 1000 (_y . sdDiff)
+        optimize pa 1000 (_x . sdSum)
+        optimize pa 1000 (_y . sdSum)
+  where help = "Automatically optimize pre amplifier gains and offsets"
 
 preAmpCmds :: [Command]
 preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
@@ -186,7 +196,7 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                     , cmd (_y.sdSum) "ysum"
                     , cmd (_y.sdDiff) "ydiff"
                     ]
-             ++ [ openPreAmp ]
+             ++ [ openPreAmp, optimizePreAmp ]
   where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> [Command]
         cmd proj name = 
             [ Cmd ["set", "amp."++name++".gain"] 
