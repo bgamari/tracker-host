@@ -68,6 +68,6 @@ optimize pa margin channel = do
                       case next of
                         Just x  -> return x
                         Nothing -> return go
-    result <- runMaybeT $ step $ GO 1 1
+    result <- runMaybeT $ step $ GO 0 0
     setGainOffset pa paCh $ maybe (GO 0 0) id result
     return result
