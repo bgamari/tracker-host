@@ -26,7 +26,7 @@ roughScan :: MonadIO m
 roughScan freq s =
     let s' = fmap realToFrac s :: RasterScan Stage Double
         path = map (fmap round) $ rasterScan sequenceStage s'
-        sequenceStage s = (\x y z->Stage $ V3 x y z) <$> (s ^. _z) <*> (s ^. _x)  <*> (s ^. _y)
+        sequenceStage s = (\x y z->Stage $ V3 x y z) <$> (s ^. _x) <*> (s ^. _y)  <*> (s ^. _z)
         --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
