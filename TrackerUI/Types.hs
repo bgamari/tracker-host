@@ -40,13 +40,13 @@ defaultTrackerState =
     TrackerState { _lastRoughCal  = Nothing
                  , _roughScanFreq = 1000
                  , _roughScan     = RasterScan { _scanCenter = pure 0x7fff
-                                               , _scanSize   = pure 0x400
-                                               , _scanPoints = Stage $ V3 20 20 2
+                                               , _scanSize   = pure 0x4000
+                                               , _scanPoints = Stage $ V3 40 40 1
                                                }
                  , _fineScan      = FineScan { _fineScanRange  = pure 0x500
                                              , _fineScanCenter = pure 0x7fff
                                              , _fineScanPoints = 500
-                                             , _fineScanFreq   = 1000
+                                             , _fineScanFreq   = 2000
                                              }
                  , _feedbackGains = pure $ pure 0
                  , _preAmp        = Nothing
