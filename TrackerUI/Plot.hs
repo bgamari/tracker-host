@@ -1,4 +1,4 @@
-module Plot (startPlot) where
+module TrackerUI.Plot (startPlot) where
       
 import Data.Traversable as T
 import Data.Int
@@ -13,6 +13,7 @@ import Control.Lens
 import Linear
 import Tracker 
 import TrackerUI.Types
+import TrackerUI.Plot.Types
 
 import Graphics.Rendering.GLPlot
 import qualified Graphics.UI.GLFW as GLFW
@@ -72,10 +73,11 @@ plotWorker npoints queue = do
     let updatePlot :: Plot -> [Curve] -> IO ()
         updatePlot plot cs = do
             let step = 1000
-                (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
-                               in ( minimum xs, maximum xs)
+                (miny, maxy) = let ys = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
+                               in (minimum ys, maximum ys)
                                --in (-0xffff, 0xffff)
-            setLimits plot $ Rect (V2 0 (miny-2000)) (V2 (realToFrac npoints) (maxy+2000))
+                limits = Rect (V2 0 (miny-2000)) (V2 (realToFrac npoints) (maxy+2000))
+            setLimits plot limits
             updateCurves plot cs 
 
         go :: Sensors (VS.Vector Int16) -> IO ()
@@ -92,9 +94,11 @@ plotWorker npoints queue = do
     GLFW.terminate
     return ()
 
-startPlot :: MonadIO m => TrackerT m ()
+startPlot :: MonadIO m => TrackerT m TrackerPlot
 startPlot = do
     queue <- getSensorQueue
-    liftIO $ forkOS $ plotWorker npoints queue
-    return ()
+    liftIO $ do
+        worker <- forkOS $ plotWorker npoints queue
+        ySize <- liftIO $ newTVarIO Nothing
+        return $ TrackerPlot worker ySize
 

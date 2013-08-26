@@ -32,7 +32,7 @@ import Control.Lens hiding (setting, Setting)
 import qualified Tracker as T
 import Tracker.Types
 import TrackerUI.Types
-import Plot
+import TrackerUI.Plot
 import PreAmp       
 import PreAmp.Optimize
 
@@ -118,7 +118,14 @@ readSensorsCmd = command ["read-sensors"] help "" $ \args->do
   where help = "Read sensors values"
   
 startPlotCmd :: Command
-startPlotCmd = command ["start-plot"] help "" $ \args->liftTracker startPlot
+startPlotCmd = command ["start-plot"] help "" $ \args->do
+    plot <- use trackerPlot
+    case plot of
+      Nothing -> do 
+        plot' <- liftTracker startPlot
+        trackerPlot .= Just plot'
+      Just _  -> do
+        throwError $ "Plot already running"
   where help = "Start plot view"
 
 indexZ :: MonadPlus m => Int -> [a] -> m a
