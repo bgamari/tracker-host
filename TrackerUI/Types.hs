@@ -18,6 +18,7 @@ import Control.Lens hiding (Setting)
 import Linear
 
 import qualified Tracker as T
+import TrackerUI.Plot.Types
 import PreAmp
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
                , RasterScan(..), FineScan(..))
@@ -30,6 +31,7 @@ data TrackerState
                    , _feedbackGains  :: Psd (Stage Double)
                    , _preAmp         :: Maybe PreAmp
                    , _logThread      :: Maybe ThreadId
+                   , _trackerPlot    :: Maybe TrackerPlot
                    }
 makeLenses ''TrackerState
            
@@ -38,17 +40,18 @@ defaultTrackerState =
     TrackerState { _lastRoughCal  = Nothing
                  , _roughScanFreq = 1000
                  , _roughScan     = RasterScan { _scanCenter = pure 0x7fff
-                                               , _scanSize   = pure 0x1000
-                                               , _scanPoints = Stage $ V3 20 20 2
+                                               , _scanSize   = pure 4000
+                                               , _scanPoints = Stage $ V3 40 40 1
                                                }
                  , _fineScan      = FineScan { _fineScanRange  = pure 0x500
                                              , _fineScanCenter = pure 0x7fff
                                              , _fineScanPoints = 500
-                                             , _fineScanFreq   = 1000
+                                             , _fineScanFreq   = 2000
                                              }
                  , _feedbackGains = pure $ pure 0
                  , _preAmp        = Nothing
                  , _logThread     = Nothing
+                 , _trackerPlot   = Nothing
                  }
 
 newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)

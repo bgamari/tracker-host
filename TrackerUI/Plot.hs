@@ -1,4 +1,10 @@
-module Plot (startPlot) where
+{-# LANGUAGE RankNTypes #-}
+                
+module TrackerUI.Plot ( startPlot
+                      , TrackerPlot
+                      , setYSize
+                      , setNPoints
+                      ) where
       
 import Data.Traversable as T
 import Data.Int
@@ -13,6 +19,7 @@ import Control.Lens
 import Linear
 import Tracker 
 import TrackerUI.Types
+import TrackerUI.Plot.Types
 
 import Graphics.Rendering.GLPlot
 import qualified Graphics.UI.GLFW as GLFW
@@ -61,30 +68,32 @@ roundUD ud k x
               Up     ->  1
               Down   -> -1
 
-plotWorker :: Int -> TChan (V.Vector (Sensors Int16)) -> IO ()
-plotWorker npoints queue = do
+plotWorker :: TVar PlotConfig -> TChan (V.Vector (Sensors Int16)) -> IO ()
+plotWorker configVar queue = do
     GLFW.setErrorCallback $ Just $ \err s->do error s
     result <- GLFW.init
     when (not result) $ error "Failed to initialize GLFW"
 
     psdPlot <- newPlot "Tracker PSD"
     stagePlot <- newPlot "Tracker Stage"
-    let updatePlot :: Plot -> [Curve] -> IO ()
-        updatePlot plot cs = do
+    let updatePlot :: PlotConfig -> Plot -> [Curve] -> IO ()
+        updatePlot config plot cs = do
             let step = 1000
-                (miny, maxy) = let xs = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
-                               in ( minimum xs, maximum xs)
-                               --in (-0xffff, 0xffff)
-            setLimits plot $ Rect (V2 0 (miny-2000)) (V2 (realToFrac npoints) (maxy+2000))
+                (miny, maxy) = case config^.pcYSize of
+                                 Just size -> let s = realToFrac size / 2 in (-s, s)
+                                 Nothing   -> let ys = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
+                                              in (minimum ys-2000, maximum ys+2000)
+            setLimits plot $ Rect (V2 0 miny) (V2 (realToFrac $ config^.pcNPoints) maxy)
             updateCurves plot cs 
 
         go :: Sensors (VS.Vector Int16) -> IO ()
         go v = do
+            config <- atomically $ readTVar configVar
             new <- atomically $ readTChan queue
-            let v' = fmap (VS.take npoints)
+            let v' = fmap (VS.take $ config^.pcNPoints)
                      $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
-            updatePlot psdPlot $ psdCurves v'
-            updatePlot stagePlot $ stageCurves v'
+            updatePlot config psdPlot $ psdCurves v'
+            updatePlot config stagePlot $ stageCurves v'
             go v'
     listener <- forkIO $ go (pure VS.empty)
     mainLoop [psdPlot, stagePlot]
@@ -92,9 +101,23 @@ plotWorker npoints queue = do
     GLFW.terminate
     return ()
 
-startPlot :: MonadIO m => TrackerT m ()
+startPlot :: MonadIO m => TrackerT m TrackerPlot
 startPlot = do
     queue <- getSensorQueue
-    liftIO $ forkOS $ plotWorker npoints queue
-    return ()
+    liftIO $ do
+        config <- liftIO $ newTVarIO $ PlotConfig { _pcYSize   = Nothing
+                                                  , _pcNPoints = 10000
+                                                  }
+        worker <- forkOS $ plotWorker config queue
+        return $ TrackerPlot worker config
+
+setYSize :: TrackerPlot -> Maybe Int16 -> IO ()
+setYSize = setConfig pcYSize
+
+setNPoints :: TrackerPlot -> Int -> IO ()
+setNPoints = setConfig pcNPoints
+    
+setConfig :: Lens' PlotConfig a -> TrackerPlot -> a -> IO ()
+setConfig lens plot value =
+    atomically $ modifyTVar (plot^.tpConfig) $ lens .~ value
 

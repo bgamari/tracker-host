@@ -6,7 +6,9 @@ import Data.Maybe (fromMaybe)
 import Data.Word
 import qualified Data.Vector as V
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.STM (TChan, STM, atomically, tryReadTChan)
+import Control.Concurrent.Async (async, wait)
+import Control.Concurrent.STM ( TChan, atomically, tryReadTChan
+                              , TVar, newTVarIO, writeTVar, readTVar)
 import Linear
 
 import Tracker.LowLevel
@@ -29,27 +31,36 @@ pathAcquire freq path = do
     -- disable triggering so we only see samples from after this point
     setAdcTriggerMode TriggerOff
     clearPath
-    -- First fill up path queue
+    -- Start capturing data
+    running <- liftIO $ newTVarIO True
+    queue <- getSensorQueue
+    framesAsync <- liftIO $ async $ readAllTChan running queue
+    -- First fill up path queue and start running path
     points <- primePath $ batchBy maxPathPoints path
     startPath freq False
-    queue <- getSensorQueue
     mapM_ queuePoints $ points
     waitUntilPathFinished
-    frames <- V.concat `liftM` liftIO (atomically $ readAllTChan queue)
+    -- Grab remaining frames
+    liftIO $ atomically $ writeTVar running False
+    frames <- liftIO $ wait framesAsync
+    -- Restart ADC triggering
     setAdcTriggerMode TriggerAuto
-    return frames
+    return $ V.concat frames
 
 waitUntilPathFinished :: MonadIO m => TrackerT m ()
 waitUntilPathFinished = do
     done <- isPathRunning
     when (not done) $ liftIO (threadDelay 10000) >> waitUntilPathFinished
 
-readAllTChan :: TChan a -> STM [a]
-readAllTChan c = go []
-  where go xs = do a <- tryReadTChan c
+readAllTChan :: TVar Bool -> TChan a -> IO [a]
+readAllTChan running c = go []
+  where go xs = do threadDelay 1000
+                   (a, running) <- atomically $ (,) <$> tryReadTChan c <*> readTVar running
                    case a of
+                     Nothing
+                       | not running -> return $ reverse xs
+                       | otherwise   -> go xs
                      Just x  -> go (x:xs)
-                     Nothing -> return $ reverse xs
 
 queuePoints :: MonadIO m => [Stage Word16] -> TrackerT m Bool
 queuePoints points = go

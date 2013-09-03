@@ -23,9 +23,10 @@ import Data.Word
 newtype PreAmp = PreAmp Handle
 
 newtype Channel = Ch Int
+                deriving (Enum, Ord, Eq, Show)
 
 newtype CodePoint = CP Word8
-                  deriving (Enum, Num, Ord, Eq)
+                  deriving (Enum, Num, Ord, Eq, Show)
 
 instance Bounded CodePoint where
     minBound = CP 0

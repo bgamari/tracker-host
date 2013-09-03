@@ -32,7 +32,7 @@ import Control.Lens hiding (setting, Setting)
 import qualified Tracker as T
 import Tracker.Types
 import TrackerUI.Types
-import Plot
+import TrackerUI.Plot
 import PreAmp       
 import PreAmp.Optimize
 
@@ -118,13 +118,36 @@ readSensorsCmd = command ["read-sensors"] help "" $ \args->do
   where help = "Read sensors values"
   
 startPlotCmd :: Command
-startPlotCmd = command ["start-plot"] help "" $ \args->liftTracker startPlot
+startPlotCmd = command ["plot", "start"] help "" $ \args->do
+    plot <- use trackerPlot
+    case plot of
+      Nothing -> do 
+        plot' <- liftTracker startPlot
+        trackerPlot .= Just plot'
+      Just _  -> do
+        throwError $ "Plot already running"
   where help = "Start plot view"
+  
+setPlotNPointsCmd :: Command
+setPlotNPointsCmd = command ["set", "plot.npoints"] help "" $ \args->do
+    plot <- use trackerPlot >>= tryJust "No plot"
+    tryHead "Expected number of points" args >>= tryRead "Invalid number of points" >>= liftIO . setNPoints plot 
+  where help = "Set number of points in plot"
 
-indexZ :: MonadPlus m => Int -> [a] -> m a
-indexZ 0 (x:xs) = return x
-indexZ n []     = mzero
-indexZ n (_:xs) = indexZ (n-1) xs
+setYSizeCmd :: Command
+setYSizeCmd = command ["set", "plot.ysize"] help "" $ \args->do
+    plot <- use trackerPlot >>= tryJust "No plot"
+    size <- case args of
+              []  -> return Nothing
+              x:_ -> Just <$> tryRead "Invalid size" x
+    liftIO $ setYSize plot size
+  where help = "Set Y extent"
+
+plotCommands :: [Command]
+plotCommands = [ startPlotCmd
+               , setPlotNPointsCmd
+               , setYSizeCmd
+               ]
 
 logger :: Handle -> Int -> TChan (V.Vector (Sensors Int16)) -> IO ()       
 logger h decimation queue = forever $ do
@@ -135,8 +158,8 @@ logger h decimation queue = forever $ do
 logStartCmd :: Command
 logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
     use logThread >>= flip when (throwError "Already logging") . isJust
-    fname <- liftEitherT $ indexZ 0 args
-    let dec = fromMaybe 1 $ indexZ 1 args >>= Safe.readZ
+    fname <- liftEitherT $ Safe.tryAt "Expected filename" args 0
+    let dec = fromMaybe 1 $ Safe.atZ args 1 >>= Safe.readZ
     h <- liftEitherT $ fmapLT show $ tryIO $ openFile fname WriteMode
     queue <- liftTracker T.getSensorQueue
     thread <- liftIO $ forkIO $ logger h dec queue
@@ -174,11 +197,22 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
   where help = "Display help message"
   
 openPreAmp :: Command
-openPreAmp = command ["open-preamp"] help "DEVICE" $ \args->do
+openPreAmp = command ["preamp", "open"] help "DEVICE" $ \args->do
     device <- tryHead "expected device" args
     pa <- liftEitherT $ PreAmp.open device
     preAmp .= Just pa
   where help = "Open pre-amplifier device"
+
+optimizePreAmp :: Command
+optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
+    pa <- tryJust "No pre-amplifier open" =<< use preAmp
+    liftTracker $ do
+        optimize pa 1000 (_x . sdDiff)
+        optimize pa 1000 (_y . sdDiff)
+        optimize pa 1000 (_x . sdSum)
+        optimize pa 1000 (_y . sdSum)
+        return ()
+  where help = "Automatically optimize pre amplifier gains and offsets"
 
 preAmpCmds :: [Command]
 preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
@@ -186,7 +220,7 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                     , cmd (_y.sdSum) "ysum"
                     , cmd (_y.sdDiff) "ydiff"
                     ]
-             ++ [ openPreAmp ]
+             ++ [ openPreAmp, optimizePreAmp ]
   where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> [Command]
         cmd proj name = 
             [ Cmd ["set", "amp."++name++".gain"] 
@@ -210,15 +244,9 @@ stageV3 = iso (\(Stage v)->v) Stage
 v3Tuple :: Iso' (V3 a) (a,a,a)
 v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
 
-readMaybe :: Read a => String -> Maybe a
-readMaybe a =          
-    case reads a of
-      []           -> Nothing
-      (value,_):_  -> Just value
-
 readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
-readParse (a:_) = readMaybe a
+readParse (a:_) = Safe.readZ a
                                  
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
@@ -273,7 +301,6 @@ commands = [ helloCmd
            , dumpRoughCmd
            , fineCalCmd
            , readSensorsCmd
-           , startPlotCmd
            , logStartCmd
            , logStopCmd
            , resetCmd
@@ -282,7 +309,7 @@ commands = [ helloCmd
            , command ["start", "adc"] "Start ADC triggering" "" $ const
              $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
            , showCmd
-           ] ++ concatMap settingCommands settings ++ preAmpCmds
+           ] ++ concatMap settingCommands settings ++ preAmpCmds ++ plotCommands
 
 prompt :: TrackerUI Bool
 prompt = do
@@ -305,7 +332,7 @@ main = either error (const $ return ()) =<< go
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
                            T.setStageGains unitStageGains
                            T.setFeedbackFreq 1000
-                           T.setAdcFreq 5000
+                           T.setAdcFreq 10000
                            T.startAdcStream
                            T.setAdcTriggerMode T.TriggerAuto
           while $ prompt
