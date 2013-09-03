@@ -3,6 +3,7 @@
 module Tracker.Types ( Sample
                      , Stage(..)
                      , mkStage
+                     , StageChannel(..)
                        -- * Modelling position sensitive photodiode
                      , SumDiff(SumDiff)
                      , sdSum, sdDiff
@@ -86,3 +87,5 @@ sumDiffDiode = iso to from
     where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
           from (Diode an cat) = SumDiff (an - cat) (an + cat)
     
+data StageChannel = StageX | StageY | StageZ
+                  deriving (Show, Eq, Ord, Bounded, Enum)
