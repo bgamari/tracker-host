@@ -63,7 +63,7 @@ setMaxError maxError = do
 
 setOutputGains :: MonadIO m => Stage Int32 -> TrackerT m ()
 setOutputGains gains = do
-    writeCommand 0x13 $ mapM_ putInt32le gains
+    writeCommand 0x15 $ mapM_ putInt32le gains
     readAck "setOutputGains"
 
 setAdcFreq :: MonadIO m => Word32 -> TrackerT m ()
