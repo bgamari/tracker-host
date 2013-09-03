@@ -18,6 +18,8 @@ module Tracker
     , module Tracker.RoughCal
       -- * Fine feedback calibration
     , module Tracker.FineCal
+      -- * Calibration excitation
+    , module Tracker.Excitation
     ) where
 
 import Tracker.Types
@@ -26,6 +28,7 @@ import Tracker.Raster
 import Tracker.RoughCal
 import Tracker.FineCal
 import Tracker.LowLevel
+import Tracker.Excitation
 
 import qualified Data.Vector as V
 

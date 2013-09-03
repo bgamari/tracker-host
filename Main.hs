@@ -238,6 +238,30 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
             ]
           where ch = PreAmp.channels ^. proj
 
+exciteCmds :: [Command]
+exciteCmds = 
+    [ command ["excite", "start"] 
+      "Start excitation" "" $ \args->do
+        use excitation >>= liftTracker . T.configureExcitation
+    , command ["excite", "stop"]
+      "Stop excitation" "" $ \args->do
+        liftTracker $ T.configureExcitation (pure Nothing)
+    , command ["excite", "cal"]
+      "Run calibration" "" $ \args->do
+        samples <- use corrPoints >>= liftTracker . fetchPoints
+        let test = fmap (view (psd . _x . sdSum)) samples
+        traj <- uses (excitation . _x . to fromJust) T.excitationTrajectory
+        liftIO $ print $ T.phaseAmp traj (fmap realToFrac test)
+    ]
+
+fetchPoints :: MonadIO m => Int -> T.TrackerT m (V.Vector (Sensors Sample))
+fetchPoints n = do
+    queue <- T.getSensorQueue
+    let go v | V.length v >= n  = return $ V.take n v
+             | otherwise        = do v' <- liftIO $ atomically $ readTChan queue
+                                     go (v V.++ v')
+    go V.empty
+
 stageV3 :: Iso' (Stage a) (V3 a)
 stageV3 = iso (\(Stage v)->v) Stage
 
@@ -247,7 +271,7 @@ v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
 readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
 readParse (a:_) = Safe.readZ a
-                                 
+
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
   where getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \args->
@@ -309,7 +333,10 @@ commands = [ helloCmd
            , command ["start", "adc"] "Start ADC triggering" "" $ const
              $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
            , showCmd
-           ] ++ concatMap settingCommands settings ++ preAmpCmds ++ plotCommands
+           ] ++ concatMap settingCommands settings
+             ++ preAmpCmds
+             ++ plotCommands
+             ++ exciteCmds
 
 prompt :: TrackerUI Bool
 prompt = do

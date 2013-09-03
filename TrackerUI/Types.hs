@@ -32,6 +32,8 @@ data TrackerState
                    , _preAmp         :: Maybe PreAmp
                    , _logThread      :: Maybe ThreadId
                    , _trackerPlot    :: Maybe TrackerPlot
+                   , _corrPoints     :: Int
+                   , _excitation     :: Stage (Maybe T.Excitation)
                    }
 makeLenses ''TrackerState
            
@@ -52,6 +54,8 @@ defaultTrackerState =
                  , _preAmp        = Nothing
                  , _logThread     = Nothing
                  , _trackerPlot   = Nothing
+                 , _corrPoints    = 4000
+                 , _excitation    = fmap pure T.defaultExcitation
                  }
 
 newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)

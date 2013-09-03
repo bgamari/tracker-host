@@ -1,6 +1,8 @@
 module Tracker.Excitation ( Excitation(..)
-                          , configureExcitations
-                          , defaultExcitations
+                          , excitationTrajectory
+                          , configureExcitation
+                          , defaultExcitation
+                          , phaseAmp
                           ) where
 
 import Tracker.Types
@@ -26,17 +28,20 @@ data Excitation = Excitation { excitePeriod :: Int
                              }
                 deriving (Show, Eq, Read)
 
-excitation :: Excitation -> V.Vector Int16
-excitation (Excitation period amp) = V.generate period f
-  where f i = round $ amp * sin (2*pi*realToFrac i/realToFrac period)
+excitationTrajectory :: Excitation -> V.Vector Double
+excitationTrajectory (Excitation period amp) = V.generate period f
+  where f i = amp * sin (2*pi*realToFrac i/realToFrac period)
 
-configureExcitations :: (Functor m, MonadIO m)
-                     => Stage Excitation -> TrackerT m ()
-configureExcitations exc =
-    void $ T.sequence $ setExcitation <$> stageAxes <*> fmap excitation exc
+configureExcitation :: (Functor m, MonadIO m)
+                    => Stage (Maybe Excitation) -> TrackerT m ()
+configureExcitation exc =
+    void $ T.sequence $ go <$> stageAxes <*> exc
+  where go axis (Just exc) = setExcitation axis
+                             $ fmap round $ excitationTrajectory exc
+        go axis Nothing    = setExcitation axis $ V.empty
 
-defaultExcitations :: Stage Excitation
-defaultExcitations = mkStage
+defaultExcitation :: Stage Excitation
+defaultExcitation = mkStage
     (Excitation 239 100)
     (Excitation 397 100)
     (Excitation 163 100)
