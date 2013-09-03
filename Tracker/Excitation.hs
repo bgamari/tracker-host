@@ -43,8 +43,8 @@ configureExcitation exc =
 defaultExcitation :: Stage Excitation
 defaultExcitation = mkStage
     (Excitation 239 100)
-    (Excitation 397 100)
-    (Excitation 163 100)
+    (Excitation 199 100)
+    (Excitation 149 100)
 
 correlate :: Num a => V.Vector a -> V.Vector a -> Phase -> a
 correlate a b lag = (V.drop lag a V.++ a) `dot` b
