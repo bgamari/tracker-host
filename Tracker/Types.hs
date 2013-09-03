@@ -3,7 +3,8 @@
 module Tracker.Types ( Sample
                      , Stage(..)
                      , mkStage
-                     , StageChannel(..)
+                     , StageAxis(..)
+                     , stageAxes
                        -- * Modelling position sensitive photodiode
                      , SumDiff(SumDiff)
                      , sdSum, sdDiff
@@ -39,6 +40,12 @@ newtype Stage a = Stage {unStage :: V3 a}
         
 mkStage :: a -> a -> a -> Stage a
 mkStage x y z = Stage $ V3 x y z
+    
+data StageAxis = StageX | StageY | StageZ
+               deriving (Show, Eq, Ord, Bounded, Enum)
+
+stageAxes :: Stage StageAxis
+stageAxes = mkStage StageX StageY StageZ
 
 -- | A sum-difference sample
 data SumDiff a = SumDiff { _sdSum, _sdDiff :: !a }
@@ -86,6 +93,3 @@ sumDiffDiode :: Num a => Iso' (SumDiff a) (Diode a)
 sumDiffDiode = iso to from
     where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
           from (Diode an cat) = SumDiff (an - cat) (an + cat)
-    
-data StageChannel = StageX | StageY | StageZ
-                  deriving (Show, Eq, Ord, Bounded, Enum)
