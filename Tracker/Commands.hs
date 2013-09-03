@@ -66,12 +66,12 @@ setOutputGains gains = do
     writeCommand 0x15 $ mapM_ putInt32le gains
     readAck "setOutputGains"
 
-setExcitation :: MonadIO m => StageAxis -> V.Vector Word16 -> TrackerT m ()
+setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
 setExcitation ch samples = do
     writeCommand 0x16 $ do
       putWord8 $ fromIntegral $ fromEnum ch
       putWord8 $ fromIntegral $ V.length samples
-      mapM_ putWord16le $ samples
+      mapM_ (putWord16le . fromIntegral) samples
     readAck "setExcitation"
 
 setAdcFreq :: MonadIO m => Word32 -> TrackerT m ()
