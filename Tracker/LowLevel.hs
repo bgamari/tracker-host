@@ -149,6 +149,8 @@ writeCommand :: MonadIO m => Word8 -> Put -> TrackerT m ()
 writeCommand cmd payload = withDeviceIO $ \h->do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
     debugOut $ "   > "++showByteString (BS.take 200 frame)
+    when (BS.length frame > 512)
+        $ error $ "writeCommand: Frame too long: "++show (BS.length frame)
     (size, status) <- liftIO $ writeBulk h cmdOutEndpt frame cmdTimeout
     case status of
         TimedOut  -> error "Command write timed out"
