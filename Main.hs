@@ -68,6 +68,13 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
+setStageSetpointCmd :: Command
+setStageSetpointCmd =
+    command ["set", "stage.setpoint"] help "(X,Y,Z)" $ \args->do
+      pos <- tryHead "expected position" args >>= tryRead "invalid position"
+      liftTracker $ T.setStageSetpoint $ pos^.from (stageV3 . v3Tuple)
+  where help = "Set stage feedback setpoint"
+  
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->
     liftTracker $ T.setRawPosition $ Stage $ V3 c c c
@@ -331,6 +338,7 @@ commands :: [Command]
 commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
+           , setStageSetpointCmd
            , roughCalCmd
            , dumpRoughCmd
            , fineCalCmd
