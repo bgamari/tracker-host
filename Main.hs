@@ -385,7 +385,7 @@ main = either error (const $ return ()) =<< go
   where go = runTrackerUI commands $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
                            T.setStageGains unitStageGains
-                           T.setFeedbackFreq 1000
+                           T.setFeedbackFreq 10000
                            T.setAdcFreq 10000
                            T.startAdcStream
                            T.setAdcTriggerMode T.TriggerAuto
