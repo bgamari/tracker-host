@@ -26,6 +26,8 @@ import Data.Ratio
 import Data.Foldable
 import Data.Traversable
 import Data.Fixed
+import Data.Binary
+import Data.Binary.Put (putWord32le)
 import Control.Applicative       
 import Data.Distributive (Distributive)
 import Linear       
@@ -65,6 +67,10 @@ instance Fractional Fixed16 where
       where num = numerator a
             denom = denominator a
 
+instance Binary Fixed16 where
+    get = Fixed16 <$> get
+    put (Fixed16 a) = putWord32le $ fromIntegral a
+    
 -- | The stage coordinate frame
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
