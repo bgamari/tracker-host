@@ -48,7 +48,7 @@ tryJust :: String -> Maybe a -> TrackerUI a
 tryJust err Nothing  = throwError err
 tryJust _   (Just a) = return a        
 
-unitStageGains :: Stage (Stage Int32)
+unitStageGains :: Stage (Stage Fixed16)
 unitStageGains = kronecker $ Stage $ V3 1 1 1
 
 command :: [String] -> String -> String -> ([String] -> TrackerUI ()) -> Command

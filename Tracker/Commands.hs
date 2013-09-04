@@ -36,9 +36,9 @@ echo payload = do
 reset :: MonadIO m => TrackerT m ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
-setStageGains :: MonadIO m => Stage (Stage Int32) -> TrackerT m ()
+setStageGains :: MonadIO m => Stage (Stage Fixed16) -> TrackerT m ()
 setStageGains gains = do
-    writeCommand 0x10 $ mapM_ (mapM_ putInt32le) gains
+    writeCommand 0x10 $ mapM_ (mapM_ put) gains
     readAck "setStageGains"
 
 setStageSetpoint :: MonadIO m => Stage Int32 -> TrackerT m ()
@@ -46,9 +46,9 @@ setStageSetpoint setpoint = do
     writeCommand 0x11 $ mapM_ putInt32le setpoint
     readAck "setStageSetpoint"
 
-setPsdGains :: MonadIO m => Psd (Stage Int32) -> TrackerT m ()
+setPsdGains :: MonadIO m => Psd (Stage Fixed16) -> TrackerT m ()
 setPsdGains gains = do
-    writeCommand 0x12 $ mapM_ (mapM_ putInt32le) gains
+    writeCommand 0x12 $ mapM_ (mapM_ put) gains
     readAck "setPsdGains"
 
 setPsdSetpoint :: MonadIO m => Psd Int32 -> TrackerT m ()
@@ -61,9 +61,9 @@ setMaxError maxError = do
     writeCommand 0x14 $ putWord32le maxError
     readAck "setMaxError"
 
-setOutputGains :: MonadIO m => Stage Int32 -> TrackerT m ()
+setOutputGains :: MonadIO m => Stage Fixed16 -> TrackerT m ()
 setOutputGains gains = do
-    writeCommand 0x15 $ mapM_ putInt32le gains
+    writeCommand 0x15 $ mapM_ put gains
     readAck "setOutputGains"
 
 setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
