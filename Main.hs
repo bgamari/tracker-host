@@ -75,6 +75,13 @@ setStageSetpointCmd =
       liftTracker $ T.setStageSetpoint $ pos^.from (stageV3 . v3Tuple)
   where help = "Set stage feedback setpoint"
   
+setStageMaxErrorCmd :: Command
+setStageMaxErrorCmd =
+    command ["set", "stage.max-error"] help "N" $ \args->do
+      e <- tryHead "expected error" args >>= tryRead "invalid error"
+      liftTracker $ T.setMaxError  e
+  where help = "Set maximum tolerable error signal before killing feedback"
+  
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->
     liftTracker $ T.setRawPosition $ Stage $ V3 c c c
@@ -339,6 +346,7 @@ commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
            , setStageSetpointCmd
+           , setStageMaxErrorCmd
            , roughCalCmd
            , dumpRoughCmd
            , fineCalCmd
