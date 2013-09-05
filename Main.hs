@@ -71,21 +71,21 @@ setStageSetpointCmd :: Command
 setStageSetpointCmd =
     command ["set", "stage.setpoint"] help "(X,Y,Z)" $ \args->do
       pos <- tryHead "expected position" args >>= tryRead "invalid position"
-      liftTracker $ T.setStageSetpoint $ pos^.from (stageV3 . v3Tuple)
+      liftTracker $ T.setKnob T.stageSetpoint $ pos^.from (stageV3 . v3Tuple)
   where help = "Set stage feedback setpoint"
   
 setStageMaxErrorCmd :: Command
 setStageMaxErrorCmd =
     command ["set", "stage.max-error"] help "N" $ \args->do
       e <- tryHead "expected error" args >>= tryRead "invalid error"
-      liftTracker $ T.setMaxError  e
+      liftTracker $ T.setKnob T.maxError  e
   where help = "Set maximum tolerable error signal before killing feedback"
   
 setOutputGainCmd :: Command
 setOutputGainCmd =
     command ["set", "stage.output-gain"] help "N" $ \args->do
       gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
-      liftTracker $ T.setOutputGain $ pure $ realToFrac (gain :: Double)
+      liftTracker $ T.setKnob T.outputGain $ pure $ realToFrac (gain :: Double)
   where help = "Set output gain"
 
 centerCmd :: Command
@@ -285,13 +285,13 @@ fetchPoints n = do
 feedbackCmds :: [Command]
 feedbackCmds =
     [ command ["feedback", "stop"] "Stop feedback" "" $ \args->
-        liftTracker $ T.setFeedbackMode T.NoFeedback
+        liftTracker $ T.setKnob T.feedbackMode T.NoFeedback
     , command ["feedback", "psd"] "Start PSD feedback" "" $ \args->
-        liftTracker $ T.setFeedbackMode T.PsdFeedback
+        liftTracker $ T.setKnob T.feedbackMode T.PsdFeedback
     , command ["feedback", "stage"] "Start stage feedback" "" $ \args->
-        liftTracker $ T.setFeedbackMode T.StageFeedback
+        liftTracker $ T.setKnob T.feedbackMode T.StageFeedback
     , command ["feedback", "status"] "Show feedback status" "" $ \args->
-        liftTracker T.getFeedbackMode >>= liftInputT . outputStrLn . show
+        liftTracker (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
     ]
 
 stageV3 :: Iso' (Stage a) (V3 a)
@@ -393,7 +393,7 @@ main :: IO ()
 main = either error (const $ return ()) =<< go
   where go = runTrackerUI commands $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
-                           T.setStageGain unitStageGains
+                           T.setKnob T.stageGain unitStageGains
                            T.setFeedbackFreq 10000
                            T.setAdcFreq 10000
                            T.startAdcStream
