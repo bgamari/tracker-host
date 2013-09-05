@@ -81,6 +81,13 @@ setStageMaxErrorCmd =
       liftTracker $ T.setMaxError  e
   where help = "Set maximum tolerable error signal before killing feedback"
   
+setOutputGainCmd :: Command
+setOutputGainCmd =
+    command ["set", "stage.output-gain"] help "N" $ \args->do
+      gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
+      liftTracker $ T.setOutputGain $ pure $ realToFrac (gain :: Double)
+  where help = "Set output gain"
+
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->
     liftTracker $ T.setRawPosition $ Stage $ V3 c c c
@@ -346,6 +353,7 @@ commands = [ helloCmd
            , setRawPositionCmd
            , setStageSetpointCmd
            , setStageMaxErrorCmd
+           , setOutputGainCmd
            , roughCalCmd
            , dumpRoughCmd
            , fineCalCmd
@@ -383,7 +391,7 @@ main :: IO ()
 main = either error (const $ return ()) =<< go
   where go = runTrackerUI commands $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
-                           T.setStageGains unitStageGains
+                           T.setStageGain unitStageGains
                            T.setFeedbackFreq 10000
                            T.setAdcFreq 10000
                            T.startAdcStream

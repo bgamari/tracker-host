@@ -36,8 +36,8 @@ echo payload = do
 reset :: MonadIO m => TrackerT m ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
-setStageGains :: MonadIO m => Stage (Stage Fixed16) -> TrackerT m ()
-setStageGains gains = do
+setStageGain :: MonadIO m => Stage (Stage Fixed16) -> TrackerT m ()
+setStageGain gains = do
     writeCommand 0x10 $ mapM_ (mapM_ put) gains
     readAck "setStageGains"
 
@@ -61,10 +61,10 @@ setMaxError maxError = do
     writeCommand 0x14 $ putWord32le maxError
     readAck "setMaxError"
 
-setOutputGains :: MonadIO m => Stage Fixed16 -> TrackerT m ()
-setOutputGains gains = do
+setOutputGain :: MonadIO m => Stage Fixed16 -> TrackerT m ()
+setOutputGain gains = do
     writeCommand 0x15 $ mapM_ put gains
-    readAck "setOutputGains"
+    readAck "setOutputGain"
 
 setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
 setExcitation ch samples = do
