@@ -38,32 +38,32 @@ reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
 setStageGain :: MonadIO m => Stage (Stage Fixed16) -> TrackerT m ()
 setStageGain gains = do
-    writeCommand 0x10 $ mapM_ (mapM_ put) gains
+    writeCommand 0x11 $ mapM_ (mapM_ put) gains
     readAck "setStageGains"
 
 setStageSetpoint :: MonadIO m => Stage Int32 -> TrackerT m ()
 setStageSetpoint setpoint = do
-    writeCommand 0x11 $ mapM_ putInt32le setpoint
+    writeCommand 0x13 $ mapM_ putInt32le setpoint
     readAck "setStageSetpoint"
 
 setPsdGains :: MonadIO m => Psd (Stage Fixed16) -> TrackerT m ()
 setPsdGains gains = do
-    writeCommand 0x12 $ mapM_ (mapM_ put) gains
+    writeCommand 0x15 $ mapM_ (mapM_ put) gains
     readAck "setPsdGains"
 
 setPsdSetpoint :: MonadIO m => Psd Int32 -> TrackerT m ()
 setPsdSetpoint setpoint = do
-    writeCommand 0x13 $ mapM_ putInt32le setpoint
+    writeCommand 0x17 $ mapM_ putInt32le setpoint
     readAck "setPsdSetpoint"
 
 setMaxError :: MonadIO m => Word32 -> TrackerT m ()
 setMaxError maxError = do
-    writeCommand 0x14 $ putWord32le maxError
+    writeCommand 0x19 $ putWord32le maxError
     readAck "setMaxError"
 
 setOutputGain :: MonadIO m => Stage Fixed16 -> TrackerT m ()
 setOutputGain gains = do
-    writeCommand 0x15 $ mapM_ put gains
+    writeCommand 0x1b $ mapM_ put gains
     readAck "setOutputGain"
 
 setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
@@ -109,14 +109,20 @@ data FeedbackMode = NoFeedback
                   | StageFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
 
+getFeedbackMode :: MonadIO m => TrackerT m FeedbackMode
+getFeedbackMode = do
+    writeCommand 0x31 $ return ()
+    r <- parseReply $ (toEnum . fromIntegral) `liftM` getWord8
+    maybe (error "setFeedbackMode") return r
+
 setFeedbackMode :: MonadIO m => FeedbackMode -> TrackerT m ()
 setFeedbackMode mode = do
-    writeCommand 0x31 $ putWord32le (fromIntegral $ fromEnum mode)
+    writeCommand 0x32 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck "setFeedbackMode"
 
 setRawPosition :: MonadIO m => Stage Word16 -> TrackerT m ()
 setRawPosition pos = do
-    writeCommand 0x32 $ mapM_ putWord16le pos
+    writeCommand 0x33 $ mapM_ putWord16le pos
     readAck "setRawPosition"
 
 maxPathPoints = 80 :: Int
