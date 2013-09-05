@@ -286,10 +286,12 @@ feedbackCmds :: [Command]
 feedbackCmds =
     [ command ["feedback", "stop"] "Stop feedback" "" $ \args->
         liftTracker $ T.setFeedbackMode T.NoFeedback
-    , command ["feedback", "psd"] "PSD feedback" "" $ \args->
+    , command ["feedback", "psd"] "Start PSD feedback" "" $ \args->
         liftTracker $ T.setFeedbackMode T.PsdFeedback
-    , command ["feedback", "stage"] "Stage feedback" "" $ \args->
+    , command ["feedback", "stage"] "Start stage feedback" "" $ \args->
         liftTracker $ T.setFeedbackMode T.StageFeedback
+    , command ["feedback", "status"] "Show feedback status" "" $ \args->
+        liftTracker T.getFeedbackMode >>= liftInputT . outputStrLn . show
     ]
 
 stageV3 :: Iso' (Stage a) (V3 a)
