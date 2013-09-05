@@ -26,7 +26,7 @@ pathAcquire _ [] = do
     liftIO $ putStrLn "pathAcquire: Tried to acquire on empty path"
     return V.empty
 pathAcquire freq path = do
-    setFeedbackMode NoFeedback
+    setKnob feedbackMode NoFeedback
     -- the firmware will enable triggering upon starting the path
     -- disable triggering so we only see samples from after this point
     setAdcTriggerMode TriggerOff
