@@ -323,11 +323,14 @@ settings = concat
             (knobA T.outputGain) stageV3
     , Setting "stage.max-error"
             (Just "maximum tolerable error signal before killing feedback")
-            readParse show (knobA T.outputGain) stageV3
+            readParse show (knobA T.outputGain) (stageV3.mapping fixed16Double)
     , Setting "stage.setpoint"
             (Just "Stage feedback setpoint")
             readParse show (knobA T.outputGain) stageV3
     ]
+    
+fixed16Double :: Iso' Fixed16 Double
+fixed16Double = iso realToFrac realToFrac
 
 showCmd :: Command
 showCmd = command ["show"] help "PATTERN" $ \args->do
