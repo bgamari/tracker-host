@@ -86,10 +86,10 @@ echo payload = do
 reset :: MonadIO m => TrackerT m ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
-stageGain :: Knob (Stage Fixed16)      
+stageGain :: Knob (Stage (Stage Fixed16))
 stageGain = Knob "stage-gain" 0x10 getter 0x11 putter
-  where getter = sequence $ pure get
-        putter = mapM_ put
+  where getter = mapM sequence $ pure (pure get)
+        putter = mapM_ (mapM_ put)
 
 stageSetpoint :: Knob (Stage Int32)
 stageSetpoint = Knob "stage-setpoint" 0x12 getter 0x13 putter
@@ -109,8 +109,10 @@ psdSetpoint = Knob "psd-setpoint" 0x16 getter 0x17 putter
 maxError :: Knob Word32
 maxError = Knob "max-error" 0x18 getWord32le 0x19 putWord32le
 
-outputGain :: Knob Fixed16
-outputGain = Knob "output-gain" 0x1a get 0x1b put
+outputGain :: Knob (Stage Fixed16)
+outputGain = Knob "output-gain" 0x1a getter 0x1b putter
+  where getter = sequence $ pure get
+        putter = mapM_ put
 
 setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
 setExcitation ch samples = do
