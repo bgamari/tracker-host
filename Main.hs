@@ -306,11 +306,13 @@ readParse (a:_) = Safe.readZ a
 
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
-  where getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \args->
-                   getSetting sSource >>= showValue >> return True
+  where get = sAccessors ^. aGet
+        put = sAccessors ^. aPut
+        getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \args->
+                   get >>= showValue . view sLens >> return True
         setter = Cmd ["set",sName] (("Set "++) <$> sHelp) "VALUE" $ \args->
                    case sParse args of
-                     Just value -> do putSetting sSource value
+                     Just value -> do get >>= put . (sLens .~ value)
                                       showValue value
                                       return True
                      Nothing    -> do liftInputT $ outputStrLn
@@ -337,6 +339,8 @@ settings = concat
     , [pureSetting "rough.freq"
             (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq]
+    , [Setting "stage.output-gain" (Just "stage output gain") readParse show
+            (knobA T.outputGain) stageV3]
     ]
 
 showCmd :: Command
@@ -346,8 +350,8 @@ showCmd = command ["show"] help "PATTERN" $ \args->do
                    $ filter (\(Setting {..})->isJust sHelp)
                    $ settings
     forM_ matching $ \(Setting {..})->do
-        value <- getSetting sSource
-        liftInputT $ outputStrLn $ sName++" = "++sFormat value 
+        value <- sAccessors^.aGet
+        liftInputT $ outputStrLn $ sName++" = "++views sLens sFormat value 
   where help = "Show values of settings matching pattern"
 
 commands :: [Command]

@@ -72,28 +72,29 @@ liftInputT = TUI . lift . lift
 liftTracker :: TrackerT IO a -> TrackerUI a
 liftTracker = TUI . lift . lift . lift
 
-data SettingSource a = forall b. KnobSetting (T.Knob b) (Lens' b a)
-                     | PureSetting (Lens' TrackerState a)
+data Accessors m a = Accessors { _aGet :: m a
+                               , _aPut :: a -> m ()
+                               }
+makeLenses ''Accessors
 
-getSetting :: SettingSource a -> TrackerUI a
-getSetting (PureSetting l) = use l
-getSetting (KnobSetting knob l) =
-    liftTracker $ (^. l) `liftM` T.getKnob knob
+stateA :: Accessors TrackerUI TrackerState
+stateA = Accessors get put
 
-putSetting :: SettingSource a -> a -> TrackerUI ()
-putSetting (PureSetting l) v = l .= v           
-putSetting (KnobSetting knob l) v = 
-    liftTracker $ T.getKnob knob >>= T.setKnob knob . (l .~ v)
+knobA :: T.Knob a -> Accessors TrackerUI a
+knobA knob = Accessors (liftTracker $ T.getKnob knob)
+                       (liftTracker . T.setKnob knob)
 
-data Setting = forall a. Setting { sName   :: String
-                                 , sHelp   :: Maybe String
-                                 , sParse  :: [String] -> Maybe a
-                                 , sFormat :: a -> String
-                                 , sSource :: SettingSource a
-                                 }
+data Setting = forall a s. Setting { sName      :: String
+                                   , sHelp      :: Maybe String
+                                   , sParse     :: [String] -> Maybe a
+                                   , sFormat    :: a -> String
+                                   , sAccessors :: Accessors TrackerUI s
+                                   , sLens      :: Lens' s a
+                                   }
      
 pureSetting :: String -> Maybe String -> ([String] -> Maybe a) -> (a -> String) -> Lens' TrackerState a -> Setting
-pureSetting name help parse format l = Setting name help parse format (PureSetting l)
+pureSetting name help parse format l =
+    Setting name help parse format stateA l
 
 data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: Maybe String
