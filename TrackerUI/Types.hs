@@ -72,12 +72,28 @@ liftInputT = TUI . lift . lift
 liftTracker :: TrackerT IO a -> TrackerUI a
 liftTracker = TUI . lift . lift . lift
 
+data SettingSource a = forall b. KnobSetting (T.Knob b) (Lens' b a)
+                     | PureSetting (Lens' TrackerState a)
+
+getSetting :: SettingSource a -> TrackerUI a
+getSetting (PureSetting l) = use l
+getSetting (KnobSetting knob l) =
+    liftTracker $ (^. l) `liftM` T.getKnob knob
+
+putSetting :: SettingSource a -> a -> TrackerUI ()
+putSetting (PureSetting l) v = l .= v           
+putSetting (KnobSetting knob l) v = 
+    liftTracker $ T.getKnob knob >>= T.setKnob knob . (l .~ v)
+
 data Setting = forall a. Setting { sName   :: String
                                  , sHelp   :: Maybe String
                                  , sParse  :: [String] -> Maybe a
                                  , sFormat :: a -> String
-                                 , sLens   :: Lens' TrackerState a
+                                 , sSource :: SettingSource a
                                  }
+     
+pureSetting :: String -> Maybe String -> ([String] -> Maybe a) -> (a -> String) -> Lens' TrackerState a -> Setting
+pureSetting name help parse format l = Setting name help parse format (PureSetting l)
 
 data Command = Cmd { _cmdName   :: [String]
                    , _cmdHelp   :: Maybe String

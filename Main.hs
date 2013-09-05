@@ -307,23 +307,23 @@ readParse (a:_) = Safe.readZ a
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
   where getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \args->
-                   use (sLens) >>= showValue >> return True
+                   getSetting sSource >>= showValue >> return True
         setter = Cmd ["set",sName] (("Set "++) <$> sHelp) "VALUE" $ \args->
                    case sParse args of
-                     Just value -> do sLens .= value
+                     Just value -> do putSetting sSource value
                                       showValue value
                                       return True
                      Nothing    -> do liftInputT $ outputStrLn
                                            $ "Invalid value: "++unwords args
                                       return True
-        showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value 
+        showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value
 
 r3Setting :: (Show a, Read a) => String -> String -> Lens' TrackerState (V3 a) -> [Setting]
 r3Setting name help l =
-     [ Setting name         (Just help) readParse show (l . v3Tuple)
-     , Setting (name++".x") Nothing     readParse show (l . _x)
-     , Setting (name++".y") Nothing     readParse show (l . _y)
-     , Setting (name++".z") Nothing     readParse show (l . _z)
+     [ pureSetting name         (Just help) readParse show (l . v3Tuple)
+     , pureSetting (name++".x") Nothing     readParse show (l . _x)
+     , pureSetting (name++".y") Nothing     readParse show (l . _y)
+     , pureSetting (name++".z") Nothing     readParse show (l . _z)
      ]
 
 settings :: [Setting] 
@@ -334,7 +334,8 @@ settings = concat
             (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             (roughScan . T.scanPoints . stageV3)
-    , [Setting "rough.freq" (Just "update frequency of rough calibration scan")
+    , [pureSetting "rough.freq"
+            (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq]
     ]
 
@@ -345,7 +346,7 @@ showCmd = command ["show"] help "PATTERN" $ \args->do
                    $ filter (\(Setting {..})->isJust sHelp)
                    $ settings
     forM_ matching $ \(Setting {..})->do
-        value <- use sLens
+        value <- getSetting sSource
         liftInputT $ outputStrLn $ sName++" = "++sFormat value 
   where help = "Show values of settings matching pattern"
 
