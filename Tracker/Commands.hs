@@ -1,6 +1,35 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Tracker.Commands where
+module Tracker.Commands ( -- * Types
+                          Knob
+                        , setKnob
+                        , getKnob
+                          -- * Knobs
+                        , stageGain
+                        , stageSetpoint
+                        , psdGains
+                        , psdSetpoint
+                        , maxError
+                        , outputGain
+                        , FeedbackMode(..)
+                        , feedbackMode
+                          -- * Commands
+                        , echo
+                        , reset
+                        , setExcitation
+                        , setAdcFreq
+                        , TriggerMode(..)
+                        , setAdcTriggerMode
+                        , startAdcStream
+                        , stopAdcStream
+                        , setFeedbackFreq
+                        , setRawPosition
+                        , clearPath
+                        , maxPathPoints
+                        , enqueuePoints
+                        , isPathRunning
+                        , startPath
+                        ) where
 
 import Prelude hiding (mapM_, sequence, mapM)
 import Data.Binary
