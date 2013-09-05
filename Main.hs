@@ -36,7 +36,6 @@ import TrackerUI.Plot
 import PreAmp       
 import PreAmp.Optimize
 
-
 tryHead :: String -> [a] -> TrackerUI a
 tryHead err []    = throwError err
 tryHead _   (x:_) = return x
@@ -356,7 +355,7 @@ commands = [ helloCmd
            , resetCmd
            , exitCmd
            , helpCmd
-           , command ["start", "adc"] "Start ADC triggering" "" $ const
+           , command ["adc", "start"] "Start ADC triggering" "" $ const
              $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
            , showCmd
            ] ++ concatMap settingCommands settings
