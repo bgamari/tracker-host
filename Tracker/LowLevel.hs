@@ -4,6 +4,7 @@ module Tracker.LowLevel
     ( TrackerT
     , withTracker
     , getSensorQueue
+    , CmdId
     , writeCommand
     , readReply
     , parseReply
@@ -41,6 +42,8 @@ import Tracker.Types
 
 type SensorQueue = TChan (V.Vector (Sensors Int16))
        
+type CmdId = Word8 
+
 data Env = Env { _device         :: DeviceHandle
                , _sensorQueue    :: SensorQueue
                }
@@ -145,7 +148,7 @@ debugOut :: MonadIO m => String -> m ()
 --debugOut = liftIO . putStrLn
 debugOut _ = return ()
 
-writeCommand :: MonadIO m => Word8 -> Put -> TrackerT m ()
+writeCommand :: MonadIO m => CmdId -> Put -> TrackerT m ()
 writeCommand cmd payload = withDeviceIO $ \h->do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
     debugOut $ "   > "++showByteString (BS.take 200 frame)

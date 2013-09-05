@@ -111,3 +111,4 @@ sumDiffDiode :: Num a => Iso' (SumDiff a) (Diode a)
 sumDiffDiode = iso to from
     where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
           from (Diode an cat) = SumDiff (an - cat) (an + cat)
+    
