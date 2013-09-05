@@ -67,27 +67,6 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
-setStageSetpointCmd :: Command
-setStageSetpointCmd =
-    command ["set", "stage.setpoint"] help "(X,Y,Z)" $ \args->do
-      pos <- tryHead "expected position" args >>= tryRead "invalid position"
-      liftTracker $ T.setKnob T.stageSetpoint $ pos^.from (stageV3 . v3Tuple)
-  where help = "Set stage feedback setpoint"
-  
-setStageMaxErrorCmd :: Command
-setStageMaxErrorCmd =
-    command ["set", "stage.max-error"] help "N" $ \args->do
-      e <- tryHead "expected error" args >>= tryRead "invalid error"
-      liftTracker $ T.setKnob T.maxError  e
-  where help = "Set maximum tolerable error signal before killing feedback"
-  
-setOutputGainCmd :: Command
-setOutputGainCmd =
-    command ["set", "stage.output-gain"] help "N" $ \args->do
-      gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
-      liftTracker $ T.setKnob T.outputGain $ pure $ realToFrac (gain :: Double)
-  where help = "Set output gain"
-
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->
     liftTracker $ T.setRawPosition $ Stage $ V3 c c c
@@ -336,11 +315,18 @@ settings = concat
             (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             (roughScan . T.scanPoints . stageV3)
-    , [pureSetting "rough.freq"
+    ] ++
+    [ pureSetting "rough.freq"
             (Just "update frequency of rough calibration scan")
-            readParse show roughScanFreq]
-    , [Setting "stage.output-gain" (Just "stage output gain") readParse show
-            (knobA T.outputGain) stageV3]
+            readParse show roughScanFreq
+    , Setting "stage.output-gain" (Just "stage output gain") readParse show
+            (knobA T.outputGain) stageV3
+    , Setting "stage.max-error"
+            (Just "maximum tolerable error signal before killing feedback")
+            readParse show (knobA T.outputGain) stageV3
+    , Setting "stage.setpoint"
+            (Just "Stage feedback setpoint")
+            readParse show (knobA T.outputGain) stageV3
     ]
 
 showCmd :: Command
@@ -358,9 +344,6 @@ commands :: [Command]
 commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
-           , setStageSetpointCmd
-           , setStageMaxErrorCmd
-           , setOutputGainCmd
            , roughCalCmd
            , dumpRoughCmd
            , fineCalCmd
