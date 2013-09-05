@@ -2,7 +2,7 @@
 
 module Tracker.Commands where
 
-import Prelude hiding (mapM_)
+import Prelude hiding (mapM_, sequence, mapM)
 import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
@@ -14,10 +14,13 @@ import Data.Foldable
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import qualified Data.Vector as V       
+import Control.Error
+import Control.Applicative
 import Control.Monad (liftM)
 import Control.Monad.IO.Class
 import Tracker.LowLevel
 import Tracker.Types
+import Control.Lens
 import Linear
 
 -- | Put a 32-bit signed integer
@@ -26,6 +29,24 @@ import Linear
 putInt32le :: Int32 -> Put
 putInt32le = putWord32le . fromIntegral
 
+data Knob a = Knob { _knobName    :: String 
+                   , _knobGetCmd  :: CmdId
+                   , _knobDecode  :: Get a
+                   , _knobSetCmd  :: CmdId
+                   , _knobEncode  :: a -> Put
+                   }
+ 
+setKnob :: MonadIO m => Knob a -> a -> TrackerT m ()
+setKnob knob value = do
+    writeCommand (_knobSetCmd knob) $ (_knobEncode knob) value
+    readAck $ _knobName knob
+        
+getKnob :: MonadIO m => Knob a -> TrackerT m a
+getKnob knob = do
+    writeCommand (_knobGetCmd knob) $ return ()
+    r <- parseReply (_knobDecode knob)
+    maybe (error $ _knobName knob) return r
+                   
 echo :: MonadIO m => ByteString -> TrackerT m (Maybe ByteString)
 echo payload = do
     writeCommand 0x0 $ do putWord8 (fromIntegral $ BS.length payload)
@@ -36,35 +57,31 @@ echo payload = do
 reset :: MonadIO m => TrackerT m ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
-setStageGain :: MonadIO m => Stage (Stage Fixed16) -> TrackerT m ()
-setStageGain gains = do
-    writeCommand 0x11 $ mapM_ (mapM_ put) gains
-    readAck "setStageGains"
+stageGain :: Knob (Stage Fixed16)      
+stageGain = Knob "stage-gain" 0x10 getter 0x11 putter
+  where getter = sequence $ pure get
+        putter = mapM_ put
 
-setStageSetpoint :: MonadIO m => Stage Int32 -> TrackerT m ()
-setStageSetpoint setpoint = do
-    writeCommand 0x13 $ mapM_ putInt32le setpoint
-    readAck "setStageSetpoint"
+stageSetpoint :: Knob (Stage Int32)
+stageSetpoint = Knob "stage-setpoint" 0x12 getter 0x13 putter
+  where getter = sequence $ pure get
+        putter = mapM_ putInt32le
 
-setPsdGains :: MonadIO m => Psd (Stage Fixed16) -> TrackerT m ()
-setPsdGains gains = do
-    writeCommand 0x15 $ mapM_ (mapM_ put) gains
-    readAck "setPsdGains"
+psdGains :: Knob (Psd (Stage Fixed16))
+psdGains = Knob "psd-gains" 0x14 getter 0x15 putter
+  where getter = mapM sequence $ pure (pure get)
+        putter = mapM_ (mapM_ put)
 
-setPsdSetpoint :: MonadIO m => Psd Int32 -> TrackerT m ()
-setPsdSetpoint setpoint = do
-    writeCommand 0x17 $ mapM_ putInt32le setpoint
-    readAck "setPsdSetpoint"
+psdSetpoint :: Knob (Psd Int32)
+psdSetpoint = Knob "psd-setpoint" 0x16 getter 0x17 putter
+  where getter = sequence $ pure get
+        putter = mapM_ putInt32le
 
-setMaxError :: MonadIO m => Word32 -> TrackerT m ()
-setMaxError maxError = do
-    writeCommand 0x19 $ putWord32le maxError
-    readAck "setMaxError"
+maxError :: Knob Word32
+maxError = Knob "max-error" 0x18 getWord32le 0x19 putWord32le
 
-setOutputGain :: MonadIO m => Stage Fixed16 -> TrackerT m ()
-setOutputGain gains = do
-    writeCommand 0x1b $ mapM_ put gains
-    readAck "setOutputGain"
+outputGain :: Knob Fixed16
+outputGain = Knob "output-gain" 0x1a get 0x1b put
 
 setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
 setExcitation ch samples = do
@@ -109,16 +126,10 @@ data FeedbackMode = NoFeedback
                   | StageFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
 
-getFeedbackMode :: MonadIO m => TrackerT m FeedbackMode
-getFeedbackMode = do
-    writeCommand 0x31 $ return ()
-    r <- parseReply $ (toEnum . fromIntegral) `liftM` getWord8
-    maybe (error "setFeedbackMode") return r
-
-setFeedbackMode :: MonadIO m => FeedbackMode -> TrackerT m ()
-setFeedbackMode mode = do
-    writeCommand 0x32 $ putWord32le (fromIntegral $ fromEnum mode)
-    readAck "setFeedbackMode"
+feedbackMode :: Knob FeedbackMode
+feedbackMode = Knob "feedback-mode" 0x31 getter 0x32 putter
+  where getter = (toEnum . fromIntegral) `liftM` getWord8
+        putter = putWord32le . fromIntegral . fromEnum
 
 setRawPosition :: MonadIO m => Stage Word16 -> TrackerT m ()
 setRawPosition pos = do
