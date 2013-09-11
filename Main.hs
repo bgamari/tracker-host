@@ -1,10 +1,12 @@
-{-# LANGUAGE OverloadedStrings, PatternGuards, RankNTypes, RecordWildCards#-}
+{-# LANGUAGE OverloadedStrings, PatternGuards, RankNTypes, RecordWildCards #-}
 
+import qualified Data.Traversable as Traversable
 import qualified Data.Foldable as F
 import Data.Maybe
 import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Monad
 import Control.Monad.Error.Class
+import Control.Monad.State
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Either
 import Control.Monad.IO.Class
@@ -283,6 +285,14 @@ readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
 readParse (a:_) = Safe.readZ a
 
+readParse' :: (Read a, Traversable f, Applicative f)
+           => [String] -> Either String (f a)
+readParse' = Traversable.sequence . evalState go
+  where go = Traversable.sequence (pure $ state parse)
+        --parse :: [String] -> (Either String a, [String])
+        parse []     = (Left "Too few arguments",               [])
+        parse (x:xs) = (note "Unable to parse" $ Safe.readZ x,  xs)
+
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
   where get = sAccessors ^. aGet
@@ -299,34 +309,34 @@ settingCommands (Setting {..}) = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value
 
-r3Setting :: (Show a, Read a) => String -> String -> Lens' TrackerState (V3 a) -> [Setting]
-r3Setting name help l =
-     [ pureSetting name         (Just help) readParse show (l . v3Tuple)
-     , pureSetting (name++".x") Nothing     readParse show (l . _x)
-     , pureSetting (name++".y") Nothing     readParse show (l . _y)
-     , pureSetting (name++".z") Nothing     readParse show (l . _z)
+r3Setting :: (Show a, Read a)
+          => String -> String
+          -> Accessors TrackerUI b -> Lens' b (V3 a) -> [Setting]
+r3Setting name help a l =
+     [ Setting name         (Just help) readParse show a (l . v3Tuple)
+     , Setting (name++".x") Nothing     readParse show a (l . _x)
+     , Setting (name++".y") Nothing     readParse show a (l . _y)
+     , Setting (name++".z") Nothing     readParse show a (l . _z)
      ]
-
+     
 settings :: [Setting] 
 settings = concat
     [ r3Setting "rough.size" "rough calibration field size in code-points"
-            (roughScan . T.scanSize . stageV3)
+            stateA (roughScan . T.scanSize . stageV3)
     , r3Setting "rough.center" "rough calibration field center in code-points"
-            (roughScan . T.scanCenter . stageV3)
+            stateA (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
-            (roughScan . T.scanPoints . stageV3)
+            stateA (roughScan . T.scanPoints . stageV3)
+    , r3Setting "stage.max-error" "maximum tolerable error signal before killing feedback"
+            (knobA T.outputGain) (stageV3 . mapping fixed16Double)
+    , r3Setting "stage.output-gain" "stage output gain"
+            (knobA T.outputGain) (stageV3 . mapping fixed16Double)
+    , r3Setting "stage.setpoint" "Stage feedback setpoint"
+            (knobA T.outputGain) (stageV3 . mapping fixed16Double)
     ] ++
     [ pureSetting "rough.freq"
             (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq
-    , Setting "stage.output-gain" (Just "stage output gain") readParse show
-            (knobA T.outputGain) stageV3
-    , Setting "stage.max-error"
-            (Just "maximum tolerable error signal before killing feedback")
-            readParse show (knobA T.outputGain) (stageV3.mapping fixed16Double)
-    , Setting "stage.setpoint"
-            (Just "Stage feedback setpoint")
-            readParse show (knobA T.outputGain) stageV3
     ]
     
 fixed16Double :: Iso' Fixed16 Double
