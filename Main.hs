@@ -326,7 +326,13 @@ settings = concat
             stateA (roughScan . T.scanPoints . stageV3)
     , r3Setting "stage.output-gain" "stage output gain"
             (knobA T.outputGain) (stageV3 . mapping fixed16Double)
-    , r3Setting "stage.setpoint" "Stage feedback setpoint"
+    , r3Setting "stage.fb-gain.x" "stage feedback gain"
+            (knobA T.stageGain) (_x . stageV3 . mapping fixed16Double)
+    , r3Setting "stage.fb-gain.y" "stage feedback gain"
+            (knobA T.stageGain) (_y . stageV3 . mapping fixed16Double)
+    , r3Setting "stage.fb-gain.z" "stage feedback gain"
+            (knobA T.stageGain) (_z . stageV3 . mapping fixed16Double)
+    , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
     ] ++
     [ pureSetting "rough.freq"
