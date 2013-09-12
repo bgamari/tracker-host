@@ -23,6 +23,16 @@ import PreAmp
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
                , RasterScan(..), FineScan(..))
 
+data ExciteChannel = ExcChan { _excChanEnabled :: Bool
+                             , _excChanExcitation :: T.Excitation
+                             }
+                   deriving (Show, Read)
+makeLenses ''ExciteChannel     
+
+maybeExciteChannel :: ExciteChannel -> Maybe T.Excitation
+maybeExciteChannel (ExcChan True exc) = Just exc
+maybeExciteChannel _                  = Nothing
+                   
 data TrackerState
     = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
@@ -33,7 +43,7 @@ data TrackerState
                    , _logThread      :: Maybe ThreadId
                    , _trackerPlot    :: Maybe TrackerPlot
                    , _corrPoints     :: Int
-                   , _excitation     :: Stage (Maybe T.Excitation)
+                   , _excitation     :: Stage ExciteChannel
                    }
 makeLenses ''TrackerState
            
@@ -55,7 +65,7 @@ defaultTrackerState =
                  , _logThread     = Nothing
                  , _trackerPlot   = Nothing
                  , _corrPoints    = 4000
-                 , _excitation    = fmap pure T.defaultExcitation
+                 , _excitation    = fmap (ExcChan False) T.defaultExcitation
                  }
 
 newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)

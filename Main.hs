@@ -239,8 +239,8 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
 exciteCmds :: [Command]
 exciteCmds = 
     [ command ["excite", "start"] 
-      "Start excitation" "" $ \args->do
-        use excitation >>= liftTrackerE . T.configureExcitation
+      "Start excitation" "" $ \args->
+        use excitation >>= liftTrackerE . T.configureExcitation . fmap maybeExciteChannel
     , command ["excite", "stop"]
       "Stop excitation" "" $ \args->do
         liftTrackerE $ T.configureExcitation (pure Nothing)
@@ -248,9 +248,28 @@ exciteCmds =
       "Run calibration" "" $ \args->do
         samples <- use corrPoints >>= liftTracker . fetchPoints
         let test = fmap (view (psd . _x . sdSum)) samples
-        traj <- uses (excitation . _x . to fromJust) T.excitationTrajectory
+        traj <- uses (excitation . _x . excChanExcitation) T.excitationTrajectory
         liftIO $ print $ T.phaseAmp traj (fmap realToFrac test)
     ]
+    
+exciteSettings :: [Setting]
+exciteSettings = concat [ f "x" _x, f "y" _y, f "z" _z ]
+  where f :: String
+          -> Lens' (Stage ExciteChannel) ExciteChannel
+          -> [Setting]
+        f n l = [ Setting ("excite."++n++".period")
+                          (Just "excitation period")
+                          readParse show stateA
+                          (excitation . l . excChanExcitation . T.excitePeriod)
+                , Setting ("excite."++n++".amp")
+                          (Just "excitation amplitude")
+                          readParse show stateA
+                          (excitation . l . excChanExcitation . T.exciteAmp)
+                , Setting ("excite."++n++".enabled")
+                          (Just "excitation enabled")
+                          readParse show stateA
+                          (excitation . l . excChanEnabled)
+                ]
 
 fetchPoints :: MonadIO m => Int -> T.TrackerT m (V.Vector (Sensors Sample))
 fetchPoints n = do
@@ -335,6 +354,7 @@ settings = concat
     , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
     ] ++
+    exciteSettings ++
     [ pureSetting "rough.freq"
             (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq
