@@ -58,6 +58,9 @@ import Linear
 putInt32le :: Int32 -> Put
 putInt32le = putWord32le . fromIntegral
 
+getInt32le :: Get Int32
+getInt32le = fromIntegral <$> getWord32le
+
 data Knob a = Knob { _knobName    :: String 
                    , _knobGetCmd  :: CmdId
                    , _knobDecode  :: Get a
@@ -93,7 +96,7 @@ stageGain = Knob "stage-gain" 0x10 getter 0x11 putter
 
 stageSetpoint :: Knob (Stage Int32)
 stageSetpoint = Knob "stage-setpoint" 0x12 getter 0x13 putter
-  where getter = sequence $ pure get
+  where getter = sequence $ pure getInt32le
         putter = mapM_ putInt32le
 
 psdGains :: Knob (Psd (Stage Fixed16))
@@ -103,7 +106,7 @@ psdGains = Knob "psd-gains" 0x14 getter 0x15 putter
 
 psdSetpoint :: Knob (Psd Int32)
 psdSetpoint = Knob "psd-setpoint" 0x16 getter 0x17 putter
-  where getter = sequence $ pure get
+  where getter = sequence $ pure getInt32le
         putter = mapM_ putInt32le
 
 maxError :: Knob Word32
