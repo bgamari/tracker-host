@@ -1,4 +1,6 @@
-module Tracker.Excitation ( Excitation(..)
+{-# LANGUAGE TemplateHaskell #-}              
+module Tracker.Excitation ( Excitation
+                          , excitePeriod, exciteAmp
                           , excitationTrajectory
                           , configureExcitation
                           , defaultExcitation
@@ -17,6 +19,7 @@ import Control.Error
 import Data.Traversable as T
 import Control.Monad (void)
 import Linear
+import Control.Lens
 
 -- | Excitation amplitude
 type Amplitude = Double
@@ -24,10 +27,11 @@ type Amplitude = Double
 -- | Phase in number of samples
 type Phase = Int
 
-data Excitation = Excitation { excitePeriod :: Int
-                             , exciteAmp    :: Amplitude
+data Excitation = Excitation { _excitePeriod :: Int
+                             , _exciteAmp    :: Amplitude
                              }
                 deriving (Show, Eq, Read)
+makeLenses ''Excitation     
 
 excitationTrajectory :: Excitation -> V.Vector Double
 excitationTrajectory (Excitation period amp) = V.generate period f
