@@ -120,7 +120,7 @@ outputGain = Knob "output-gain" 0x1a getter 0x1b putter
 setExcitation :: MonadIO m
               => StageAxis -> V.Vector Int16 -> EitherT String (TrackerT m) ()
 setExcitation ch samples = do
-    writeCommand 0x16 $ do
+    writeCommand 0x1c $ do
       putWord8 $ fromIntegral $ fromEnum ch
       putWord8 $ fromIntegral $ V.length samples
       mapM_ (putWord16le . fromIntegral) samples
