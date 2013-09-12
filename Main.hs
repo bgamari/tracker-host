@@ -327,16 +327,16 @@ settings = concat
             stateA (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             stateA (roughScan . T.scanPoints . stageV3)
-    , r3Setting "stage.max-error" "maximum tolerable error signal before killing feedback"
-            (knobA T.outputGain) (stageV3 . mapping fixed16Double)
     , r3Setting "stage.output-gain" "stage output gain"
             (knobA T.outputGain) (stageV3 . mapping fixed16Double)
     , r3Setting "stage.setpoint" "Stage feedback setpoint"
-            (knobA T.outputGain) (stageV3 . mapping fixed16Double)
+            (knobA T.stageSetpoint) stageV3
     ] ++
     [ pureSetting "rough.freq"
             (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq
+    , Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
+            readParse show (knobA T.maxError) id
     ]
     
 fixed16Double :: Iso' Fixed16 Double
