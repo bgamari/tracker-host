@@ -41,21 +41,20 @@ type Sample = Int16
 
 data F16 = F16
 -- | A signed 16.16 fixed-point number
-newtype Fixed16 = Fixed16 (Fixed F16)
-                deriving (Show, Read, Eq, Ord, Fractional, Num, Real, RealFrac)
+type Fixed16 = Fixed F16
                 
 instance HasResolution F16 where
     resolution _ = 0x10000
     
-instance Binary Fixed16 where
-    get = getFixed16le
-    put = putFixed16le
-
 getFixed16le :: Get Fixed16
-getFixed16le = Fixed16 . fromIntegral <$> getWord32le
+getFixed16le =
+    f . fromIntegral <$> getWord32le
+  where f :: Fixed16 -> Fixed16
+        f x = x / realToFrac (resolution (undefined :: Fixed F16))
 
 putFixed16le :: Fixed16 -> Put
-putFixed16le (Fixed16 a) = putWord32le $ round $ 0x10000 * a
+putFixed16le a =
+    putWord32le $ round $ realToFrac (resolution (0::Fixed F16)) * a
     
 -- | The stage coordinate frame
 newtype Stage a = Stage {unStage :: V3 a}
