@@ -13,6 +13,7 @@ import Data.Word
 import Data.Foldable
 import Data.Monoid
 import Data.Traversable
+import Control.Error
 import Control.Lens
 import Linear
 
@@ -22,7 +23,8 @@ import Tracker.PathAcquire
 import Tracker.LowLevel
 
 roughScan :: MonadIO m
-          => Word32 -> RasterScan Stage Word16 -> TrackerT m (V.Vector (Sensors Sample))
+          => Word32 -> RasterScan Stage Word16
+          -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
 roughScan freq s =
     let s' = fmap realToFrac s :: RasterScan Stage Double
         path = map (fmap round) $ rasterScan sequenceStage s'

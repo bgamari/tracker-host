@@ -63,12 +63,12 @@ helloCmd = command ["hello"] help ""
 setRawPositionCmd :: Command
 setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     pos <- tryHead "expected position" args >>= tryRead "invalid position"
-    liftTracker $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
+    liftTrackerE $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->
-    liftTracker $ T.setRawPosition $ Stage $ V3 c c c
+    liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
   where c = 0xffff `div` 2
         help = "Set stage at center position"
 
@@ -76,7 +76,7 @@ roughCalCmd :: Command
 roughCalCmd = command ["rough-cal"] help "" $ \args->do
     rs <- use roughScan
     freq <- use roughScanFreq
-    scan <- liftTracker $ T.roughScan freq rs
+    scan <- liftTrackerE $ T.roughScan freq rs
     lastRoughCal .= Just scan
   where help = "Perform rough calibration"
 
@@ -95,7 +95,7 @@ dumpRoughCmd = command ["dump-rough"] help "[FILENAME]" $ \args->do
 fineCalCmd :: Command
 fineCalCmd = command ["fine-cal"] help "" $ \args->do
     fs <- use fineScan
-    gains <- liftTracker $ T.fineCal fs
+    gains <- liftTrackerE $ T.fineCal fs
     feedbackGains .= gains
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
@@ -174,7 +174,7 @@ logStopCmd = command ["log","stop"] help "" $ \args->do
   
 resetCmd :: Command
 resetCmd = command ["reset"] help "" $ \args->do
-    liftTracker $ T.reset
+    liftTrackerE T.reset
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
   
@@ -240,10 +240,10 @@ exciteCmds :: [Command]
 exciteCmds = 
     [ command ["excite", "start"] 
       "Start excitation" "" $ \args->do
-        use excitation >>= liftTracker . T.configureExcitation
+        use excitation >>= liftTrackerE . T.configureExcitation
     , command ["excite", "stop"]
       "Stop excitation" "" $ \args->do
-        liftTracker $ T.configureExcitation (pure Nothing)
+        liftTrackerE $ T.configureExcitation (pure Nothing)
     , command ["excite", "cal"]
       "Run calibration" "" $ \args->do
         samples <- use corrPoints >>= liftTracker . fetchPoints
@@ -263,13 +263,13 @@ fetchPoints n = do
 feedbackCmds :: [Command]
 feedbackCmds =
     [ command ["feedback", "stop"] "Stop feedback" "" $ \args->
-        liftTracker $ T.setKnob T.feedbackMode T.NoFeedback
+        liftTrackerE $ T.setKnob T.feedbackMode T.NoFeedback
     , command ["feedback", "psd"] "Start PSD feedback" "" $ \args->
-        liftTracker $ T.setKnob T.feedbackMode T.PsdFeedback
+        liftTrackerE $ T.setKnob T.feedbackMode T.PsdFeedback
     , command ["feedback", "stage"] "Start stage feedback" "" $ \args->
-        liftTracker $ T.setKnob T.feedbackMode T.StageFeedback
+        liftTrackerE $ T.setKnob T.feedbackMode T.StageFeedback
     , command ["feedback", "status"] "Show feedback status" "" $ \args->
-        liftTracker (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
+        liftTrackerE (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
     ]
 
 stageV3 :: Iso' (Stage a) (V3 a)
@@ -370,7 +370,7 @@ commands = [ helloCmd
            , exitCmd
            , helpCmd
            , command ["adc", "start"] "Start ADC triggering" "" $ const
-             $ liftTracker $ T.setAdcTriggerMode T.TriggerAuto
+             $ liftTrackerE $ T.setAdcTriggerMode T.TriggerAuto
            , showCmd
            ] ++ concatMap settingCommands settings
              ++ preAmpCmds
@@ -402,13 +402,13 @@ defaultOutputGains = pure 1e-2
 main :: IO ()
 main = either error (const $ return ()) =<< go
   where go = runTrackerUI commands $ do
-          liftTracker $ do T.echo "Hello World!" >>= liftIO . print
-                           T.setKnob T.stageGain defaultStageGains
-                           T.setKnob T.outputGain defaultOutputGains
-                           T.setFeedbackFreq 10000
-                           T.setAdcFreq 10000
-                           T.startAdcStream
-                           T.setAdcTriggerMode T.TriggerAuto
+          liftTrackerE $ do T.echo "Hello World!" >>= liftIO . print
+                            T.setKnob T.stageGain defaultStageGains
+                            T.setKnob T.outputGain defaultOutputGains
+                            T.setFeedbackFreq 10000
+                            T.setAdcFreq 10000
+                            T.startAdcStream
+                            T.setAdcTriggerMode T.TriggerAuto
           while $ prompt
 
 while :: Monad m => m Bool -> m ()

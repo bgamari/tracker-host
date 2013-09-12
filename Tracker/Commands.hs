@@ -68,25 +68,25 @@ data Knob a = Knob { _knobName    :: String
                    , _knobEncode  :: a -> Put
                    }
  
-setKnob :: MonadIO m => Knob a -> a -> TrackerT m ()
+setKnob :: MonadIO m => Knob a -> a -> EitherT String (TrackerT m) ()
 setKnob knob value = do
     writeCommand (_knobSetCmd knob) $ (_knobEncode knob) value
     readAck $ _knobName knob
         
-getKnob :: MonadIO m => Knob a -> TrackerT m a
+getKnob :: MonadIO m => Knob a -> EitherT String (TrackerT m) a
 getKnob knob = do
     writeCommand (_knobGetCmd knob) $ return ()
     r <- parseReply (_knobDecode knob)
     maybe (error $ _knobName knob) return r
                    
-echo :: MonadIO m => ByteString -> TrackerT m (Maybe ByteString)
+echo :: MonadIO m => ByteString -> EitherT String (TrackerT m) (Maybe ByteString)
 echo payload = do
     writeCommand 0x0 $ do putWord8 (fromIntegral $ BS.length payload)
                           putByteString payload
     parseReply $ do length <- getWord8
                     getByteString $ fromIntegral length
 
-reset :: MonadIO m => TrackerT m ()
+reset :: MonadIO m => EitherT String (TrackerT m) ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
 stageGain :: Knob (Stage (Stage Fixed16))
@@ -117,7 +117,8 @@ outputGain = Knob "output-gain" 0x1a getter 0x1b putter
   where getter = sequence $ pure getFixed16le
         putter = mapM_ putFixed16le
 
-setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
+setExcitation :: MonadIO m
+              => StageAxis -> V.Vector Int16 -> EitherT String (TrackerT m) ()
 setExcitation ch samples = do
     writeCommand 0x16 $ do
       putWord8 $ fromIntegral $ fromEnum ch
@@ -125,7 +126,7 @@ setExcitation ch samples = do
       mapM_ (putWord16le . fromIntegral) samples
     readAck "setExcitation"
 
-setAdcFreq :: MonadIO m => Word32 -> TrackerT m ()
+setAdcFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
 setAdcFreq freq = do
     writeCommand 0x20 $ putWord32le freq
     readAck "setAdcFreq"
@@ -135,22 +136,22 @@ data TriggerMode = TriggerOff
                  | TriggerManual
                  deriving (Show, Eq, Bounded, Enum)
 
-setAdcTriggerMode :: MonadIO m => TriggerMode -> TrackerT m ()
+setAdcTriggerMode :: MonadIO m => TriggerMode -> EitherT String (TrackerT m) ()
 setAdcTriggerMode mode = do
     writeCommand 0x21 $ putWord32le (fromIntegral $ fromEnum mode)
     readAck "setAdcTriggerMode"
 
-startAdcStream :: MonadIO m => TrackerT m ()
+startAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
 startAdcStream = do
     writeCommand 0x22 $ return ()
     readAck "startAdcStream"
 
-stopAdcStream :: MonadIO m => TrackerT m ()
+stopAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
 stopAdcStream = do
     writeCommand 0x23 $ return ()
     readAck "stopAdcStream"
 
-setFeedbackFreq :: MonadIO m => Word32 -> TrackerT m ()
+setFeedbackFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
 setFeedbackFreq freq = do
     writeCommand 0x30 $ putWord32le freq
     readAck "setFeedbackFreq"
@@ -165,19 +166,20 @@ feedbackMode = Knob "feedback-mode" 0x31 getter 0x32 putter
   where getter = (toEnum . fromIntegral) `liftM` getWord8
         putter = putWord32le . fromIntegral . fromEnum
 
-setRawPosition :: MonadIO m => Stage Word16 -> TrackerT m ()
+setRawPosition :: MonadIO m => Stage Word16 -> EitherT String (TrackerT m) ()
 setRawPosition pos = do
     writeCommand 0x33 $ mapM_ putWord16le pos
     readAck "setRawPosition"
 
 maxPathPoints = 80 :: Int
 
-clearPath :: MonadIO m => TrackerT m ()
+clearPath :: MonadIO m => EitherT String (TrackerT m) ()
 clearPath = do
     writeCommand 0x40 $ return ()
     readAck "clearPath"
 
-enqueuePoints :: MonadIO m => V.Vector (Stage Word16) -> TrackerT m (Maybe Bool)
+enqueuePoints :: MonadIO m
+              => V.Vector (Stage Word16) -> EitherT String (TrackerT m) (Maybe Bool)
 enqueuePoints points 
   | V.length points > maxPathPoints = return Nothing
   | otherwise = do
@@ -190,14 +192,14 @@ enqueuePoints points
         Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
         otherwise                   -> return Nothing
 
-isPathRunning :: MonadIO m => TrackerT m Bool
+isPathRunning :: MonadIO m => EitherT String (TrackerT m) Bool
 isPathRunning = do
     s <- enqueuePoints V.empty
     case s of
       Just a  -> return a
       Nothing -> error "isPathRunning: Unexpected nack"
 
-startPath :: MonadIO m => Word32 -> Bool -> TrackerT m ()
+startPath :: MonadIO m => Word32 -> Bool -> EitherT String (TrackerT m) ()
 startPath freq syncAdc = do
     writeCommand 0x42 $ putWord32le freq >> putWord8 (if syncAdc then 1 else 0)
     readAck "startPath"

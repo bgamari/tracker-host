@@ -5,6 +5,8 @@ import Control.Monad (when, liftM)
 import Data.Maybe (fromMaybe)
 import Data.Word
 import qualified Data.Vector as V
+import Control.Error
+import Control.Monad.Trans
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, wait)
 import Control.Concurrent.STM ( TChan, atomically, tryReadTChan
@@ -21,7 +23,7 @@ batchBy n xs = batch : batchBy n rest
   where (batch,rest) = splitAt n xs
 
 pathAcquire :: MonadIO m => Word32 -> [Stage Word16]
-            -> TrackerT m (V.Vector (Sensors Sample))
+            -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
 pathAcquire _ [] = do
     liftIO $ putStrLn "pathAcquire: Tried to acquire on empty path"
     return V.empty
@@ -33,7 +35,7 @@ pathAcquire freq path = do
     clearPath
     -- Start capturing data
     running <- liftIO $ newTVarIO True
-    queue <- getSensorQueue
+    queue <- lift getSensorQueue
     framesAsync <- liftIO $ async $ readAllTChan running queue
     -- First fill up path queue and start running path
     points <- primePath $ batchBy maxPathPoints path
@@ -47,7 +49,7 @@ pathAcquire freq path = do
     setAdcTriggerMode TriggerAuto
     return $ V.concat frames
 
-waitUntilPathFinished :: MonadIO m => TrackerT m ()
+waitUntilPathFinished :: MonadIO m => EitherT String (TrackerT m) ()
 waitUntilPathFinished = do
     done <- isPathRunning
     when (not done) $ liftIO (threadDelay 10000) >> waitUntilPathFinished
@@ -62,14 +64,15 @@ readAllTChan running c = go []
                        | otherwise   -> go xs
                      Just x  -> go (x:xs)
 
-queuePoints :: MonadIO m => [Stage Word16] -> TrackerT m Bool
+queuePoints :: MonadIO m => [Stage Word16] -> EitherT String (TrackerT m) Bool
 queuePoints points = go
   where go = do r <- enqueuePoints $ V.fromList points
                 case r of
                   Just running -> return running
                   Nothing      -> liftIO (threadDelay 10000) >> go
 
-primePath :: MonadIO m => [[Stage Word16]] -> TrackerT m [[Stage Word16]]
+primePath :: MonadIO m
+          => [[Stage Word16]] -> EitherT String (TrackerT m) [[Stage Word16]]
 primePath [] = return []
 primePath (points:rest) = do
     r <- enqueuePoints $ V.fromList points

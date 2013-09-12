@@ -29,6 +29,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
 
+import Control.Error
 import Control.Monad.Morph
 import Control.Monad.Reader
 import System.Console.Haskeline.MonadException
@@ -127,7 +128,7 @@ parseFrames a =
 
 sensorListen :: MonadIO m => TrackerT m ()
 sensorListen = forever $ do
-    d <- readData
+    d <- either error id `liftM` runEitherT readData
     queue <- TrackerT $ view sensorQueue
     case d of
         Just d' -> liftIO $ atomically $ writeTChan queue $ parseFrames d'
@@ -148,37 +149,37 @@ debugOut :: MonadIO m => String -> m ()
 --debugOut = liftIO . putStrLn
 debugOut _ = return ()
 
-writeCommand :: MonadIO m => CmdId -> Put -> TrackerT m ()
-writeCommand cmd payload = withDeviceIO $ \h->do
+writeCommand :: MonadIO m => CmdId -> Put -> EitherT String (TrackerT m) ()
+writeCommand cmd payload = EitherT $ withDeviceIO $ \h->do
     let frame = BSL.toStrict $ runPut $ putWord8 cmd >> payload
     debugOut $ "   > "++showByteString (BS.take 200 frame)
     when (BS.length frame > 512)
         $ error $ "writeCommand: Frame too long: "++show (BS.length frame)
     (size, status) <- liftIO $ writeBulk h cmdOutEndpt frame cmdTimeout
     case status of
-        TimedOut  -> error "Command write timed out"
-        Completed -> return ()
+        TimedOut  -> return $ Left "Command write timed out"
+        Completed -> return $ Right ()
 
-readReply :: MonadIO m => TrackerT m (Maybe ByteString)
-readReply = withDeviceIO $ \h->do
+readReply :: MonadIO m => EitherT String (TrackerT m) (Maybe ByteString)
+readReply = EitherT $ withDeviceIO $ \h->do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
     debugOut $ "   < "++showByteString (BS.take 32 d)
     let cmd = BS.head d
         statusCode = BS.head $ BS.drop 1 d
-    case status of
-        TimedOut  -> error "Reply read timed out"
-        _ | BS.length d < 2    -> error "Too short reply"
-          | statusCode == 0x06 -> return $ Just $ BS.drop 2 d
-          | otherwise          -> return Nothing
+    return $ case status of
+        TimedOut               -> Left "Reply read timed out"
+        _ | BS.length d < 2    -> Left "Reply too short"
+          | statusCode == 0x06 -> Right $ Just $ BS.drop 2 d
+          | otherwise          -> Right Nothing
                        
-readAck :: MonadIO m => String -> TrackerT m ()
+readAck :: MonadIO m => String -> EitherT String (TrackerT m) ()
 readAck when = do
     a <- readReply
     case a of
         Just _  -> return ()
         Nothing -> error $ "Ack expected: "++when
 
-parseReply :: MonadIO m => Get a -> TrackerT m (Maybe a)
+parseReply :: MonadIO m => Get a -> EitherT String (TrackerT m) (Maybe a)
 parseReply parser = do
      reply <- readReply
      return $ case reply of
@@ -186,10 +187,10 @@ parseReply parser = do
          Just reply -> either (const Nothing) (\(_,_,a)->Just a)
                      $ runGetOrFail parser $ BSL.fromStrict reply
 
-readData :: MonadIO m => TrackerT m (Maybe ByteString)
-readData = withDeviceIO $ \h->do
+readData :: MonadIO m => EitherT String (TrackerT m) (Maybe ByteString)
+readData = EitherT $ withDeviceIO $ \h->do
     (d, status) <- readBulk h dataInEndpt 512 dataTimeout
     debugOut $ "   % "++showByteString (BS.take 32 d)
-    case status of
-        TimedOut  -> return Nothing
-        Completed -> return $ Just d
+    return $ Right $ case status of
+        TimedOut  -> Nothing
+        Completed -> Just d

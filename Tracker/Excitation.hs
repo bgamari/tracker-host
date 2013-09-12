@@ -13,6 +13,7 @@ import Data.Int
 import Data.List (maximumBy)
 import Data.Ord (comparing)
 import Control.Applicative
+import Control.Error
 import Data.Traversable as T
 import Control.Monad (void)
 import Linear
@@ -33,7 +34,8 @@ excitationTrajectory (Excitation period amp) = V.generate period f
   where f i = amp * sin (2*pi*realToFrac i/realToFrac period)
 
 configureExcitation :: (Functor m, MonadIO m)
-                    => Stage (Maybe Excitation) -> TrackerT m ()
+                    => Stage (Maybe Excitation)
+                    -> EitherT String (TrackerT m) ()
 configureExcitation exc =
     void $ T.sequence $ go <$> stageAxes <*> exc
   where go axis (Just exc) = setExcitation axis

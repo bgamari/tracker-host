@@ -72,6 +72,9 @@ liftInputT = TUI . lift . lift
 liftTracker :: TrackerT IO a -> TrackerUI a
 liftTracker = TUI . lift . lift . lift
 
+liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
+liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
+
 data Accessors m a = Accessors { _aGet :: m a
                                , _aPut :: a -> m ()
                                }
@@ -81,8 +84,8 @@ stateA :: Accessors TrackerUI TrackerState
 stateA = Accessors get put
 
 knobA :: T.Knob a -> Accessors TrackerUI a
-knobA knob = Accessors (liftTracker $ T.getKnob knob)
-                       (liftTracker . T.setKnob knob)
+knobA knob = Accessors (liftTrackerE $ T.getKnob knob)
+                       (liftTrackerE . T.setKnob knob)
 
 data Setting = forall a s. Setting { sName      :: String
                                    , sHelp      :: Maybe String
