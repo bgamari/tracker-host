@@ -112,10 +112,10 @@ psdSetpoint = Knob "psd-setpoint" 0x16 getter 0x17 putter
 maxError :: Knob Word32
 maxError = Knob "max-error" 0x18 getWord32le 0x19 putWord32le
 
-outputGain :: Knob (Stage Fixed16)
+outputGain :: Knob (Stage (PropInt Fixed16))
 outputGain = Knob "output-gain" 0x1a getter 0x1b putter
-  where getter = sequence $ pure getFixed16le
-        putter = mapM_ putFixed16le
+  where getter = traverse sequence $ pure $ pure getFixed16le
+        putter = mapM_ (mapM_ putFixed16le)
 
 setExcitation :: MonadIO m
               => StageAxis -> V.Vector Int16 -> EitherT String (TrackerT m) ()

@@ -18,6 +18,9 @@ module Tracker.Types ( Sample
                        -- * Sensor inputs
                      , Sensors(Sensors)
                      , stage, psd
+                       -- * Feedback
+                     , PropInt(PropInt)
+                     , propGain, intGain
                        -- * Convenient re-exports
                      , MonadIO, liftIO
                      ) where
@@ -60,7 +63,7 @@ putFixed16le a =
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
                       , Applicative, Additive, Metric, Distributive
-                      , R1, R2, R3)
+                      , R1, R2, R3, Core)
         
 mkStage :: a -> a -> a -> Stage a
 mkStage x y z = Stage $ V3 x y z
@@ -118,3 +121,10 @@ sumDiffDiode = iso to from
     where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
           from (Diode an cat) = SumDiff (an - cat) (an + cat)
     
+data PropInt a = PropInt { _propGain, _intGain :: a }
+               deriving (Show, Read, Eq, Ord, Functor, Traversable, Foldable)
+makeLenses ''PropInt
+
+instance Applicative PropInt where
+    pure x = PropInt x x
+    PropInt a b <*> PropInt x y = PropInt (a x) (b y)           

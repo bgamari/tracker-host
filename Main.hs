@@ -334,12 +334,20 @@ r3Setting :: (Show a, Read a)
           => String -> String
           -> Accessors TrackerUI b -> Lens' b (V3 a) -> [Setting]
 r3Setting name help a l =
-     [ Setting name         (Just help) readParse show a (l . v3Tuple)
-     , Setting (name++".x") Nothing     readParse show a (l . _x)
-     , Setting (name++".y") Nothing     readParse show a (l . _y)
-     , Setting (name++".z") Nothing     readParse show a (l . _z)
-     ]
-     
+    [ Setting name         (Just help) readParse show a (l . v3Tuple)
+    ]++coreSettings name labels a l
+  where labels = V3 "x" "y" "z"
+  
+coreSettings :: (Show a, Read a, Core f, F.Foldable f)
+            => String -> f String
+            -> Accessors TrackerUI b
+            -> Lens' b (f a)
+            -> [Setting]
+coreSettings name labels a l =
+    F.toList $ core $ \l'->
+      let label = labels ^. l'
+      in Setting (name++"."++label) Nothing readParse show a (l . l')
+    
 settings :: [Setting] 
 settings = concat
     [ r3Setting "rough.size" "rough calibration field size in code-points"
@@ -348,8 +356,10 @@ settings = concat
             stateA (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             stateA (roughScan . T.scanPoints . stageV3)
-    , r3Setting "stage.output-gain" "stage output gain"
-            (knobA T.outputGain) (stageV3 . mapping fixed16Double)
+    , r3Setting "stage.output-gain.prop" "stage output proportional gain"
+            (knobA T.outputGain) (incore propGain . stageV3 . mapping fixed16Double)
+    , r3Setting "stage.output-gain.int" "stage output proportional gain"
+            (knobA T.outputGain) (incore intGain . stageV3 . mapping fixed16Double)
     , r3Setting "stage.fb-gain.x" "stage feedback gain"
             (knobA T.stageGain) (_x . stageV3 . mapping fixed16Double)
     , r3Setting "stage.fb-gain.y" "stage feedback gain"
@@ -421,8 +431,8 @@ prompt = do
 defaultStageGains :: Stage (Stage Fixed16)
 defaultStageGains = kronecker $ Stage $ V3 1 1 1
 
-defaultOutputGains :: Stage Fixed16
-defaultOutputGains = pure 1e-2
+defaultOutputGains :: Stage (PropInt Fixed16)
+defaultOutputGains = pure (PropInt 1e-2 0)
 
 main :: IO ()
 main = either error (const $ return ()) =<< go
