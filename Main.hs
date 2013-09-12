@@ -162,6 +162,7 @@ logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
     queue <- liftTracker T.getSensorQueue
     thread <- liftIO $ forkIO $ logger h dec queue
     logThread .= Just thread
+    liftInputT $ outputStrLn $ "Logging sensor samples to "++fname
   where help = "Start logging sensor samples to given file"
 
 logStopCmd :: Command
