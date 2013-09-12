@@ -253,7 +253,11 @@ exciteCmds =
     ]
     
 exciteSettings :: [Setting]
-exciteSettings = concat [ f "x" _x, f "y" _y, f "z" _z ]
+exciteSettings =
+    concat [ f "x" _x, f "y" _y, f "z" _z ]++
+    [ Setting "excite.corr-points" (Just "number of points to use in correlation")
+              readParse show stateA corrPoints
+    ]
   where f :: String
           -> Lens' (Stage ExciteChannel) ExciteChannel
           -> [Setting]
