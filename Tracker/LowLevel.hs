@@ -177,7 +177,7 @@ readAck when = do
     a <- readReply
     case a of
         Just _  -> return ()
-        Nothing -> error $ "Ack expected: "++when
+        Nothing -> left $ when++": ACK expected"
 
 parseReply :: MonadIO m => Get a -> EitherT String (TrackerT m) (Maybe a)
 parseReply parser = do
