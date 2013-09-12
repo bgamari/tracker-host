@@ -91,8 +91,8 @@ reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
 
 stageGain :: Knob (Stage (Stage Fixed16))
 stageGain = Knob "stage-gain" 0x10 getter 0x11 putter
-  where getter = mapM sequence $ pure (pure get)
-        putter = mapM_ (mapM_ put)
+  where getter = mapM sequence $ pure (pure getFixed16le)
+        putter = mapM_ (mapM_ putFixed16le)
 
 stageSetpoint :: Knob (Stage Int32)
 stageSetpoint = Knob "stage-setpoint" 0x12 getter 0x13 putter
@@ -101,8 +101,8 @@ stageSetpoint = Knob "stage-setpoint" 0x12 getter 0x13 putter
 
 psdGains :: Knob (Psd (Stage Fixed16))
 psdGains = Knob "psd-gains" 0x14 getter 0x15 putter
-  where getter = mapM sequence $ pure (pure get)
-        putter = mapM_ (mapM_ put)
+  where getter = mapM sequence $ pure (pure getFixed16le)
+        putter = mapM_ (mapM_ putFixed16le)
 
 psdSetpoint :: Knob (Psd Int32)
 psdSetpoint = Knob "psd-setpoint" 0x16 getter 0x17 putter
@@ -114,8 +114,8 @@ maxError = Knob "max-error" 0x18 getWord32le 0x19 putWord32le
 
 outputGain :: Knob (Stage Fixed16)
 outputGain = Knob "output-gain" 0x1a getter 0x1b putter
-  where getter = sequence $ pure get
-        putter = mapM_ put
+  where getter = sequence $ pure getFixed16le
+        putter = mapM_ putFixed16le
 
 setExcitation :: MonadIO m => StageAxis -> V.Vector Int16 -> TrackerT m ()
 setExcitation ch samples = do

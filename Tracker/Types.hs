@@ -2,6 +2,7 @@
 
 module Tracker.Types ( Sample
                      , Fixed16
+                     , getFixed16le, putFixed16le
                      , Stage(..)
                      , mkStage
                      , StageAxis(..)
@@ -47,8 +48,14 @@ instance HasResolution F16 where
     resolution _ = 0x10000
     
 instance Binary Fixed16 where
-    get = Fixed16 . fromIntegral <$> getWord32le
-    put (Fixed16 a) = putWord32le $ round $ 0x10000 * a
+    get = getFixed16le
+    put = putFixed16le
+
+getFixed16le :: Get Fixed16
+getFixed16le = Fixed16 . fromIntegral <$> getWord32le
+
+putFixed16le :: Fixed16 -> Put
+putFixed16le (Fixed16 a) = putWord32le $ round $ 0x10000 * a
     
 -- | The stage coordinate frame
 newtype Stage a = Stage {unStage :: V3 a}
