@@ -49,9 +49,6 @@ tryJust :: String -> Maybe a -> TrackerUI a
 tryJust err Nothing  = throwError err
 tryJust _   (Just a) = return a        
 
-unitStageGains :: Stage (Stage Fixed16)
-unitStageGains = kronecker $ Stage $ V3 1 1 1
-
 command :: [String] -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd name (Just help) args (\a->action a >> return True)
 
@@ -390,11 +387,18 @@ prompt = do
                     liftInputT $ outputStrLn $ "Ambiguous command: matches "++matches
                     return True
 
+defaultStageGains :: Stage (Stage Fixed16)
+defaultStageGains = kronecker $ Stage $ V3 1 1 1
+
+defaultOutputGains :: Stage Fixed16
+defaultOutputGains = pure 1e-2
+
 main :: IO ()
 main = either error (const $ return ()) =<< go
   where go = runTrackerUI commands $ do
           liftTracker $ do T.echo "Hello World!" >>= liftIO . print
-                           T.setKnob T.stageGain unitStageGains
+                           T.setKnob T.stageGain defaultStageGains
+                           T.setKnob T.outputGain defaultOutputGains
                            T.setFeedbackFreq 10000
                            T.setAdcFreq 10000
                            T.startAdcStream
