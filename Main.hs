@@ -173,6 +173,13 @@ logStopCmd = command ["log","stop"] help "" $ \args->do
         Just x    -> liftIO (killThread x) >> logThread .= Nothing
   where help = "Stop logging of sensor samples"
   
+sourceCmd :: Command
+sourceCmd = command ["source"] help "FILE" $ \args->do
+    fname <- liftEitherT $ Safe.tryAt "Expected filename" args 0
+    cmds <- liftEitherT $ fmapLT show $ tryIO $ readFile fname          
+    mapM_ (runCommand . words) $ lines cmds
+  where help = "Execute commands from the given file"
+
 resetCmd :: Command
 resetCmd = command ["reset"] help "" $ \args->do
     liftTrackerE T.reset
@@ -403,6 +410,7 @@ commands = [ helloCmd
            , readSensorsCmd
            , logStartCmd
            , logStopCmd
+           , sourceCmd
            , resetCmd
            , exitCmd
            , helpCmd
