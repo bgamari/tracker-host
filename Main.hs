@@ -418,6 +418,10 @@ commands = [ helloCmd
 prompt :: TrackerUI Bool
 prompt = do
     input <- maybe ["exit"] words <$> liftInputT (getInputLine "> ")
+    runCommand input
+
+runCommand :: [String] -> TrackerUI Bool
+runCommand input = do
     let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
     case cmds of
       cmd:[]  -> do let Just rest = stripPrefix (cmd^.cmdName) input
