@@ -126,11 +126,33 @@ outputTau = Knob "output-tau" 0x1c getter 0x1d putter
 setExcitation :: MonadIO m
               => StageAxis -> V.Vector Int16 -> EitherT String (TrackerT m) ()
 setExcitation ch samples = do
+    writeSamples 0 samples
+    setExcitation' ch V.empty 0 (fromIntegral $ V.length samples)
+  where maxSamplesPerPacket = (512-6-1) `div` 2
+        writeSamples :: MonadIO m
+                     => Word16 -> V.Vector Int16
+                     -> EitherT String (TrackerT m) ()
+        writeSamples offset v
+          | V.null v  = return ()
+          | otherwise = do
+              let (s, rest) = V.splitAt maxSamplesPerPacket v
+              setExcitation' ch s offset 0
+              writeSamples (offset + fromIntegral (V.length s)) rest
+
+setExcitation' :: MonadIO m
+               => StageAxis
+               -> V.Vector Int16   -- ^ samples
+               -> Word16           -- ^ offset
+               -> Word16           -- ^ total_length
+               -> EitherT String (TrackerT m) ()
+setExcitation' ch samples offset totalLength = do
     writeCommand 0x1e $ do
-      putWord8 $ fromIntegral $ fromEnum ch
-      putWord8 $ fromIntegral $ V.length samples
-      mapM_ (putWord16le . fromIntegral) samples
-    readAck "setExcitation"
+        putWord8 $ fromIntegral $ fromEnum ch
+        putWord16le $ totalLength
+        putWord16le $ offset
+        putWord8 $ fromIntegral $ V.length samples
+        mapM_ (putWord16le . fromIntegral) samples
+    readAck "setExcitation'"
 
 setAdcFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
 setAdcFreq freq = do
