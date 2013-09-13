@@ -78,7 +78,9 @@ getKnob :: MonadIO m => Knob a -> EitherT String (TrackerT m) a
 getKnob knob = do
     writeCommand (_knobGetCmd knob) $ return ()
     r <- parseReply (_knobDecode knob)
-    maybe (error $ _knobName knob) return r
+    case r of
+      Nothing   -> left $ "getKnob: Error fetching value for "++_knobName knob
+      Just x    -> return x
                    
 echo :: MonadIO m => ByteString -> EitherT String (TrackerT m) (Maybe ByteString)
 echo payload = do
