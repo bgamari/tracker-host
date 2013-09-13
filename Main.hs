@@ -186,6 +186,11 @@ resetCmd = command ["reset"] help "" $ \args->do
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
   
+eventCountersCmd :: Command
+eventCountersCmd = command ["event-counters"] help "" $ \args->do
+    liftTrackerE T.getEventCounters >>= liftInputT . outputStrLn . show
+  where help = "Show event counters"
+  
 helpCmd :: Command
 helpCmd = command ["help"] help "[CMD]" $ \args->
     let cmdFilter :: [Command] -> [Command]
@@ -412,6 +417,7 @@ commands = [ helloCmd
            , logStopCmd
            , sourceCmd
            , resetCmd
+           , eventCountersCmd
            , exitCmd
            , helpCmd
            , command ["adc", "start"] "Start ADC triggering" "" $ const
@@ -454,7 +460,7 @@ main = either error (const $ return ()) =<< go
           liftTrackerE $ do T.echo "Hello World!" >>= liftIO . print
                             T.setKnob T.stageGain defaultStageGains
                             T.setKnob T.outputGain defaultOutputGains
-                            T.setFeedbackFreq 5000
+                            T.setFeedbackFreq 40000
                             T.setAdcFreq 5000
                             T.startAdcStream
                             T.setAdcTriggerMode T.TriggerAuto
