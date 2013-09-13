@@ -12,6 +12,7 @@ module Tracker.Commands ( -- * Types
                         , maxError
                         , outputGain
                         , outputTau
+                        , adcDecimation
                         , FeedbackMode(..)
                         , feedbackMode
                           -- * Commands
@@ -195,6 +196,11 @@ stopAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
 stopAdcStream = do
     writeCommand 0x23 $ return ()
     readAck "stopAdcStream"
+    
+adcDecimation :: Knob Word32
+adcDecimation = Knob "adc-decimation" 0x24 getter 0x25 putter
+  where getter = getWord32le
+        putter = putWord32le
 
 setFeedbackFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
 setFeedbackFreq freq = do
