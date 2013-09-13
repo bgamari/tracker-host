@@ -17,6 +17,8 @@ module Tracker.Commands ( -- * Types
                           -- * Commands
                         , echo
                         , reset
+                        , EventCounters(..)
+                        , getEventCounters
                         , setExcitation
                         , setAdcFreq
                         , TriggerMode(..)
@@ -91,6 +93,19 @@ echo payload = do
 
 reset :: MonadIO m => EitherT String (TrackerT m) ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
+
+data EventCounters = EventCounters { evCountFeedback  :: Word32       
+                                   , evCountAdcSample :: Word32
+                                   }
+                   deriving (Show, Read, Eq, Ord)
+
+getEventCounters :: MonadIO m => EitherT String (TrackerT m) EventCounters
+getEventCounters = do
+    writeCommand 0x02 $ return ()
+    r <- parseReply $ EventCounters <$> getWord32le <*> getWord32le
+    case r of
+      Nothing   -> left "getEventCounters: Error"
+      Just x    -> return x
 
 stageGain :: Knob (Stage (Stage Fixed16))
 stageGain = Knob "stage-gain" 0x10 getter 0x11 putter
