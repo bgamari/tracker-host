@@ -11,6 +11,7 @@ module Tracker.Commands ( -- * Types
                         , psdSetpoint
                         , maxError
                         , outputGain
+                        , outputTau
                         , FeedbackMode(..)
                         , feedbackMode
                           -- * Commands
@@ -117,10 +118,15 @@ outputGain = Knob "output-gain" 0x1a getter 0x1b putter
   where getter = traverse sequence $ pure $ pure getFixed16le
         putter = mapM_ (mapM_ putFixed16le)
 
+outputTau :: Knob (Stage Word8)
+outputTau = Knob "output-tau" 0x1c getter 0x1d putter
+  where getter = sequence $ pure getWord8
+        putter = mapM_ putWord8
+
 setExcitation :: MonadIO m
               => StageAxis -> V.Vector Int16 -> EitherT String (TrackerT m) ()
 setExcitation ch samples = do
-    writeCommand 0x1c $ do
+    writeCommand 0x1e $ do
       putWord8 $ fromIntegral $ fromEnum ch
       putWord8 $ fromIntegral $ V.length samples
       mapM_ (putWord16le . fromIntegral) samples
