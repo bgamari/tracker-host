@@ -360,6 +360,8 @@ settings = concat
             (knobA T.outputGain) (incore propGain . stageV3 . mapping fixed16Double)
     , r3Setting "stage.output-gain.int" "stage output proportional gain"
             (knobA T.outputGain) (incore intGain . stageV3 . mapping fixed16Double)
+    , r3Setting "stage.tau" "stage feedback integration time"
+            (knobA T.outputTau) stageV3
     , r3Setting "stage.fb-gain.x" "stage feedback gain"
             (knobA T.stageGain) (_x . stageV3 . mapping fixed16Double)
     , r3Setting "stage.fb-gain.y" "stage feedback gain"
