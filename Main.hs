@@ -389,6 +389,8 @@ settings = concat
             readParse show roughScanFreq
     , Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
             readParse show (knobA T.maxError) id
+    , Setting "decimation" (Just "decimation factor of samples")
+            readParse show (knobA T.adcDecimation) id
     ]
     
 fixed16Double :: Iso' Fixed16 Double
