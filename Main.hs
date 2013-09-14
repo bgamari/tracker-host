@@ -460,8 +460,8 @@ main = either error (const $ return ()) =<< go
           liftTrackerE $ do T.echo "Hello World!" >>= liftIO . print
                             T.setKnob T.stageGain defaultStageGains
                             T.setKnob T.outputGain defaultOutputGains
-                            T.setFeedbackFreq 20000
-                            T.setAdcFreq 5000
+                            T.setFeedbackFreq 25000
+                            T.setAdcFreq 25000
                             T.setKnob T.adcDecimation 4
                             T.startAdcStream
                             T.setAdcTriggerMode T.TriggerAuto
