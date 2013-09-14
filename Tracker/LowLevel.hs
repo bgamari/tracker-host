@@ -116,7 +116,7 @@ getInt16le = fromIntegral `fmap` getWord16le
 
 parseFrames :: BS.ByteString -> V.Vector (Sensors Sample)
 parseFrames a =
-    runGet (V.replicateM (BS.length a `div` 32) frame) $ BSL.fromStrict a
+    runGet (V.replicateM (BS.length a `div` 16) frame) $ BSL.fromStrict a
   where frame = do stage <- sequenceA $ pure getInt16le :: Get (Stage Sample)
                    xDiff <- getInt16le
                    yDiff <- getInt16le
