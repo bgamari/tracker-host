@@ -147,30 +147,39 @@ plotCommands = [ startPlotCmd
                , setYSizeCmd
                ]
 
-logger :: Handle -> Int -> TChan (V.Vector (Sensors Int16)) -> IO ()       
-logger h decimation queue = forever $ do
+logger :: Handle -> Int -> TChan (V.Vector (Sensors Int16)) -> TVar Int -> IO ()
+logger h decimation queue countVar = forever $ do
     v <- atomically $ readTChan queue
-    V.mapM_ (hPutStrLn h . showSensors)
-        $ V.ifilter (\i _->i `mod` decimation == 0) v
+    let decimated = V.ifilter (\i _->i `mod` decimation == 0) v
+    atomically $ modifyTVar countVar (+V.length decimated)
+    V.mapM_ (hPutStrLn h . showSensors) decimated
     
+killLogger :: Handle -> ThreadId -> TVar Int -> TrackerUI ()
+killLogger h thread countVar = do
+    liftIO $ killThread thread
+    liftIO $ hClose h
+    count <- liftIO $ atomically $ readTVar countVar
+    liftInputT $ outputStrLn $ "Logged "++show count++" samples"
+
 logStartCmd :: Command
 logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
-    use logThread >>= flip when (throwError "Already logging") . isJust
+    use stopLogger >>= flip when (throwError "Already logging") . isJust
     fname <- liftEitherT $ Safe.tryAt "Expected filename" args 0
     let dec = fromMaybe 1 $ Safe.atZ args 1 >>= Safe.readZ
     h <- liftEitherT $ fmapLT show $ tryIO $ openFile fname WriteMode
     queue <- liftTracker T.getSensorQueue
-    thread <- liftIO $ forkIO $ logger h dec queue
-    logThread .= Just thread
+    countVar <- liftIO $ newTVarIO 0
+    thread <- liftIO $ forkIO $ logger h dec queue countVar
+    stopLogger .= Just (killLogger h thread countVar)
     liftInputT $ outputStrLn $ "Logging sensor samples to "++fname
   where help = "Start logging sensor samples to given file"
 
 logStopCmd :: Command
 logStopCmd = command ["log","stop"] help "" $ \args->do
-    thread <- use logThread
-    case thread of 
+    stop <- use stopLogger
+    case stop of 
         Nothing   -> throwError "Not currently logging"
-        Just x    -> liftIO (killThread x) >> logThread .= Nothing
+        Just x    -> x >> stopLogger .= Nothing
   where help = "Stop logging of sensor samples"
   
 sourceCmd :: Command
@@ -462,8 +471,8 @@ main = either error (const $ return ()) =<< go
           liftTrackerE $ do T.echo "Hello World!" >>= liftIO . print
                             T.setKnob T.stageGain defaultStageGains
                             T.setKnob T.outputGain defaultOutputGains
-                            T.setFeedbackFreq 25000
-                            T.setAdcFreq 25000
+                            T.setFeedbackFreq 50000
+                            T.setAdcFreq 50000
                             T.setKnob T.adcDecimation 4
                             T.startAdcStream
                             T.setAdcTriggerMode T.TriggerAuto

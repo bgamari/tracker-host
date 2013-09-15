@@ -32,7 +32,24 @@ makeLenses ''ExciteChannel
 maybeExciteChannel :: ExciteChannel -> Maybe T.Excitation
 maybeExciteChannel (ExcChan True exc) = Just exc
 maybeExciteChannel _                  = Nothing
-                   
+
+newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)
+                    deriving ( Functor, Applicative, Monad, MonadIO
+                             , MonadState TrackerState, MonadError String
+                             )
+
+liftEitherT :: EitherT String (StateT TrackerState (InputT (TrackerT IO))) a -> TrackerUI a
+liftEitherT = TUI            
+
+liftInputT :: InputT (TrackerT IO) a -> TrackerUI a
+liftInputT = TUI . lift . lift
+
+liftTracker :: TrackerT IO a -> TrackerUI a
+liftTracker = TUI . lift . lift . lift
+
+liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
+liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
+
 data TrackerState
     = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
@@ -40,7 +57,7 @@ data TrackerState
                    , _fineScan       :: FineScan
                    , _feedbackGains  :: Psd (Stage Double)
                    , _preAmp         :: Maybe PreAmp
-                   , _logThread      :: Maybe ThreadId
+                   , _stopLogger     :: Maybe (TrackerUI ())
                    , _trackerPlot    :: Maybe TrackerPlot
                    , _corrPoints     :: Int
                    , _excitation     :: Stage ExciteChannel
@@ -62,28 +79,11 @@ defaultTrackerState =
                                              }
                  , _feedbackGains = pure $ pure 0
                  , _preAmp        = Nothing
-                 , _logThread     = Nothing
+                 , _stopLogger    = Nothing
                  , _trackerPlot   = Nothing
                  , _corrPoints    = 4000
                  , _excitation    = fmap (ExcChan False) T.defaultExcitation
                  }
-
-newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)
-                    deriving ( Functor, Applicative, Monad, MonadIO
-                             , MonadState TrackerState, MonadError String
-                             )
-
-liftEitherT :: EitherT String (StateT TrackerState (InputT (TrackerT IO))) a -> TrackerUI a
-liftEitherT = TUI            
-
-liftInputT :: InputT (TrackerT IO) a -> TrackerUI a
-liftInputT = TUI . lift . lift
-
-liftTracker :: TrackerT IO a -> TrackerUI a
-liftTracker = TUI . lift . lift . lift
-
-liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
-liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
 
 data Accessors m a = Accessors { _aGet :: m a
                                , _aPut :: a -> m ()
