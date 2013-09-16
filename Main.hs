@@ -269,9 +269,13 @@ exciteCmds =
     , command ["excite", "cal"]
       "Run calibration" "" $ \args->do
         samples <- use corrPoints >>= liftTracker . fetchPoints
-        let test = fmap (view (psd . _x . sdSum)) samples
-        traj <- uses (excitation . _x . excChanExcitation) T.excitationTrajectory
-        liftIO $ print $ T.phaseAmp traj (fmap realToFrac test)
+        let test = fmap (view (stage . _x)) samples
+        decimation <- liftTrackerE $ T.getKnob T.adcDecimation
+        decimatedExc <- uses (excitation . _x . excChanExcitation)
+                             (T.excitePeriod %~ (`div` fromIntegral decimation))
+        let traj = T.excitationTrajectory decimatedExc
+            phaseAmp = T.phaseAmp traj (fmap realToFrac test)
+        liftIO $ print phaseAmp
     ]
     
 exciteSettings :: [Setting]
