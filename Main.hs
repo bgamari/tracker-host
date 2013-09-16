@@ -274,7 +274,7 @@ exciteCmds =
         decimatedExc <- uses (excitation . _x . excChanExcitation)
                              (T.excitePeriod %~ (`div` fromIntegral decimation))
         let traj = T.excitationTrajectory decimatedExc
-            phaseAmp = T.phaseAmp traj (fmap realToFrac test)
+        phaseAmp <- liftTracker $ T.phaseAmp traj (fmap realToFrac test)
         liftIO $ print phaseAmp
     ]
     

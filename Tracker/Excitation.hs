@@ -21,6 +21,10 @@ import Control.Monad (void)
 import Linear
 import Control.Lens
 
+import Graphics.Rendering.Chart
+import Graphics.Rendering.Chart.Backend.Cairo
+import Data.Default
+
 -- | Excitation amplitude
 type Amplitude = Double
 
@@ -58,13 +62,22 @@ correlate a b lag = (V.drop lag a V.++ a) `dot` b
 mean :: Fractional a => V.Vector a -> a
 mean v = V.sum v / realToFrac (V.length v)
 
-phaseAmp :: V.Vector Double -> V.Vector Double -> (Phase, Amplitude)
-phaseAmp exc samples = 
+phaseAmp :: MonadIO m
+         => V.Vector Double -> V.Vector Double -> TrackerT m (Phase, Amplitude)
+phaseAmp exc samples = do
     let samples' = fmap (\x->x - mean samples) samples
-        sampleLen = (V.length samples `div` V.length exc) * V.length exc
-        (corrNorm, phase) = maximumBy (comparing fst)
-                            [ (correlate (V.take sampleLen samples') exc i, i)
-                            | i <- [0..V.length exc `div` 2]
-                            ]
+        sampleLen = 10 * V.length exc
+        corr = [ (i, correlate (V.take sampleLen samples') exc i)
+               | i <- [0..V.length exc]
+               ]
+        (phase, corrNorm) = maximumBy (comparing snd) corr
         amp = corrNorm / norm exc
-    in (phase, amp)
+    plotSVG "corr.svg" $ plotPoints corr
+    return $ (phase, amp)
+    
+plotSVG :: (ToRenderable a, MonadIO m) => FilePath -> a -> m ()
+plotSVG fname a = liftIO $ renderableToSVGFile (toRenderable a) 640 480 fname
+
+plotPoints :: (PlotValue x, PlotValue y) => [(x,y)] -> Layout1 x y
+plotPoints pts = layout1_plots .~ [Left plot] $ def           
+    where plot = toPlot $ plot_points_values .~ pts $ def

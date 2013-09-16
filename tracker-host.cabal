@@ -37,4 +37,5 @@ executable tracker-host
                        errors,
                        either,
                        gl-plot,
-                       OpenGL, GLFW-b
+                       OpenGL, GLFW-b,
+                       Chart, Chart-cairo, data-default
