@@ -7,8 +7,9 @@ import Control.Concurrent.STM
 import Control.Lens
 import Data.Int
 
-data PlotConfig = PlotConfig { _pcYSize    :: Maybe Int16
-                             , _pcNPoints  :: Int
+data PlotConfig = PlotConfig { _pcYSize       :: Maybe Int16
+                             , _pcNPoints     :: Int
+                             , _pcDecimation  :: Int
                              }
                 deriving (Show)
 makeLenses ''PlotConfig

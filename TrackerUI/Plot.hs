@@ -90,8 +90,10 @@ plotWorker configVar queue = do
         go v = do
             config <- atomically $ readTVar configVar
             new <- atomically $ readTChan queue
-            let v' = fmap (VS.take $ config^.pcNPoints)
-                     $ (VS.++) <$> fmap VS.convert (T.sequenceA new) <*> v
+            let d = config ^. pcDecimation
+                new' = fmap VS.convert $ T.sequenceA $ decimate d new
+                v' = fmap (VS.take $ config^.pcNPoints)
+                     $ (VS.++) <$> new' <*> v
             updatePlot config psdPlot $ psdCurves v'
             updatePlot config stagePlot $ stageCurves v'
             go v'
@@ -105,9 +107,11 @@ startPlot :: MonadIO m => TrackerT m TrackerPlot
 startPlot = do
     queue <- getSensorQueue
     liftIO $ do
-        config <- liftIO $ newTVarIO $ PlotConfig { _pcYSize   = Nothing
-                                                  , _pcNPoints = 10000
-                                                  }
+        config <- liftIO $ newTVarIO
+                  $ PlotConfig { _pcYSize   = Nothing
+                               , _pcNPoints = 10000
+                               , _pcDecimation = 10
+                               }
         worker <- forkOS $ plotWorker config queue
         return $ TrackerPlot worker config
 
@@ -116,7 +120,10 @@ setYSize = setConfig pcYSize
 
 setNPoints :: TrackerPlot -> Int -> IO ()
 setNPoints = setConfig pcNPoints
-    
+
+setDecimation :: TrackerPlot -> Int -> IO ()
+setDecimation = setConfig pcDecimation
+
 setConfig :: Lens' PlotConfig a -> TrackerPlot -> a -> IO ()
 setConfig lens plot value =
     atomically $ modifyTVar (plot^.tpConfig) $ lens .~ value
