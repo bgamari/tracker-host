@@ -25,8 +25,6 @@ import Graphics.Rendering.GLPlot
 import qualified Graphics.UI.GLFW as GLFW
 import Graphics.Rendering.OpenGL.GL (GLfloat, Color4(..))
 
-npoints = 4000
-
 fixPoints :: (VS.Storable a, Real a) => VS.Vector a -> VS.Vector (V2 GLfloat)
 fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
 
