@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}              
 module Tracker.Excitation ( Excitation
                           , excitePeriod, exciteAmp
-                          , excitationTrajectory
+                          , trajectory
                           , configureExcitation
                           , defaultExcitation
                           , phaseAmp
@@ -21,6 +21,8 @@ import Control.Monad (void)
 import Linear
 import Control.Lens
 
+import Data.Colour
+import Data.Colour.Names as Colours
 import Graphics.Rendering.Chart
 import Graphics.Rendering.Chart.Backend.Cairo
 import Data.Default
@@ -37,9 +39,12 @@ data Excitation = Excitation { _excitePeriod :: Int
                 deriving (Show, Eq, Read)
 makeLenses ''Excitation     
 
-excitationTrajectory :: Excitation -> V.Vector Double
-excitationTrajectory (Excitation period amp) = V.generate period f
-  where f i = amp * sin (2*pi*realToFrac i/realToFrac period)
+trajectory :: Excitation -> V.Vector Double
+trajectory exc = V.generate (exc ^. excitePeriod) (trajectory' exc)
+
+trajectory' :: Excitation -> Int -> Double
+trajectory' (Excitation period amp) i = 
+    amp * sin (2*pi*realToFrac i/realToFrac period)
 
 configureExcitation :: (Functor m, MonadIO m)
                     => Stage (Maybe Excitation)
@@ -47,7 +52,7 @@ configureExcitation :: (Functor m, MonadIO m)
 configureExcitation exc =
     void $ T.sequence $ go <$> stageAxes <*> exc
   where go axis (Just exc) = setExcitation axis
-                             $ fmap round $ excitationTrajectory exc
+                             $ fmap round $ trajectory exc
         go axis Nothing    = setExcitation axis $ V.empty
 
 defaultExcitation :: Stage Excitation
@@ -63,21 +68,35 @@ mean :: Fractional a => V.Vector a -> a
 mean v = V.sum v / realToFrac (V.length v)
 
 phaseAmp :: MonadIO m
-         => V.Vector Double -> V.Vector Double -> TrackerT m (Phase, Amplitude)
-phaseAmp exc samples = do
+         => Excitation -> V.Vector Double -> TrackerT m (Phase, Amplitude)
+phaseAmp excitation samples = do
     let samples' = fmap (\x->x - mean samples) samples
-        sampleLen = 10 * V.length exc
+        excLen = V.length exc
+        exc = trajectory excitation
+        sampleLen = 10 * excLen
         corr = [ (i, correlate (V.take sampleLen samples') exc i)
                | i <- [0..V.length exc]
                ]
         (phase, corrNorm) = maximumBy (comparing snd) corr
-        amp = corrNorm / norm exc
-    plotSVG "corr.svg" $ plotPoints corr
+        amp = correlate (V.take excLen samples) exc phase / correlate exc exc 0
+    plotSVG "corr.svg" $ layout1_plots .~ [Left $ plotPoints corr] $ def
+    plotSVG "phaseAmp.svg"
+      $ layout1_plots .~ [ Left $ toPlot
+                           $ plot_points_values .~
+                             (V.toList $ V.indexed $ V.map (*amp) exc)
+                           $ plot_points_style . point_color .~ opaque Colours.blue $ def
+                         , Left $ toPlot
+                           $ plot_points_values .~
+                             (V.toList $ V.indexed $ V.take sampleLen $ V.drop phase samples')
+                           $ plot_points_style . point_color .~ opaque Colours.red $ def
+                         ] $ def
+    let inPhase = V.drop phase samples'
+    let corrected = V.imap (\i _->amp * trajectory' excitation i) inPhase
+    plotSVG "r.svg" $ layout1_plots .~ [Left $ plotPoints $ V.toList $ V.zip inPhase corrected] $ def
     return $ (phase, amp)
     
 plotSVG :: (ToRenderable a, MonadIO m) => FilePath -> a -> m ()
 plotSVG fname a = liftIO $ renderableToSVGFile (toRenderable a) 640 480 fname
 
-plotPoints :: (PlotValue x, PlotValue y) => [(x,y)] -> Layout1 x y
-plotPoints pts = layout1_plots .~ [Left plot] $ def           
-    where plot = toPlot $ plot_points_values .~ pts $ def
+plotPoints :: (PlotValue x, PlotValue y) => [(x,y)] -> Plot x y
+plotPoints pts = toPlot $ plot_points_values .~ pts $ def

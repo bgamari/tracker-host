@@ -38,4 +38,4 @@ executable tracker-host
                        either,
                        gl-plot,
                        OpenGL, GLFW-b,
-                       Chart, Chart-cairo, data-default
+                       Chart, Chart-cairo, data-default, colour
