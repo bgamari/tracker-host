@@ -24,12 +24,12 @@ import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
                , RasterScan(..), FineScan(..))
 
 data ExciteChannel = ExcChan { _excChanEnabled :: Bool
-                             , _excChanExcitation :: T.Excitation
+                             , _excChanExcitation :: T.Excitation Int
                              }
                    deriving (Show, Read)
 makeLenses ''ExciteChannel     
 
-maybeExciteChannel :: ExciteChannel -> Maybe T.Excitation
+maybeExciteChannel :: ExciteChannel -> Maybe (T.Excitation Int)
 maybeExciteChannel (ExcChan True exc) = Just exc
 maybeExciteChannel _                  = Nothing
 

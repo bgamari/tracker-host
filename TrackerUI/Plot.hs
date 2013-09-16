@@ -31,7 +31,7 @@ fixPoints :: (VS.Storable a, Real a) => VS.Vector a -> VS.Vector (V2 GLfloat)
 fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
 
 decimate :: Int -> V.Vector a -> V.Vector a
-decimate n = fmap snd . V.filter (\(i,_)->i `mod` n == 0) . V.indexed
+decimate n = V.ifilter (\i _->i `mod` n == 0)
 
 psdCurves :: Sensors (VS.Vector Int16) -> [Curve]
 psdCurves pts =

@@ -33,21 +33,22 @@ type Amplitude = Double
 -- | Phase in number of samples
 type Phase = Int
 
-data Excitation = Excitation { _excitePeriod :: Int
-                             , _exciteAmp    :: Amplitude
-                             }
+data Excitation t = Excitation { _excitePeriod :: t
+                               , _exciteAmp    :: Amplitude
+                               }
                 deriving (Show, Eq, Read)
 makeLenses ''Excitation     
 
-trajectory :: Excitation -> V.Vector Double
-trajectory exc = V.generate (exc ^. excitePeriod) (trajectory' exc)
+trajectory :: Excitation Int -> V.Vector Double
+trajectory exc = V.generate (exc ^. excitePeriod) (trajectory' exc')
+  where exc' = excitePeriod %~ realToFrac $ exc           
 
-trajectory' :: Excitation -> Int -> Double
+trajectory' :: RealFrac a => Excitation a -> Int -> Double
 trajectory' (Excitation period amp) i = 
     amp * sin (2*pi*realToFrac i/realToFrac period)
 
 configureExcitation :: (Functor m, MonadIO m)
-                    => Stage (Maybe Excitation)
+                    => Stage (Maybe (Excitation Int))
                     -> EitherT String (TrackerT m) ()
 configureExcitation exc =
     void $ T.sequence $ go <$> stageAxes <*> exc
@@ -55,7 +56,7 @@ configureExcitation exc =
                              $ fmap round $ trajectory exc
         go axis Nothing    = setExcitation axis $ V.empty
 
-defaultExcitation :: Stage Excitation
+defaultExcitation :: Stage (Excitation Int)
 defaultExcitation = mkStage
     (Excitation 239 100)
     (Excitation 199 100)
@@ -68,11 +69,12 @@ mean :: Fractional a => V.Vector a -> a
 mean v = V.sum v / realToFrac (V.length v)
 
 phaseAmp :: MonadIO m
-         => Excitation -> V.Vector Double -> TrackerT m (Phase, Amplitude)
+         => Excitation Double -> V.Vector Double -> TrackerT m (Phase, Amplitude)
 phaseAmp excitation samples = do
     let samples' = fmap (\x->x - mean samples) samples
         excLen = V.length exc
-        exc = trajectory excitation
+        exc = V.generate (ceiling $ excitation^.excitePeriod)
+              $ trajectory' excitation
         sampleLen = 10 * excLen
         corr = [ (i, correlate (V.take sampleLen samples') exc i)
                | i <- [0..V.length exc]
@@ -81,15 +83,17 @@ phaseAmp excitation samples = do
         amp = correlate (V.take excLen samples) exc phase / correlate exc exc 0
     plotSVG "corr.svg" $ layout1_plots .~ [Left $ plotPoints corr] $ def
     plotSVG "phaseAmp.svg"
-      $ layout1_plots .~ [ Left $ toPlot
-                           $ plot_points_values .~
-                             (V.toList $ V.indexed $ V.map (*amp) exc)
-                           $ plot_points_style . point_color .~ opaque Colours.blue $ def
-                         , Left $ toPlot
-                           $ plot_points_values .~
-                             (V.toList $ V.indexed $ V.take sampleLen $ V.drop phase samples')
-                           $ plot_points_style . point_color .~ opaque Colours.red $ def
-                         ] $ def
+      $ layout1_plots .~
+        [ Left $ toPlot
+            $ plot_points_values .~
+                (V.toList $ V.indexed $ V.generate sampleLen
+                $ \i->amp * trajectory' excitation i)
+            $ plot_points_style . point_color .~ opaque Colours.blue $ def
+        , Left $ toPlot
+            $ plot_points_values .~
+                (V.toList $ V.indexed $ V.take sampleLen $ V.drop phase samples')
+            $ plot_points_style . point_color .~ opaque Colours.red $ def
+        ] $ def
     let inPhase = V.drop phase samples'
     let corrected = V.imap (\i _->amp * trajectory' excitation i) inPhase
     plotSVG "r.svg" $ layout1_plots .~ [Left $ plotPoints $ V.toList $ V.zip inPhase corrected] $ def
