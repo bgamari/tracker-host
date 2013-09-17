@@ -34,6 +34,8 @@ pathAcquire freq path = do
     setKnob adcTriggerMode TriggerOff
     clearPath
     -- Start capturing data
+    dec <- getKnob adcDecimation
+    setKnob adcDecimation 1
     running <- liftIO $ newTVarIO True
     queue <- lift getSensorQueue
     framesAsync <- liftIO $ async $ readAllTChan running queue
@@ -46,6 +48,7 @@ pathAcquire freq path = do
     liftIO $ atomically $ writeTVar running False
     frames <- liftIO $ wait framesAsync
     -- Restart ADC triggering
+    setKnob adcDecimation dec
     setKnob adcTriggerMode TriggerAuto
     return $ V.concat frames
 
