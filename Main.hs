@@ -66,11 +66,14 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     liftTrackerE $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
-centerCmd :: Command
-centerCmd = command ["center"] help "" $ \args->
-    liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
+-- | Return the stage to center
+center :: TrackerUI ()
+center = liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
   where c = 0xffff `div` 2
-        help = "Set stage at center position"
+
+centerCmd :: Command
+centerCmd = command ["center"] help "" $ \args->center
+  where help = "Set stage at center position"
 
 roughCalCmd :: Command
 roughCalCmd = command ["rough-cal"] help "" $ \args->do
@@ -78,6 +81,7 @@ roughCalCmd = command ["rough-cal"] help "" $ \args->do
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
     lastRoughCal .= Just scan
+    center
   where help = "Perform rough calibration"
 
 showSensors :: Show a => Sensors a -> String
