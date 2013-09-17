@@ -269,12 +269,14 @@ exciteCmds =
     , command ["excite", "cal"]
       "Run calibration" "" $ \args->do
         samples <- use corrPoints >>= liftTracker . fetchPoints
-        let test = fmap (view (stage . _x)) samples
+        let test = fmap (view (psd . _x . sdDiff)) samples
         decimation <- liftTrackerE $ T.getKnob T.adcDecimation
         decimatedExc <- uses (excitation . _x . excChanExcitation)
                              (T.excitePeriod %~ (/ realToFrac decimation) . realToFrac)
         phaseAmp <- liftTracker $ T.phaseAmp decimatedExc (fmap realToFrac test)
         liftIO $ print phaseAmp
+        liftIO $ withFile "r.txt" WriteMode $ \h->
+            V.mapM_ (hPutStrLn h . showSensors) samples
     ]
     
 exciteSettings :: [Setting]
@@ -435,7 +437,7 @@ commands = [ helloCmd
            , exitCmd
            , helpCmd
            , command ["adc", "start"] "Start ADC triggering" "" $ const
-             $ liftTrackerE $ T.setAdcTriggerMode T.TriggerAuto
+             $ liftTrackerE $ T.setKnob T.adcTriggerMode T.TriggerAuto
            , showCmd
            ] ++ concatMap settingCommands settings
              ++ preAmpCmds
@@ -475,10 +477,10 @@ main = either error (const $ return ()) =<< go
                             T.setKnob T.stageGain defaultStageGains
                             T.setKnob T.outputGain defaultOutputGains
                             T.setFeedbackFreq 50000
-                            T.setAdcFreq 50000
+                            T.setKnob T.adcFreq 50000
                             T.setKnob T.adcDecimation 4
                             T.startAdcStream
-                            T.setAdcTriggerMode T.TriggerAuto
+                            T.setKnob T.adcTriggerMode T.TriggerAuto
           while $ prompt
 
 while :: Monad m => m Bool -> m ()

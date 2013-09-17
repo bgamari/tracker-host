@@ -31,7 +31,7 @@ pathAcquire freq path = do
     setKnob feedbackMode NoFeedback
     -- the firmware will enable triggering upon starting the path
     -- disable triggering so we only see samples from after this point
-    setAdcTriggerMode TriggerOff
+    setKnob adcTriggerMode TriggerOff
     clearPath
     -- Start capturing data
     running <- liftIO $ newTVarIO True
@@ -46,7 +46,7 @@ pathAcquire freq path = do
     liftIO $ atomically $ writeTVar running False
     frames <- liftIO $ wait framesAsync
     -- Restart ADC triggering
-    setAdcTriggerMode TriggerAuto
+    setKnob adcTriggerMode TriggerAuto
     return $ V.concat frames
 
 waitUntilPathFinished :: MonadIO m => EitherT String (TrackerT m) ()
