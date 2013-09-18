@@ -83,13 +83,18 @@ roughCalCmd = command ["rough", "cal"] help "" $ \args->do
     scan <- liftTrackerE $ T.roughScan freq rs
     lastRoughCal .= Just scan
     center
+  where help = "Perform rough calibration"
+  
+roughFitCmd :: Command
+roughFitCmd = command ["rough", "fit"] help "" $ \args->do
+    scan <- use lastRoughCal >>= tryJust "No rough calibration"
     let samples = V.map (\s->(s^.stage._xy, s^.psd._x.sdDiff))
                   $ V.map (fmap realToFrac) scan
         m0 = Model.initialModel samples
         m = head $ drop 10 $ Model.fit samples m0
     liftIO $ print m0
     liftIO $ print m
-  where help = "Perform rough calibration"
+  where help = "Perform fit on rough calibration"
 
 showSensors :: Show a => Sensors a -> String
 showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
@@ -437,6 +442,7 @@ commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
            , roughCalCmd
+           , roughFitCmd
            , dumpRoughCmd
            , fineCalCmd
            , readSensorsCmd
