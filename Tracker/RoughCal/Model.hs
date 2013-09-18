@@ -15,15 +15,15 @@ import GHC.Generics
 import Numeric.AD
 
 data Gaussian f a = Gaussian { gMean :: !(f a)
-                             , gVariance :: !a
-                             , gAmp :: !a
+                             , gStd  :: !a
+                             , gAmp  :: !a
                              }
                   deriving (Show, Functor, Foldable, Traversable, Generic)
 
 instance Applicative f => Applicative (Gaussian f) where
     pure x = Gaussian (pure x) x x
-    Gaussian m1 v1 a1 <*> Gaussian m2 v2 a2 =
-        Gaussian (m1 <*> m2) (v1 v2) (a1 a2)
+    Gaussian m1 d1 a1 <*> Gaussian m2 d2 a2 =
+        Gaussian (m1 <*> m2) (d1 d2) (a1 a2)
     
 instance (Applicative f, Additive f) => Additive (Gaussian f) where
     zero = pure 0
@@ -31,8 +31,8 @@ instance (Applicative f, Metric f, Foldable f) => Metric (Gaussian f)
 
 gaussian :: (RealFloat a, Metric f)
          => Gaussian f a -> f a -> a
-gaussian (Gaussian m v a) x =
-    a * exp (- quadrance (m ^-^ x) / 2 / v)
+gaussian (Gaussian m d a) x =
+    a * exp (- quadrance (m ^-^ x) / 2 / d^2)
 
 data Model a = Model { g1, g2 :: !(Gaussian V2 a)
                      , offset :: !a
@@ -63,11 +63,11 @@ initialModel samples =
         (minPos, minAmp) = V.minimumBy (comparing snd) samples
         offset = mean $ V.map snd samples
     in Model { g1 = Gaussian { gMean     = maxPos
-                             , gVariance = 100
+                             , gStd      = 100
                              , gAmp      = maxAmp - offset
                              }
              , g2 = Gaussian { gMean     = minPos
-                             , gVariance = 100
+                             , gStd      = 100
                              , gAmp      = minAmp - offset
                              }
              , offset = offset
@@ -75,8 +75,7 @@ initialModel samples =
  
 fit :: RealFloat a => V.Vector (V2 a, a) -> Model a -> [Model a]
 fit samples m0 = conjGrad search beta dChiSq m0
-  where --search = armijoSearch 0.1 0.1 1e-4 chiSq
-        search = constantSearch 0.001
+  where search = armijoSearch 0.1 0.2 0.2 chiSq
         beta = fletcherReeves
         dChiSq = grad chiSq
         chiSq :: RealFloat a => Model a -> a
