@@ -73,10 +73,20 @@ initialModel samples =
              , offset = offset
              }
  
+-- Gradient by finite difference
+finiteDiff :: (Fractional a, Additive f, Applicative f, Traversable f)
+           => a -> (f a -> a) -> (f a -> f a)
+finiteDiff h f x = fmap (\y->(y-fx) / h) fdx
+  where fx = f x
+        fdx = f . (x ^+^) <$> kronecker (pure h)
+
 fit :: RealFloat a => V.Vector (V2 a, a) -> Model a -> [Model a]
 fit samples m0 = conjGrad search beta dChiSq m0
-  where search = armijoSearch 0.1 0.2 0.2 chiSq
+  where --search = wolfeSearch 0.1 0.2 1e-4 0.9 chiSq
+        search = armijoSearch 0.1 0.1 1e-4 chiSq
         beta = fletcherReeves
         dChiSq = grad chiSq
+        --dChiSq = finiteDiff 1e-2 chiSq
         chiSq :: RealFloat a => Model a -> a
         chiSq m = V.sum $ V.map (\(x,y)->(residual (fmap realToFrac x) (realToFrac y) m)^2) samples
+{-# INLINE fit #-}
