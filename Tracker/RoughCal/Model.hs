@@ -14,9 +14,9 @@ import Tracker.Types
 import GHC.Generics
 import Numeric.AD
 
-data Gaussian f a = Gaussian { gMean :: f a
-                             , gVariance :: a
-                             , gAmp :: a
+data Gaussian f a = Gaussian { gMean :: !(f a)
+                             , gVariance :: !a
+                             , gAmp :: !a
                              }
                   deriving (Show, Functor, Foldable, Traversable, Generic)
 
@@ -32,10 +32,10 @@ instance (Applicative f, Metric f, Foldable f) => Metric (Gaussian f)
 gaussian :: (RealFloat a, Metric f)
          => Gaussian f a -> f a -> a
 gaussian (Gaussian m v a) x =
-    a * exp (quadrance (m ^-^ x) / 2 / v)
+    a * exp (- quadrance (m ^-^ x) / 2 / v)
 
-data Model a = Model { g1, g2 :: Gaussian Stage a
-                     , offset :: a
+data Model a = Model { g1, g2 :: !(Gaussian V2 a)
+                     , offset :: !a
                      }
              deriving (Show, Functor, Foldable, Traversable, Generic)
      
@@ -47,35 +47,37 @@ instance Additive Model where
     zero = pure 0
 instance Metric Model
 
-model :: RealFloat a => Model a -> Stage a -> a
+model :: RealFloat a => Model a -> V2 a -> a
 model (Model g1 g2 off) x =
-    off + gaussian g1 x - gaussian g2 x
+    off + gaussian g1 x + gaussian g2 x
 
-residual :: RealFloat a => Stage a -> a -> Model a -> a
+residual :: RealFloat a => V2 a -> a -> Model a -> a
 residual x y m = model m x - y
 
 mean :: Fractional a => V.Vector a -> a
 mean xs = V.sum xs / fromIntegral (V.length xs)
 
-initialModel :: (Ord a, Fractional a) => V.Vector (Stage a, a) -> Model a
+initialModel :: (Ord a, Fractional a) => V.Vector (V2 a, a) -> Model a
 initialModel samples =
     let (maxPos, maxAmp) = V.maximumBy (comparing snd) samples
         (minPos, minAmp) = V.minimumBy (comparing snd) samples
+        offset = mean $ V.map snd samples
     in Model { g1 = Gaussian { gMean     = maxPos
                              , gVariance = 100
-                             , gAmp      = maxAmp
+                             , gAmp      = maxAmp - offset
                              }
              , g2 = Gaussian { gMean     = minPos
                              , gVariance = 100
-                             , gAmp      = minAmp
+                             , gAmp      = minAmp - offset
                              }
-             , offset = mean $ V.map snd samples
+             , offset = offset
              }
  
-fit :: RealFloat a => V.Vector (Stage a, a) -> Model a -> [Model a]
+fit :: RealFloat a => V.Vector (V2 a, a) -> Model a -> [Model a]
 fit samples m0 = conjGrad search beta dChiSq m0
-  where search = armijoSearch 0.1 0.2 1 chiSq
+  where --search = armijoSearch 0.1 0.1 1e-4 chiSq
+        search = constantSearch 0.001
         beta = fletcherReeves
         dChiSq = grad chiSq
         chiSq :: RealFloat a => Model a -> a
-        chiSq m = V.sum $ V.map (\(x,y)->residual (fmap realToFrac x) (realToFrac y) m) samples
+        chiSq m = V.sum $ V.map (\(x,y)->(residual (fmap realToFrac x) (realToFrac y) m)^2) samples
