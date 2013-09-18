@@ -77,7 +77,7 @@ centerCmd = command ["center"] help "" $ \args->center
   where help = "Set stage at center position"
 
 roughCalCmd :: Command
-roughCalCmd = command ["rough cal"] help "" $ \args->do
+roughCalCmd = command ["rough", "cal"] help "" $ \args->do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
@@ -90,7 +90,7 @@ showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]+
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 dumpRoughCmd :: Command
-dumpRoughCmd = command ["rough dump"] help "[FILENAME]" $ \args->do
+dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughCal >>= tryJust "No rough calibration."
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
@@ -98,7 +98,7 @@ dumpRoughCmd = command ["rough dump"] help "[FILENAME]" $ \args->do
   where help = "Dump last rough calibration"
 
 fineCalCmd :: Command
-fineCalCmd = command ["fine cal"] help "" $ \args->do
+fineCalCmd = command ["fine", "cal"] help "" $ \args->do
     fs <- use fineScan
     gains <- liftTrackerE $ T.fineCal fs
     feedbackGains .= gains
@@ -110,7 +110,7 @@ fineCalCmd = command ["fine cal"] help "" $ \args->do
   where help = "Perform fine calibration"
   
 readSensorsCmd :: Command
-readSensorsCmd = command ["sensors read"] help "" $ \args->do
+readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
