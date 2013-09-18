@@ -21,6 +21,7 @@ import Tracker.Types
 import Tracker.Raster
 import Tracker.PathAcquire
 import Tracker.LowLevel
+import Tracker.RoughCal.Model
 
 roughScan :: MonadIO m
           => Word32 -> RasterScan Stage Word16

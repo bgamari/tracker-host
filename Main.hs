@@ -33,6 +33,7 @@ import Control.Lens hiding (setting, Setting)
 
 import qualified Tracker as T
 import Tracker.Types
+import Tracker.RoughCal.Model
 import TrackerUI.Types
 import TrackerUI.Plot
 import PreAmp       
