@@ -66,18 +66,22 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     liftTrackerE $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
-centerCmd :: Command
-centerCmd = command ["center"] help "" $ \args->
-    liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
+-- | Return the stage to center
+center :: TrackerUI ()
+center = liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
   where c = 0xffff `div` 2
-        help = "Set stage at center position"
+
+centerCmd :: Command
+centerCmd = command ["center"] help "" $ \args->center
+  where help = "Set stage at center position"
 
 roughCalCmd :: Command
-roughCalCmd = command ["rough-cal"] help "" $ \args->do
+roughCalCmd = command ["rough cal"] help "" $ \args->do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
     lastRoughCal .= Just scan
+    center
   where help = "Perform rough calibration"
 
 showSensors :: Show a => Sensors a -> String
@@ -85,7 +89,7 @@ showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]+
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 dumpRoughCmd :: Command
-dumpRoughCmd = command ["dump-rough"] help "[FILENAME]" $ \args->do
+dumpRoughCmd = command ["rough dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughCal >>= tryJust "No rough calibration."
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
@@ -93,7 +97,7 @@ dumpRoughCmd = command ["dump-rough"] help "[FILENAME]" $ \args->do
   where help = "Dump last rough calibration"
 
 fineCalCmd :: Command
-fineCalCmd = command ["fine-cal"] help "" $ \args->do
+fineCalCmd = command ["fine cal"] help "" $ \args->do
     fs <- use fineScan
     gains <- liftTrackerE $ T.fineCal fs
     feedbackGains .= gains
@@ -105,7 +109,7 @@ fineCalCmd = command ["fine-cal"] help "" $ \args->do
   where help = "Perform fine calibration"
   
 readSensorsCmd :: Command
-readSensorsCmd = command ["read-sensors"] help "" $ \args->do
+readSensorsCmd = command ["sensors read"] help "" $ \args->do
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
@@ -269,12 +273,14 @@ exciteCmds =
     , command ["excite", "cal"]
       "Run calibration" "" $ \args->do
         samples <- use corrPoints >>= liftTracker . fetchPoints
-        let test = fmap (view (stage . _x)) samples
+        let test = fmap (view (psd . _x . sdDiff)) samples
         decimation <- liftTrackerE $ T.getKnob T.adcDecimation
         decimatedExc <- uses (excitation . _x . excChanExcitation)
                              (T.excitePeriod %~ (/ realToFrac decimation) . realToFrac)
         phaseAmp <- liftTracker $ T.phaseAmp decimatedExc (fmap realToFrac test)
         liftIO $ print phaseAmp
+        liftIO $ withFile "r.txt" WriteMode $ \h->
+            V.mapM_ (hPutStrLn h . showSensors) samples
     ]
     
 exciteSettings :: [Setting]
@@ -435,7 +441,7 @@ commands = [ helloCmd
            , exitCmd
            , helpCmd
            , command ["adc", "start"] "Start ADC triggering" "" $ const
-             $ liftTrackerE $ T.setAdcTriggerMode T.TriggerAuto
+             $ liftTrackerE $ T.setKnob T.adcTriggerMode T.TriggerAuto
            , showCmd
            ] ++ concatMap settingCommands settings
              ++ preAmpCmds
@@ -475,10 +481,10 @@ main = either error (const $ return ()) =<< go
                             T.setKnob T.stageGain defaultStageGains
                             T.setKnob T.outputGain defaultOutputGains
                             T.setFeedbackFreq 50000
-                            T.setAdcFreq 50000
+                            T.setKnob T.adcFreq 50000
                             T.setKnob T.adcDecimation 4
                             T.startAdcStream
-                            T.setAdcTriggerMode T.TriggerAuto
+                            T.setKnob T.adcTriggerMode T.TriggerAuto
           while $ prompt
 
 while :: Monad m => m Bool -> m ()

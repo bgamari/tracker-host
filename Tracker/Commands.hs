@@ -12,6 +12,9 @@ module Tracker.Commands ( -- * Types
                         , maxError
                         , outputGain
                         , outputTau
+                        , adcFreq
+                        , TriggerMode(..)
+                        , adcTriggerMode
                         , adcDecimation
                         , FeedbackMode(..)
                         , feedbackMode
@@ -21,9 +24,6 @@ module Tracker.Commands ( -- * Types
                         , EventCounters(..)
                         , getEventCounters
                         , setExcitation
-                        , setAdcFreq
-                        , TriggerMode(..)
-                        , setAdcTriggerMode
                         , startAdcStream
                         , stopAdcStream
                         , setFeedbackFreq
@@ -55,6 +55,12 @@ import Tracker.LowLevel
 import Tracker.Types
 import Control.Lens
 import Linear
+
+getEnum :: (Integral n, Enum a) => Get n -> Get a
+getEnum getN = toEnum . fromIntegral <$> getN
+
+putEnum :: (Integral n, Enum a) => (n -> Put) -> (a -> Put)
+putEnum putN = putN . fromIntegral . fromEnum
 
 -- | Put a 32-bit signed integer
 --
@@ -165,43 +171,48 @@ setExcitation' :: MonadIO m
                -> EitherT String (TrackerT m) ()
 setExcitation' ch samples offset totalLength = do
     writeCommand 0x1e $ do
-        putWord8 $ fromIntegral $ fromEnum ch
+        putEnum putWord8 ch
         putWord16le $ totalLength
         putWord16le $ offset
         putWord8 $ fromIntegral $ V.length samples
         mapM_ (putWord16le . fromIntegral) samples
     readAck "setExcitation'"
 
-setAdcFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
-setAdcFreq freq = do
-    writeCommand 0x20 $ putWord32le freq
-    readAck "setAdcFreq"
+adcFreq :: Knob Word32
+adcFreq = Knob "adc-freq" 0x20 getter 0x21 putter
+  where getter = getWord32le
+        putter = putWord32le
 
 data TriggerMode = TriggerOff
                  | TriggerAuto
                  | TriggerManual
                  deriving (Show, Eq, Bounded, Enum)
 
-setAdcTriggerMode :: MonadIO m => TriggerMode -> EitherT String (TrackerT m) ()
-setAdcTriggerMode mode = do
-    writeCommand 0x21 $ putWord32le (fromIntegral $ fromEnum mode)
-    readAck "setAdcTriggerMode"
+adcTriggerMode :: Knob TriggerMode
+adcTriggerMode = Knob "adc-trigger-mode" 0x22 getter 0x23 putter
+  where getter = getEnum getWord32le
+        putter = putEnum putWord32le
 
-startAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
-startAdcStream = do
-    writeCommand 0x22 $ return ()
-    readAck "startAdcStream"
-
-stopAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
-stopAdcStream = do
-    writeCommand 0x23 $ return ()
-    readAck "stopAdcStream"
-    
 adcDecimation :: Knob Word32
 adcDecimation = Knob "adc-decimation" 0x24 getter 0x25 putter
   where getter = getWord32le
         putter = putWord32le
 
+startAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
+startAdcStream = do
+    writeCommand 0x2a $ return ()
+    readAck "startAdcStream"
+
+stopAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
+stopAdcStream = do
+    writeCommand 0x2b $ return ()
+    readAck "stopAdcStream"
+    
+flushAdcStream :: MonadIO m => EitherT String (TrackerT m) ()
+flushAdcStream = do
+    writeCommand 0x2c $ return ()
+    readAck "flushAdcStream"
+    
 setFeedbackFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
 setFeedbackFreq freq = do
     writeCommand 0x30 $ putWord32le freq
@@ -214,8 +225,8 @@ data FeedbackMode = NoFeedback
 
 feedbackMode :: Knob FeedbackMode
 feedbackMode = Knob "feedback-mode" 0x31 getter 0x32 putter
-  where getter = (toEnum . fromIntegral) `liftM` getWord8
-        putter = putWord32le . fromIntegral . fromEnum
+  where getter = getEnum getWord8
+        putter = putEnum putWord32le
 
 setRawPosition :: MonadIO m => Stage Word16 -> EitherT String (TrackerT m) ()
 setRawPosition pos = do
