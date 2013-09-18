@@ -3,6 +3,7 @@ module Tracker.RoughCal.Model where
 
 import Prelude hiding (sequence)       
 import Control.Applicative
+import Data.Ord
 import Data.Foldable
 import Data.Traversable
 import Data.Monoid
@@ -13,9 +14,9 @@ import Tracker.Types
 import GHC.Generics
 import Numeric.AD
 
-data Gaussian f a = Gaussian { mean :: f a
-                             , variance :: a
-                             , amp :: a
+data Gaussian f a = Gaussian { gMean :: f a
+                             , gVariance :: a
+                             , gAmp :: a
                              }
                   deriving (Show, Functor, Foldable, Traversable, Generic)
 
@@ -52,6 +53,24 @@ model (Model g1 g2 off) x =
 
 residual :: RealFloat a => Stage a -> a -> Model a -> a
 residual x y m = model m x - y
+
+mean :: Fractional a => V.Vector a -> a
+mean xs = V.sum xs / fromIntegral (V.length xs)
+
+initialModel :: (Ord a, Fractional a) => V.Vector (Stage a, a) -> Model a
+initialModel samples =
+    let (maxPos, maxAmp) = V.maximumBy (comparing snd) samples
+        (minPos, minAmp) = V.minimumBy (comparing snd) samples
+    in Model { g1 = Gaussian { gMean     = maxPos
+                             , gVariance = 100
+                             , gAmp      = maxAmp
+                             }
+             , g2 = Gaussian { gMean     = minPos
+                             , gVariance = 100
+                             , gAmp      = minAmp
+                             }
+             , offset = mean $ V.map snd samples
+             }
  
 fit :: RealFloat a => V.Vector (Stage a, a) -> Model a -> [Model a]
 fit samples m0 = conjGrad search beta dChiSq m0

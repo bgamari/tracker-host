@@ -33,7 +33,7 @@ import Control.Lens hiding (setting, Setting)
 
 import qualified Tracker as T
 import Tracker.Types
-import Tracker.RoughCal.Model
+import Tracker.RoughCal.Model as Model
 import TrackerUI.Types
 import TrackerUI.Plot
 import PreAmp       
@@ -83,6 +83,11 @@ roughCalCmd = command ["rough", "cal"] help "" $ \args->do
     scan <- liftTrackerE $ T.roughScan freq rs
     lastRoughCal .= Just scan
     center
+    let samples = V.map (\s->(s^.stage, s^.psd._x.sdDiff))
+                  $ V.map (fmap realToFrac) scan
+        m0 = Model.initialModel samples
+        m = head $ drop 10 $ Model.fit samples m0
+    liftIO $ print m
   where help = "Perform rough calibration"
 
 showSensors :: Show a => Sensors a -> String
