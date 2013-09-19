@@ -42,7 +42,7 @@ center v =
 
 asDouble = realToFrac :: Real a => a -> Double
 
-roughCenter :: V.Vector (Sensors Word16) -> Stage Double
+roughCenter :: V.Vector (Sensors Sample) -> Stage Double
 roughCenter v =
     let Psd (V2 cx cy) = fmap center $ core
                          $ \l->V.map (\s->( fmap asDouble $ s ^. stage
