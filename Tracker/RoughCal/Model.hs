@@ -34,30 +34,31 @@ gaussian :: (RealFloat a, Metric f)
 gaussian (Gaussian m d a) x =
     a * exp (- quadrance (m ^-^ x) / 2 / d^2)
 
-data Model a = Model { g1, g2 :: !(Gaussian V2 a)
-                     , offset :: !a
-                     }
-             deriving (Show, Functor, Foldable, Traversable, Generic)
+data Model f a = Model { g1, g2 :: !(Gaussian f a)
+                       , offset :: !a
+                       }
+               deriving (Show, Functor, Foldable, Traversable, Generic)
      
-instance Applicative Model where
+instance Applicative f => Applicative (Model f) where
     pure x = Model (pure x) (pure x) x
     Model a1 b1 c1 <*> Model a2 b2 c2 = Model (a1 <*> a2) (b1 <*> b2) (c1 c2)
 
-instance Additive Model where
+instance Applicative f => Additive (Model f) where
     zero = pure 0
-instance Metric Model
+instance (Foldable f, Applicative f) => Metric (Model f)
 
-model :: RealFloat a => Model a -> V2 a -> a
+model :: (RealFloat a, Metric f)
+      => Model f a -> f a -> a
 model (Model g1 g2 off) x =
     off + gaussian g1 x + gaussian g2 x
 
-residual :: RealFloat a => V2 a -> a -> Model a -> a
+residual :: (RealFloat a, Metric f) => f a -> a -> Model f a -> a
 residual x y m = model m x - y
 
 mean :: Fractional a => V.Vector a -> a
 mean xs = V.sum xs / fromIntegral (V.length xs)
 
-initialModel :: (Ord a, Fractional a) => V.Vector (V2 a, a) -> Model a
+initialModel :: (Ord a, Fractional a) => V.Vector (V2 a, a) -> Model V2 a
 initialModel samples =
     let (maxPos, maxAmp) = V.maximumBy (comparing snd) samples
         (minPos, minAmp) = V.minimumBy (comparing snd) samples
@@ -80,13 +81,14 @@ finiteDiff h f x = fmap (\y->(y-fx) / h) fdx
   where fx = f x
         fdx = f . (x ^+^) <$> kronecker (pure h)
 
-fit :: RealFloat a => V.Vector (V2 a, a) -> Model a -> [Model a]
+fit :: (RealFloat a, Traversable f, Applicative f, Metric f)
+    => V.Vector (f a, a) -> Model f a -> [Model f a]
 fit samples m0 = conjGrad search beta dChiSq m0
   where --search = wolfeSearch 0.1 0.2 1e-4 0.9 chiSq
         search = armijoSearch 0.1 0.1 1e-4 chiSq
         beta = fletcherReeves
         dChiSq = grad chiSq
         --dChiSq = finiteDiff 1e-2 chiSq
-        chiSq :: RealFloat a => Model a -> a
         chiSq m = V.sum $ V.map (\(x,y)->(residual (fmap realToFrac x) (realToFrac y) m)^2) samples
 {-# INLINE fit #-}
+    
