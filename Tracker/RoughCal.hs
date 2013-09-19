@@ -12,6 +12,7 @@ import qualified Data.Vector as V
 import Data.Word
 import Data.Foldable
 import Data.Monoid
+import Data.Ord (comparing)
 import Data.Traversable
 import Control.Error
 import Control.Lens
@@ -33,25 +34,18 @@ roughScan freq s =
         --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
     in pathAcquire freq path
 
-roughCenter :: V.Vector (Sensors Word16) -> Stage Word16
+center :: (Fractional a, Ord b) => V.Vector (Stage a, b) -> Stage a
+center v =
+    let (minPos,_) = V.minimumBy (comparing snd) v
+        (maxPos,_) = V.maximumBy (comparing snd) v
+    in lerp 0.5 minPos maxPos
+
+asDouble = realToFrac :: Real a => a -> Double
+
+roughCenter :: V.Vector (Sensors Word16) -> Stage Double
 roughCenter v =
-    let psds :: Psd (V.Vector (SumDiff Word16))
-        psds = sequenceA $ fmap (^. psd) v
-        psdDiff :: Psd (V.Vector Word16)
-        psdDiff = fmap (fmap (^. sdDiff)) psds
-        maxPos :: Psd (Stage Word16)
-        maxPos = mapped %~ ( fst
-                           . maximumBy (compare `on` snd)
-                           . V.zip (fmap (^. stage) v)
-                           )
-                $ psdDiff
-        minPos :: Psd (Stage Word16)
-        minPos = mapped %~ ( fst
-                           . minimumBy (compare `on` snd)
-                           . V.zip (fmap (^. stage) v)
-                           )
-                $ psdDiff
-        hi = foldr (^+^) zero
-             $ (^+^) <$> maxPos <*> minPos
-            :: Stage Word16
-    in (`div` 4) <$> hi
+    let Psd (V2 cx cy) = fmap center $ core
+                         $ \l->V.map (\s->( fmap asDouble $ s ^. stage
+                                          , s ^. psd . l . sdDiff)
+                                     ) v
+    in lerp 0.5 cx cy
