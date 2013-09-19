@@ -443,10 +443,12 @@ fixed16Double = iso realToFrac realToFrac
 
 showCmd :: Command
 showCmd = command ["show"] help "PATTERN" $ \args->do
-    pattern <- tryHead "expected pattern" args
-    let matching = filter (\(Setting {..})->pattern `isPrefixOf` sName)
-                   $ filter (\(Setting {..})->isJust sHelp)
-                   $ settings
+    let matching =
+          case listToMaybe args of
+            Just pattern -> filter (\(Setting {..})->pattern `isPrefixOf` sName)
+                            $ filter (\(Setting {..})->isJust sHelp)
+                            $ settings
+            Nothing      -> settings
     forM_ matching $ \(Setting {..})->do
         value <- sAccessors^.aGet
         liftInputT $ outputStrLn $ sName++" = "++views sLens sFormat value 
