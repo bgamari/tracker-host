@@ -54,7 +54,6 @@ data TrackerState
     = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
                    , _roughScan      :: RasterScan Stage Word16
-                   , _roughZSize     :: Word16
                    , _fineScan       :: FineScan
                    , _feedbackGains  :: Psd (Stage Double)
                    , _preAmp         :: Maybe PreAmp
@@ -73,7 +72,6 @@ defaultTrackerState =
                                                , _scanSize   = pure 4000
                                                , _scanPoints = Stage $ V3 40 40 1
                                                }
-                 , _roughZSize    = 20000
                  , _fineScan      = FineScan { _fineScanRange  = pure 0x500
                                              , _fineScanCenter = pure 0x7fff
                                              , _fineScanPoints = 500

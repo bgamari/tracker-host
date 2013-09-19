@@ -78,7 +78,8 @@ centerCmd = command ["center"] help "" $ \args->center
 
 roughCalCmd :: Command
 roughCalCmd = command ["rough", "cal"] help "" $ \args->do
-    rs <- use roughScan
+    rs <- uses roughScan $ (T.scanSize . _z .~ 0)
+                         . (T.scanPoints . _z .~ 1)
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
     lastRoughCal .= Just scan
@@ -89,14 +90,10 @@ roughZCalCmd = command ["rough", "zcal"] help "" $ \args->do
     scan <- use lastRoughCal >>= tryJust "No last rough calibration"
     let c = T.roughCenter scan
     liftInputT $ outputStrLn $ show c
-    xSize <- use $ roughScan . T.scanSize . _x
-    zSize <- use roughZSize
-    let zrs = T.RasterScan { T._scanCenter = fmap round c
-                           , T._scanSize = mkStage xSize 0 zSize
-                           , T._scanPoints = mkStage 10 1 50
-                           }
+    rs <- uses roughScan $ (T.scanSize . _y .~ 0)
+                         . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
-    zScan <- liftTrackerE $ T.roughScan freq zrs
+    zScan <- liftTrackerE $ T.roughScan freq rs
     liftIO $ writeFile "rough-z.txt" $ unlines $ map showSensors $ V.toList zScan
   where help = "Perform rough Z scan"
   
