@@ -94,7 +94,7 @@ roughZCalCmd = command ["rough", "zcal"] help "" $ \args->do
                          . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
     zScan <- liftTrackerE $ T.roughScan freq rs
-    liftIO $ writeFile "rough-z.txt" $ unlines $ map showSensors $ V.toList zScan
+    lastRoughZCal .= Just zScan
   where help = "Perform rough Z scan"
   
 roughFitCmd :: Command
@@ -119,6 +119,14 @@ dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
+
+dumpZRoughCmd :: Command
+dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
+    let fname = fromMaybe "rough-zcal.txt" $ listToMaybe args
+    s <- use lastRoughZCal >>= tryJust "No rough Z calibration."
+    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
+  where help = "Dump last rough Z calibration"
 
 fineCalCmd :: Command
 fineCalCmd = command ["fine", "cal"] help "" $ \args->do
@@ -459,6 +467,7 @@ commands = [ helloCmd
            , roughZCalCmd
            , roughFitCmd
            , dumpRoughCmd
+           , dumpZRoughCmd
            , fineCalCmd
            , readSensorsCmd
            , logStartCmd

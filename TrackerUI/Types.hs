@@ -52,6 +52,7 @@ liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
 
 data TrackerState
     = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
+                   , _lastRoughZCal  :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
                    , _roughScan      :: RasterScan Stage Word16
                    , _fineScan       :: FineScan
@@ -67,6 +68,7 @@ makeLenses ''TrackerState
 defaultTrackerState :: TrackerState           
 defaultTrackerState =
     TrackerState { _lastRoughCal  = Nothing
+                 , _lastRoughZCal = Nothing
                  , _roughScanFreq = 1000
                  , _roughScan     = RasterScan { _scanCenter = pure 0x7fff
                                                , _scanSize   = pure 4000

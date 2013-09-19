@@ -92,3 +92,5 @@ fit samples m0 = conjGrad search beta dChiSq m0
         chiSq m = V.sum $ V.map (\(x,y)->(residual (fmap realToFrac x) (realToFrac y) m)^2) samples
 {-# INLINE fit #-}
     
+modelToGains :: Model V3 Double -> Psd (Stage Double)
+modelToGains = undefined             
