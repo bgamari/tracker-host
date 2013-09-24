@@ -71,8 +71,8 @@ defaultTrackerState =
                  , _lastRoughZScan = Nothing
                  , _roughScanFreq  = 1000
                  , _roughScan      = RasterScan { _scanCenter = pure 0x7fff
-                                                , _scanSize   = pure 4000
-                                                , _scanPoints = Stage $ V3 40 40 1
+                                                , _scanSize   = T.mkStage 6000 6000 20000
+                                                , _scanPoints = T.mkStage 40 40 80
                                                 }
                  , _fineScan       = FineScan { _fineScanRange  = pure 0x500
                                               , _fineScanCenter = pure 0x7fff
