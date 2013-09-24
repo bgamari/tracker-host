@@ -96,6 +96,7 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
     freq <- use roughScanFreq
     zScan <- liftTrackerE $ T.roughScan freq rs
     lastRoughZScan .= Just zScan
+    center
   where help = "Perform rough Z scan"
   
 roughFitCmd :: Command
