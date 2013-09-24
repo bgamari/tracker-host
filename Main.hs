@@ -76,36 +76,42 @@ centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->center
   where help = "Set stage at center position"
 
-roughCalCmd :: Command
-roughCalCmd = command ["rough", "cal"] help "" $ \args->do
+roughScanCmd :: Command
+roughScanCmd = command ["rough", "scan"] help "" $ \args->do
     rs <- uses roughScan $ (T.scanSize . _z .~ 0)
                          . (T.scanPoints . _z .~ 1)
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
-    lastRoughCal .= Just scan
+    lastRoughScan .= Just scan
+    center
   where help = "Perform rough scan"
     
-roughZCalCmd :: Command
-roughZCalCmd = command ["rough", "zcal"] help "" $ \args->do
-    scan <- use lastRoughCal >>= tryJust "No last rough calibration"
+roughZScanCmd :: Command
+roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
+    scan <- use lastRoughScan >>= tryJust "No last rough calibration"
     let c = T.roughCenter scan
     liftInputT $ outputStrLn $ show c
     rs <- uses roughScan $ (T.scanSize . _y .~ 0)
                          . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
     zScan <- liftTrackerE $ T.roughScan freq rs
-    lastRoughZCal .= Just zScan
+    lastRoughZScan .= Just zScan
   where help = "Perform rough Z scan"
   
 roughFitCmd :: Command
 roughFitCmd = command ["rough", "fit"] help "" $ \args->do
-    scan <- use lastRoughCal >>= tryJust "No rough calibration"
+    scan <- use lastRoughScan >>= tryJust "No rough calibration"
     let samples = V.map (\s->(s^.stage._xy, s^.psd._x.sdDiff))
                   $ V.map (fmap realToFrac) scan
         m0 = Model.initialModel samples
         m = head $ drop 10 $ Model.fit samples m0
+        center = Model.modelCenter m
+        --gains = Model.modelToGains center m
     liftIO $ print m0
     liftIO $ print m
+    --liftIO $ print gains
+    --when ("gains" `elem` args)
+    --  $ liftTrackerE $ T.setKnob T.psdGains gains
   where help = "Perform fit on rough calibration"
 
 showSensors :: Show a => Sensors a -> String
@@ -115,7 +121,7 @@ showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]+
 dumpRoughCmd :: Command
 dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
-    s <- use lastRoughCal >>= tryJust "No rough calibration."
+    s <- use lastRoughScan >>= tryJust "No rough calibration."
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
@@ -123,7 +129,7 @@ dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
 dumpZRoughCmd :: Command
 dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-zcal.txt" $ listToMaybe args
-    s <- use lastRoughZCal >>= tryJust "No rough Z calibration."
+    s <- use lastRoughZScan >>= tryJust "No rough Z calibration."
     liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough Z calibration"
@@ -463,8 +469,8 @@ commands :: [Command]
 commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
-           , roughCalCmd
-           , roughZCalCmd
+           , roughScanCmd
+           , roughZScanCmd
            , roughFitCmd
            , dumpRoughCmd
            , dumpZRoughCmd

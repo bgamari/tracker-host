@@ -51,8 +51,8 @@ liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
 liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
 
 data TrackerState
-    = TrackerState { _lastRoughCal   :: Maybe (V.Vector (Sensors Sample))
-                   , _lastRoughZCal  :: Maybe (V.Vector (Sensors Sample))
+    = TrackerState { _lastRoughScan  :: Maybe (V.Vector (Sensors Sample))
+                   , _lastRoughZScan :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
                    , _roughScan      :: RasterScan Stage Word16
                    , _fineScan       :: FineScan
@@ -67,24 +67,24 @@ makeLenses ''TrackerState
            
 defaultTrackerState :: TrackerState           
 defaultTrackerState =
-    TrackerState { _lastRoughCal  = Nothing
-                 , _lastRoughZCal = Nothing
-                 , _roughScanFreq = 1000
-                 , _roughScan     = RasterScan { _scanCenter = pure 0x7fff
-                                               , _scanSize   = pure 4000
-                                               , _scanPoints = Stage $ V3 40 40 1
-                                               }
-                 , _fineScan      = FineScan { _fineScanRange  = pure 0x500
-                                             , _fineScanCenter = pure 0x7fff
-                                             , _fineScanPoints = 500
-                                             , _fineScanFreq   = 2000
-                                             }
-                 , _feedbackGains = pure $ pure 0
-                 , _preAmp        = Nothing
-                 , _stopLogger    = Nothing
-                 , _trackerPlot   = Nothing
-                 , _corrPoints    = 4000
-                 , _excitation    = fmap (ExcChan False) T.defaultExcitation
+    TrackerState { _lastRoughScan  = Nothing
+                 , _lastRoughZScan = Nothing
+                 , _roughScanFreq  = 1000
+                 , _roughScan      = RasterScan { _scanCenter = pure 0x7fff
+                                                , _scanSize   = pure 4000
+                                                , _scanPoints = Stage $ V3 40 40 1
+                                                }
+                 , _fineScan       = FineScan { _fineScanRange  = pure 0x500
+                                              , _fineScanCenter = pure 0x7fff
+                                              , _fineScanPoints = 500
+                                              , _fineScanFreq   = 2000
+                                              }
+                 , _feedbackGains  = pure $ pure 0
+                 , _preAmp         = Nothing
+                 , _stopLogger     = Nothing
+                 , _trackerPlot    = Nothing
+                 , _corrPoints     = 4000
+                 , _excitation     = fmap (ExcChan False) T.defaultExcitation
                  }
 
 data Accessors m a = Accessors { _aGet :: m a

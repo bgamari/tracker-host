@@ -13,6 +13,7 @@ import Optimization.LineSearch.ConjugateGradient
 import Tracker.Types
 import GHC.Generics
 import Numeric.AD
+import Control.Lens
 
 data Gaussian f a = Gaussian { gMean :: !(f a)
                              , gStd  :: !a
@@ -90,7 +91,12 @@ fit samples m0 = conjGrad search beta dChiSq m0
         dChiSq = grad chiSq
         --dChiSq = finiteDiff 1e-2 chiSq
         chiSq m = V.sum $ V.map (\(x,y)->(residual (fmap realToFrac x) (realToFrac y) m)^2) samples
-{-# INLINE fit #-}
+{-# INLINEABLE fit #-}
     
-modelToGains :: Model V3 Double -> Psd (Stage Double)
-modelToGains = undefined             
+modelCenter :: Additive f => Model f Double -> f Double
+modelCenter m = lerp 0.5 (gMean $ g1 m) (gMean $ g2 m)
+
+modelToGains :: Model V3 Double -> V3 Double -> Psd (Stage Double)
+modelToGains m center =
+    _x .~ Stage (grad (model (fmap realToFrac m)) center)
+  $ pure (pure 0)
