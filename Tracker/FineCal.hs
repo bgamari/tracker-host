@@ -85,6 +85,10 @@ fineScan :: (Applicative m, MonadIO m)
          => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Int16))
 fineScan fs = do
     path <- liftIO $ withSystemRandom $ asGenIO $ \mwc->do
-        let point = T.sequence $ pure (uniform mwc)
-        replicateM (fs ^. fineScanPoints) (Stage <$> point)
+        let coord :: Word16 -> Word16 -> IO Word16
+            coord center range = let range2 = range `div` 2
+                                 in uniformR (center-range2, center+range2) mwc
+            point :: IO (Stage Word16)
+            point = T.sequence $ coord <$> fs ^. fineScanCenter <*> fs ^. fineScanRange
+        replicateM (fs ^. fineScanPoints) point
     pathAcquire (fs^.fineScanFreq) path
