@@ -85,12 +85,18 @@ roughScanCmd = command ["rough", "scan"] help "" $ \args->do
     lastRoughScan .= Just scan
     center
   where help = "Perform rough scan"
-    
-roughZScanCmd :: Command
-roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
+  
+roughCenterCmd :: Command
+roughCenterCmd = command ["rough", "center"] help "" $ \args->do
     scan <- use lastRoughScan >>= tryJust "No last rough calibration"
     let c = T.roughCenter scan
     liftInputT $ outputStrLn $ show c
+    roughScan . T.scanCenter .= fmap round c
+  where help = "Find center of particle from XY rough scan"
+  
+roughZScanCmd :: Command
+roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
+    scan <- use lastRoughScan >>= tryJust "No last rough calibration"
     rs <- uses roughScan $ (T.scanSize . _y .~ 0)
                          . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
@@ -471,6 +477,7 @@ commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
            , roughScanCmd
+           , roughCenterCmd
            , roughZScanCmd
            , roughFitCmd
            , dumpRoughCmd
