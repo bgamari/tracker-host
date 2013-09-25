@@ -54,8 +54,9 @@ pathAcquire freq path = do
 
 waitUntilPathFinished :: MonadIO m => EitherT String (TrackerT m) ()
 waitUntilPathFinished = do
+    liftIO $ threadDelay 10000
     done <- isPathRunning
-    when (not done) $ liftIO (threadDelay 10000) >> waitUntilPathFinished
+    when (not done) waitUntilPathFinished
 
 readAllTChan :: TVar Bool -> TChan a -> IO [a]
 readAllTChan running c = go []
