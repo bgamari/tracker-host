@@ -444,6 +444,8 @@ settings = concat
             (knobA T.stageGain) (_z . stageV3 . mapping fixed16Double)
     , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
+    , r3Setting "psd.fb-gain.x.diff" "stage feedback gain"
+            (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping fixed16Double)
     ] ++
     exciteSettings ++
     [ pureSetting "rough.freq"
