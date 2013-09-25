@@ -69,8 +69,7 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
 
 -- | Return the stage to center
 center :: TrackerUI ()
-center = liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
-  where c = 0xffff `div` 2
+center = use centerPos >>= liftTrackerE . T.setRawPosition . fmap fromIntegral
 
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->center

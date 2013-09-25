@@ -51,7 +51,8 @@ liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
 liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
 
 data TrackerState
-    = TrackerState { _lastRoughScan  :: Maybe (V.Vector (Sensors Sample))
+    = TrackerState { _centerPos      :: Stage Sample
+                   , _lastRoughScan  :: Maybe (V.Vector (Sensors Sample))
                    , _lastRoughZScan :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
                    , _roughScan      :: RasterScan Stage Word16
@@ -67,15 +68,16 @@ makeLenses ''TrackerState
            
 defaultTrackerState :: TrackerState           
 defaultTrackerState =
-    TrackerState { _lastRoughScan  = Nothing
+    TrackerState { _centerPos      = pure 0x3fff
+                 , _lastRoughScan  = Nothing
                  , _lastRoughZScan = Nothing
                  , _roughScanFreq  = 1000
-                 , _roughScan      = RasterScan { _scanCenter = pure 0x7fff
+                 , _roughScan      = RasterScan { _scanCenter = pure 0x3fff
                                                 , _scanSize   = T.mkStage 6000 6000 20000
                                                 , _scanPoints = T.mkStage 40 40 80
                                                 }
                  , _fineScan       = FineScan { _fineScanRange  = pure 0x500
-                                              , _fineScanCenter = pure 0x7fff
+                                              , _fineScanCenter = pure 0x3fff
                                               , _fineScanPoints = 500
                                               , _fineScanFreq   = 2000
                                               }
