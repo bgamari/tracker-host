@@ -137,8 +137,8 @@ sensorListen = forever $ do
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
-cmdTimeout = 100
-dataTimeout = 100
+cmdTimeout = 500   -- milliseconds
+dataTimeout = 100  -- milliseconds
 
 showByteString :: BS.ByteString -> String
 showByteString = intercalate " " . map (pad 2 . flip showHex "" . fromIntegral) . BS.unpack
