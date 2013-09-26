@@ -431,15 +431,22 @@ coreSettings name labels a l =
       let label = labels ^. l'
       in Setting (name++"."++label) Nothing readParse show a (l . l')
     
-settings :: [Setting] 
-settings = concat
+roughCalSettings :: [Setting]
+roughCalSettings = concat
     [ r3Setting "rough.size" "rough calibration field size in code-points"
             stateA (roughScan . T.scanSize . stageV3)
     , r3Setting "rough.center" "rough calibration field center in code-points"
             stateA (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             stateA (roughScan . T.scanPoints . stageV3)
-    , r3Setting "stage.output-gain.prop" "stage output proportional gain"
+    , [pureSetting "rough.freq"
+            (Just "update frequency of rough calibration scan")
+            readParse show roughScanFreq]
+    ]
+    
+stageSettings :: [Setting]
+stageSettings = concat
+    [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
             (knobA T.outputGain) (incore propGain . stageV3 . mapping fixed16Double)
     , r3Setting "stage.output-gain.int" "stage output proportional gain"
             (knobA T.outputGain) (incore intGain . stageV3 . mapping fixed16Double)
@@ -453,17 +460,21 @@ settings = concat
             (knobA T.stageGain) (_z . stageV3 . mapping fixed16Double)
     , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
-    , r3Setting "psd.fb-gain.x.diff" "stage feedback gain"
+    , [Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
+            readParse show (knobA T.maxError) id]
+    ]
+
+psdSettings :: [Setting]
+psdSettings = concat
+    [ r3Setting "psd.fb-gain.x.diff" "stage feedback gain"
             (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping fixed16Double)
-    ] ++
-    exciteSettings ++
-    [ pureSetting "rough.freq"
-            (Just "update frequency of rough calibration scan")
-            readParse show roughScanFreq
-    , Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
-            readParse show (knobA T.maxError) id
-    , Setting "decimation" (Just "decimation factor of samples")
-            readParse show (knobA T.adcDecimation) id
+    ]
+    
+settings :: [Setting] 
+settings = concat
+    [ roughCalSettings, stageSettings, exciteSettings
+    , [Setting "decimation" (Just "decimation factor of samples")
+            readParse show (knobA T.adcDecimation) id]
     ]
     
 fixed16Double :: Iso' Fixed16 Double
