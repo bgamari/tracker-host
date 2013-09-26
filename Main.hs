@@ -148,8 +148,9 @@ fineCalCmd = command ["fine", "cal"] help "" $ \args->do
     feedbackGains .= gains
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
-    liftIO $ putStrLn $ unlines $ F.toList
-           $ fmap (F.foldMap (\x->showF x "\t")) gains
+    liftIO $ putStrLn $ unlines
+           $ fmap (F.foldMap (\x->showF x "\t"))
+           $ concat $ F.toList $ fmap F.toList gains
     return ()
   where help = "Perform fine calibration"
 

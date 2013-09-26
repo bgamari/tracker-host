@@ -14,6 +14,7 @@ import Control.Monad
 import Data.List (foldl')
 import Data.Word
 import Data.Int
+import Debug.Trace
 import qualified Data.Vector as V
 import Linear
 import System.Random.MWC
@@ -63,18 +64,20 @@ psdsToMatrix v = LA.buildMatrix (V.length v) 4 f
                      3  -> x ^. _y . sdDiff
           where x = v V.! i
 
-feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (Stage a)
-feedbackGainsFromMatrix m =
-    Psd $ V2 (Stage $ V3 (m LA.@@> (0,0)) (m LA.@@> (0,1)) (m LA.@@> (0,2)))
-        (Stage $ V3 (m LA.@@> (1,0)) (m LA.@@> (1,1)) (m LA.@@> (1,2)))
+feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (SumDiff (Stage a))
+feedbackGainsFromMatrix m = traceShow (LA.rows m, LA.cols m) $ mkPsd (SumDiff sumX diffX) (SumDiff sumY diffY)
+  where sumX  = mkStage (m LA.@@> (0,0)) (m LA.@@> (1,0)) (m LA.@@> (2,0))
+        diffX = mkStage (m LA.@@> (0,1)) (m LA.@@> (1,1)) (m LA.@@> (2,1))
+        sumY  = mkStage (m LA.@@> (0,2)) (m LA.@@> (1,2)) (m LA.@@> (2,2))
+        diffY = mkStage (m LA.@@> (0,3)) (m LA.@@> (1,3)) (m LA.@@> (2,3))
 
-thinSvd' :: (Field a, Element a) => V.Vector (Sensors a) -> Psd (Stage a)
+thinSvd' :: (Field a, Element a) => V.Vector (Sensors a) -> Psd (SumDiff (Stage a))
 thinSvd' xs = 
     let stages = stagesToMatrix $ V.map (^. stage) xs
         psds   = psdsToMatrix $ V.map (^. psd) xs
     in feedbackGainsFromMatrix $ LA.linearSolveLS stages psds
     
-fineCal :: V.Vector (Sensors Sample) -> Psd (Stage Double)
+fineCal :: V.Vector (Sensors Sample) -> Psd (SumDiff (Stage Double))
 fineCal points =
     let ps' :: V.Vector (Sensors Double)
         ps' = fmap (fmap (realToFrac)) points

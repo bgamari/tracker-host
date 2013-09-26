@@ -21,7 +21,7 @@ import qualified Tracker as T
 import TrackerUI.Plot.Types
 import PreAmp
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
-               , RasterScan(..), FineScan(..))
+               , RasterScan(..), FineScan(..), SumDiff(..))
 
 data ExciteChannel = ExcChan { _excChanEnabled :: Bool
                              , _excChanExcitation :: T.Excitation Int
@@ -58,7 +58,7 @@ data TrackerState
                    , _roughScan      :: RasterScan Stage Word16
                    , _fineScan       :: FineScan
                    , _lastFineScan   :: Maybe (V.Vector (Sensors Sample))
-                   , _feedbackGains  :: Psd (Stage Double)
+                   , _feedbackGains  :: Psd (SumDiff (Stage Double))
                    , _preAmp         :: Maybe PreAmp
                    , _stopLogger     :: Maybe (TrackerUI ())
                    , _trackerPlot    :: Maybe TrackerPlot
@@ -83,7 +83,7 @@ defaultTrackerState =
                                               , _fineScanFreq   = 2000
                                               }
                  , _lastFineScan   = Nothing
-                 , _feedbackGains  = pure $ pure 0
+                 , _feedbackGains  = pure $ pure $ pure 0
                  , _preAmp         = Nothing
                  , _stopLogger     = Nothing
                  , _trackerPlot    = Nothing
