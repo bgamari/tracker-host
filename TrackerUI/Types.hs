@@ -77,7 +77,7 @@ defaultTrackerState =
                                                 , _scanSize   = T.mkStage 6000 6000 20000
                                                 , _scanPoints = T.mkStage 40 40 80
                                                 }
-                 , _fineScan       = FineScan { _fineScanRange  = pure 0x500
+                 , _fineScan       = FineScan { _fineScanRange  = pure 500
                                               , _fineScanCenter = pure 0x3fff
                                               , _fineScanPoints = 500
                                               , _fineScanFreq   = 2000
