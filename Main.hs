@@ -439,9 +439,16 @@ roughCalSettings = concat
             stateA (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             stateA (roughScan . T.scanPoints . stageV3)
-    , [pureSetting "rough.freq"
-            (Just "update frequency of rough calibration scan")
+    , [pureSetting "rough.freq" (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq]
+    ]
+    
+fineCalSettings :: [Setting]
+fineCalSettings = concat
+    [ [ pureSetting "fine.points" (Just "number of points in fine calibration")
+            readParse show (fineScan . T.fineScanPoints)]
+    , r3Setting "fine.range" "size of fine calibration in code points"
+            stateA (fineScan . T.fineScanRange . stageV3)
     ]
     
 stageSettings :: [Setting]
@@ -472,7 +479,7 @@ psdSettings = concat
     
 settings :: [Setting] 
 settings = concat
-    [ roughCalSettings, stageSettings, exciteSettings
+    [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
     ]
