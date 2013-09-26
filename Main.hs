@@ -91,6 +91,9 @@ roughCenterCmd = command ["rough", "center"] help "" $ \args->do
     let c = T.roughCenter scan
     liftInputT $ outputStrLn $ show c
     roughScan . T.scanCenter .= fmap round c
+    fineScan . T.fineScanCenter .= fmap round c
+    centerPos .= fmap round c
+    center
   where help = "Find center of particle from XY rough scan"
   
 roughZScanCmd :: Command
