@@ -57,6 +57,7 @@ data TrackerState
                    , _roughScanFreq  :: Word32
                    , _roughScan      :: RasterScan Stage Word16
                    , _fineScan       :: FineScan
+                   , _lastFineScan   :: Maybe (V.Vector (Sensors Sample))
                    , _feedbackGains  :: Psd (Stage Double)
                    , _preAmp         :: Maybe PreAmp
                    , _stopLogger     :: Maybe (TrackerUI ())
@@ -81,6 +82,7 @@ defaultTrackerState =
                                               , _fineScanPoints = 500
                                               , _fineScanFreq   = 2000
                                               }
+                 , _lastFineScan   = Nothing
                  , _feedbackGains  = pure $ pure 0
                  , _preAmp         = Nothing
                  , _stopLogger     = Nothing

@@ -3,6 +3,7 @@
 module Tracker.FineCal ( fineCal
                        , FineScan(..)
                        , fineScanRange, fineScanCenter, fineScanPoints, fineScanFreq
+                       , fineScan
                        ) where
 
 import Data.Traversable as T
@@ -73,16 +74,14 @@ thinSvd' xs =
         psds   = psdsToMatrix $ V.map (^. psd) xs
     in feedbackGainsFromMatrix $ LA.linearSolveLS stages psds
     
-fineCal :: (Applicative m, MonadIO m)
-        => FineScan -> EitherT String (TrackerT m) (Psd (Stage Double))
-fineCal fs = do
-    points <- fineScan fs
-    let ps' = fmap (fmap (realToFrac)) points
-              :: V.Vector (Sensors Double)
-    return $ thinSvd' ps'
+fineCal :: V.Vector (Sensors Sample) -> Psd (Stage Double)
+fineCal points =
+    let ps' :: V.Vector (Sensors Double)
+        ps' = fmap (fmap (realToFrac)) points
+    in thinSvd' ps'
    
 fineScan :: (Applicative m, MonadIO m)
-         => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Int16))
+         => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
 fineScan fs = do
     path <- liftIO $ withSystemRandom $ asGenIO $ \mwc->do
         let coord :: Word16 -> Word16 -> IO Word16
