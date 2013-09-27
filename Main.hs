@@ -158,18 +158,20 @@ fineScanCmd = command ["fine", "scan"] help "" $ \args->do
 
 fineCalCmd :: Command
 fineCalCmd = command ["fine", "cal"] help "" $ \args->do
+    s <- use fineScale
     points <- use lastFineScan >>= tryJust "No fine calibration scan"
     let (psdSetpt, gains) = T.fineCal points
-    feedbackGains .= gains
-    s <- use fineScale
+        gains' = over (mapped . mapped . mapped) (realToFrac . (*s)) gains
     liftTrackerE $ do
-        T.setKnob T.psdGains $ over (mapped . mapped . mapped) (realToFrac . (*s)) gains
+        T.setKnob T.psdGains gains'
         T.setKnob T.psdSetpoint $ over (mapped . mapped) round psdSetpt
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
     liftIO $ putStrLn $ unlines
-           $ fmap (F.foldMap (\x->showF x "\t"))
-           $ concat $ F.toList $ fmap F.toList gains
+           $ fmap (F.foldMap (\x->shows x "\t"))
+           $ concat $ F.toList $ fmap F.toList gains'
+    liftIO $ putStrLn "Feedback setpoint = "
+    liftIO $ putStrLn $ concat $ fmap (F.foldMap (\x->shows x "\t")) $ F.toList psdSetpt
   where help = "Perform fine calibration regression"
     
 fineDumpCmd :: Command
