@@ -106,6 +106,13 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
     lastRoughZScan .= Just zScan
     center
   where help = "Perform rough Z scan"
+ 
+showMatrix :: (Show a, Functor f, F.Foldable f, Functor g, F.Foldable g)
+           => f (g a) -> String
+showMatrix xs = unlines $ F.toList $ fmap (F.fold . fmap pad) xs'
+  where xs' = fmap (fmap show) xs
+        maxLength = F.maximum $ fmap (F.maximum . fmap length) xs'
+        pad x = take (maxLength+4) $ x++repeat ' '
   
 roughFitCmd :: Command
 roughFitCmd = command ["rough", "fit"] help "" $ \args->do
