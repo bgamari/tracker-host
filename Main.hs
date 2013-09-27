@@ -486,11 +486,17 @@ psdSettings :: [Setting]
 psdSettings = concat
     [ r3Setting "psd.fb-gain.x.diff" "stage feedback gain"
             (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping fixed16Double)
+    , r3Setting "psd.fb-gain.x.sum" "stage feedback gain"
+            (knobA T.psdGains) (_x . sdSum  . stageV3 . mapping fixed16Double)
+    , r3Setting "psd.fb-gain.y.diff" "stage feedback gain"
+            (knobA T.psdGains) (_y . sdDiff . stageV3 . mapping fixed16Double)
+    , r3Setting "psd.fb-gain.y.sum" "stage feedback gain"
+            (knobA T.psdGains) (_y . sdSum  . stageV3 . mapping fixed16Double)
     ]
     
 settings :: [Setting] 
 settings = concat
-    [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
+    [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings, psdSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
     ]
