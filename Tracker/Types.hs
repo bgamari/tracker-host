@@ -54,10 +54,12 @@ getFixed16le =
     f . fromIntegral <$> getWord32le
   where f :: Fixed16 -> Fixed16
         f x = x / realToFrac (resolution (undefined :: Fixed F16))
+{-# INLINE getFixed16le #-}
 
 putFixed16le :: Fixed16 -> Put
 putFixed16le a =
     putWord32le $ round $ realToFrac (resolution (0::Fixed F16)) * a
+{-# INLINE putFixed16le #-}
     
 -- | The stage coordinate frame
 newtype Stage a = Stage {unStage :: V3 a}
@@ -68,12 +70,14 @@ newtype Stage a = Stage {unStage :: V3 a}
         
 mkStage :: a -> a -> a -> Stage a
 mkStage x y z = Stage $ V3 x y z
-    
+{-# INLINE mkStage #-}
+
 data StageAxis = StageX | StageY | StageZ
                deriving (Show, Eq, Ord, Bounded, Enum)
 
 stageAxes :: Stage StageAxis
 stageAxes = mkStage StageX StageY StageZ
+{-# INLINE stageAxes #-}
 
 -- | A sum-difference sample
 data SumDiff a = SumDiff { _sdSum, _sdDiff :: !a }
@@ -106,6 +110,7 @@ newtype Psd a = Psd {unPsd :: V2 a}
 
 mkPsd :: a -> a -> Psd a
 mkPsd x y = Psd $ V2 x y
+{-# INLINE mkPsd #-}
 
 -- | Stage and PSD input
 data Sensors a = Sensors { _stage :: !(Stage a)
