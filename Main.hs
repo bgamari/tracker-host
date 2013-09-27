@@ -150,20 +150,25 @@ dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough Z calibration"
 
-fineCalCmd :: Command
-fineCalCmd = command ["fine", "cal"] help "" $ \args->do
+fineScanCmd :: Command
+fineScanCmd = command ["fine", "scan"] help "" $ \args->do
     points <- use fineScan >>= liftTrackerE . T.fineScan
     lastFineScan ?= points
+  where help = "Perform fine calibration scan"
+
+fineCalCmd :: Command
+fineCalCmd = command ["fine", "cal"] help "" $ \args->do
+    points <- use lastFineScan >>= tryJust "No fine calibration scan"
     let gains = T.fineCal points
     feedbackGains .= gains
+    liftTrackerE $ T.setKnob T.psdGains $ over (mapped . mapped . mapped) realToFrac gains
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
     liftIO $ putStrLn $ unlines
            $ fmap (F.foldMap (\x->showF x "\t"))
            $ concat $ F.toList $ fmap F.toList gains
-    return ()
-  where help = "Perform fine calibration"
-
+  where help = "Perform fine calibration regression"
+    
 fineDumpCmd :: Command
 fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
     let fname = fromMaybe "fine-cal.txt" $ listToMaybe args
@@ -525,6 +530,7 @@ commands = [ helloCmd
            , roughFitCmd
            , dumpRoughCmd
            , dumpZRoughCmd
+           , fineScanCmd
            , fineCalCmd
            , fineDumpCmd
            , readSensorsCmd
