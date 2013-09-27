@@ -500,11 +500,9 @@ fixed16Double = iso realToFrac realToFrac
 
 showCmd :: Command
 showCmd = command ["show"] help "PATTERN" $ \args->do
-    let matching =
+    let matching = filter (\(Setting {..})->isJust sHelp) $
           case listToMaybe args of
-            Just pattern -> filter (\(Setting {..})->pattern `isPrefixOf` sName)
-                            $ filter (\(Setting {..})->isJust sHelp)
-                            $ settings
+            Just pattern -> filter (\(Setting {..})->pattern `isPrefixOf` sName) settings
             Nothing      -> settings
     forM_ matching $ \(Setting {..})->do
         value <- sAccessors^.aGet
