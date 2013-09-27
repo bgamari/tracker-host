@@ -101,7 +101,8 @@ instance Additive Diode where zero = pure 0
 -- | The position-sensitive detector frame
 newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
-                       , Additive, Metric, R1, R2, Core)
+                       , Additive, Metric, R1, R2, Core, Num, Fractional
+                       )
 
 mkPsd :: a -> a -> Psd a
 mkPsd x y = Psd $ V2 x y
