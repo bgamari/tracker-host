@@ -161,8 +161,9 @@ fineCalCmd = command ["fine", "cal"] help "" $ \args->do
     points <- use lastFineScan >>= tryJust "No fine calibration scan"
     let (psdSetpt, gains) = T.fineCal points
     feedbackGains .= gains
+    s <- use fineScale
     liftTrackerE $ do
-        T.setKnob T.psdGains $ over (mapped . mapped . mapped) realToFrac gains
+        T.setKnob T.psdGains $ over (mapped . mapped . mapped) (realToFrac . (*s)) gains
         T.setKnob T.psdSetpoint $ over (mapped . mapped) round psdSetpt
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
@@ -467,6 +468,8 @@ fineCalSettings = concat
             readParse show (fineScan . T.fineScanPoints)]
     , r3Setting "fine.range" "size of fine calibration in code points"
             stateA (fineScan . T.fineScanRange . stageV3)
+    , [pureSetting "fine.gain-scale" (Just "factor to scale result of regression by to get feedback gains")
+            readParse show fineScale]
     ]
     
 stageSettings :: [Setting]
