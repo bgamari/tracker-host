@@ -75,12 +75,21 @@ thinSvd' xs =
     let stages = stagesToMatrix $ V.map (^. stage) xs
         psds   = psdsToMatrix $ V.map (^. psd) xs
     in feedbackGainsFromMatrix $ LA.linearSolveLS stages psds
-    
-fineCal :: V.Vector (Sensors Sample) -> Psd (SumDiff (Stage Double))
+
+mean :: (Additive f, Fractional a) => V.Vector (f a) -> f a
+mean v =
+    let sum = V.foldl (^+^) zero v
+    in fmap (/ realToFrac (V.length v)) sum
+ 
+fineCal :: V.Vector (Sensors Sample) -> (Psd (SumDiff Double), Psd (SumDiff (Stage Double)))
 fineCal points =
     let ps' :: V.Vector (Sensors Double)
         ps' = fmap (fmap (realToFrac)) points
-    in thinSvd' ps'
+        meanPsd = mean $ fmap (view psd) ps'
+        meanStage = mean $ fmap (view stage) ps'
+        center = (psd   %~ (`subtract` meanPsd))
+               . (stage %~ (`subtract` meanStage))
+    in (meanPsd, thinSvd' $ fmap center ps')
    
 fineScan :: (Applicative m, MonadIO m)
          => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))

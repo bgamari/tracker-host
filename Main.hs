@@ -159,9 +159,11 @@ fineScanCmd = command ["fine", "scan"] help "" $ \args->do
 fineCalCmd :: Command
 fineCalCmd = command ["fine", "cal"] help "" $ \args->do
     points <- use lastFineScan >>= tryJust "No fine calibration scan"
-    let gains = T.fineCal points
+    let (psdSetpt, gains) = T.fineCal points
     feedbackGains .= gains
-    liftTrackerE $ T.setKnob T.psdGains $ over (mapped . mapped . mapped) realToFrac gains
+    liftTrackerE $ do
+        T.setKnob T.psdGains $ over (mapped . mapped . mapped) realToFrac gains
+        T.setKnob T.psdSetpoint $ over (mapped . mapped) round psdSetpt
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
     liftIO $ putStrLn $ unlines
