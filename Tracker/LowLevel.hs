@@ -123,7 +123,7 @@ parseFrames a =
                    xSum  <- getInt16le
                    ySum  <- getInt16le
                    _ <- getInt16le
-                   let sumDiff = Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff)
+                   let sumDiff = Psd $ V2 (mkSumDiff xSum xDiff) (mkSumDiff ySum yDiff)
                    return $ Sensors stage sumDiff
 
 sensorListen :: MonadIO m => TrackerT m ()

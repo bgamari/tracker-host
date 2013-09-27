@@ -8,13 +8,10 @@ module Tracker.Types ( Sample
                      , StageAxis(..)
                      , stageAxes
                        -- * Modelling position sensitive photodiode
-                     , SumDiff(SumDiff)
+                     , SumDiff, mkSumDiff
                      , sdSum, sdDiff
-                     , Diode(Diode)
-                     , anode, cathode
                      , Psd(Psd, unPsd)
                      , mkPsd
-                     , sumDiffDiode
                        -- * Sensor inputs
                      , Sensors(Sensors)
                      , stage, psd
@@ -80,27 +77,20 @@ stageAxes = mkStage StageX StageY StageZ
 {-# INLINE stageAxes #-}
 
 -- | A sum-difference sample
-data SumDiff a = SumDiff { _sdSum, _sdDiff :: !a }
-               deriving (Show, Functor, Foldable, Traversable)
-makeLenses ''SumDiff
+newtype SumDiff a = SumDiff {unSumDiff :: V2 a}
+                  deriving ( Show, Functor, Foldable, Traversable, Applicative
+                           , Additive, Metric, R1, R2, Core, Num, Fractional
+                           )
 
-instance Applicative SumDiff where
-    pure x = SumDiff x x
-    SumDiff s d <*> SumDiff x y = SumDiff (s x) (d y)
+mkSumDiff :: a -> a -> SumDiff a
+mkSumDiff s d = SumDiff $ V2 s d
 
-instance Additive SumDiff where zero = pure 0
+sumDiffIso :: Iso' (SumDiff a) (V2 a)
+sumDiffIso = iso unSumDiff SumDiff
 
--- | Values associated with the anode and cathode of a diode
-data Diode a = Diode { _anode, _cathode :: !a }
-             deriving (Show, Functor, Foldable, Traversable)
-
-makeLenses ''Diode
-     
-instance Applicative Diode where
-    pure x = Diode x x
-    Diode a c <*> Diode x y = Diode (a x) (c y)
-
-instance Additive Diode where zero = pure 0
+sdSum, sdDiff :: Lens' (SumDiff a) a
+sdSum = sumDiffIso . _x
+sdDiff = sumDiffIso . _y
 
 -- | The position-sensitive detector frame
 newtype Psd a = Psd {unPsd :: V2 a}
@@ -123,11 +113,6 @@ instance Applicative Sensors where
     pure x = Sensors (pure x) (pure $ pure x)
     Sensors s1 p1 <*> Sensors s2 p2 = Sensors (s1 <*> s2) (fmap (<*>) p1 <*> p2)
 
-sumDiffDiode :: Num a => Iso' (SumDiff a) (Diode a)
-sumDiffDiode = iso to from
-    where to (SumDiff sum diff) = Diode (sum - diff) (sum + diff)
-          from (Diode an cat) = SumDiff (an - cat) (an + cat)
-    
 data PropInt a = PropInt { _propGain, _intGain :: a }
                deriving (Show, Read, Eq, Ord, Functor, Traversable, Foldable)
 makeLenses ''PropInt

@@ -14,7 +14,6 @@ import Control.Monad
 import Data.List (foldl')
 import Data.Word
 import Data.Int
-import Debug.Trace
 import qualified Data.Vector as V
 import Linear
 import System.Random.MWC
@@ -65,7 +64,7 @@ psdsToMatrix v = LA.buildMatrix (V.length v) 4 f
           where x = v V.! i
 
 feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (SumDiff (Stage a))
-feedbackGainsFromMatrix m = traceShow (LA.rows m, LA.cols m) $ mkPsd (SumDiff sumX diffX) (SumDiff sumY diffY)
+feedbackGainsFromMatrix m = mkPsd (mkSumDiff sumX diffX) (mkSumDiff sumY diffY)
   where sumX  = mkStage (m LA.@@> (0,0)) (m LA.@@> (1,0)) (m LA.@@> (2,0))
         diffX = mkStage (m LA.@@> (0,1)) (m LA.@@> (1,1)) (m LA.@@> (2,1))
         sumY  = mkStage (m LA.@@> (0,2)) (m LA.@@> (1,2)) (m LA.@@> (2,2))
