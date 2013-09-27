@@ -63,7 +63,8 @@ putFixed16le a =
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
                       , Applicative, Additive, Metric, Distributive
-                      , R1, R2, R3, Core)
+                      , R1, R2, R3, Core, Num, Fractional
+                      )
         
 mkStage :: a -> a -> a -> Stage a
 mkStage x y z = Stage $ V3 x y z
