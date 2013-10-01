@@ -118,11 +118,11 @@ parseFrames :: BS.ByteString -> V.Vector (Sensors Sample)
 parseFrames a =
     runGet (V.replicateM (BS.length a `div` 16) frame) $ BSL.fromStrict a
   where frame = do stage <- sequenceA $ pure getInt16le :: Get (Stage Sample)
-                   xDiff <- getInt16le
-                   yDiff <- getInt16le
                    xSum  <- getInt16le
+                   xDiff <- getInt16le
                    ySum  <- getInt16le
-                   _ <- getInt16le
+                   yDiff <- getInt16le
+                   _     <- getInt16le
                    let sumDiff = Psd $ V2 (mkSumDiff xSum xDiff) (mkSumDiff ySum yDiff)
                    return $ Sensors stage sumDiff
 
