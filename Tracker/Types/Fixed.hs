@@ -24,3 +24,23 @@ putFixed16le :: Fixed16 -> Put
 putFixed16le a =
     putWord32le $ round $ realToFrac (resolution (0::Fixed F16)) * a
 {-# INLINE putFixed16le #-}
+
+
+data F24 = F24
+-- | A signed 8.24 fixed-point number
+type Fixed24 = Fixed F24
+                
+instance HasResolution F24 where
+    resolution _ = 0x1000000
+    
+getFixed24le :: Get Fixed24
+getFixed24le =
+    f . fromIntegral <$> getWord32le
+  where f :: Fixed24 -> Fixed24
+        f x = x / realToFrac (resolution (undefined :: Fixed F24))
+{-# INLINE getFixed24le #-}
+
+putFixed24le :: Fixed24 -> Put
+putFixed24le a =
+    putWord32le $ round $ realToFrac (resolution (0::Fixed F24)) * a
+{-# INLINE putFixed24le #-}
