@@ -1,4 +1,10 @@
-module Tracker.Types.Fixed where
+module Tracker.Types.Fixed ( -- * 16.16 signed fixed point
+                             Fixed16
+                           , getFixed16le, putFixed16le
+                             -- * 8.24 signed fixed point
+                           , Fixed24
+                           , getFixed24le, putFixed24le
+                           ) where
 
 import Data.Fixed
 import Control.Applicative       
