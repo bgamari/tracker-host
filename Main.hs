@@ -186,7 +186,11 @@ readSensorsCmd :: Command
 readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
-            , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
+            , "PSD   = "++intercalate "\t" [ "x-sum="++showSInt (s^.T.psd._x.sdSum) ""
+                                           , "x-diff="++showSInt (s^.T.psd._x.sdDiff) ""
+                                           , "y-sum="++showSInt (s^.T.psd._y.sdSum) ""
+                                           , "y-diff="++showSInt (s^.T.psd._y.sdDiff) ""
+                                           ]
             ]
           where showSInt = showSigned showInt 0
     s <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
