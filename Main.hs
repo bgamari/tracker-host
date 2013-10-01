@@ -481,17 +481,17 @@ fineCalSettings = concat
 stageSettings :: [Setting]
 stageSettings = concat
     [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
-            (knobA T.outputGain) (incore propGain . stageV3 . mapping fixed16Double)
+            (knobA T.outputGain) (incore propGain . stageV3 . mapping realDouble)
     , r3Setting "stage.output-gain.int" "stage output proportional gain"
-            (knobA T.outputGain) (incore intGain . stageV3 . mapping fixed16Double)
+            (knobA T.outputGain) (incore intGain . stageV3 . mapping realDouble)
     , r3Setting "stage.tau" "stage feedback integration time"
             (knobA T.outputTau) stageV3
     , r3Setting "stage.fb-gain.x" "stage feedback gain"
-            (knobA T.stageGain) (_x . stageV3 . mapping fixed16Double)
+            (knobA T.stageGain) (_x . stageV3 . mapping realDouble)
     , r3Setting "stage.fb-gain.y" "stage feedback gain"
-            (knobA T.stageGain) (_y . stageV3 . mapping fixed16Double)
+            (knobA T.stageGain) (_y . stageV3 . mapping realDouble)
     , r3Setting "stage.fb-gain.z" "stage feedback gain"
-            (knobA T.stageGain) (_z . stageV3 . mapping fixed16Double)
+            (knobA T.stageGain) (_z . stageV3 . mapping realDouble)
     , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
     , [Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
@@ -501,13 +501,13 @@ stageSettings = concat
 psdSettings :: [Setting]
 psdSettings = concat
     [ r3Setting "psd.fb-gain.x.diff" "PSD feedback gain"
-            (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping fixed16Double)
+            (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping realDouble)
     , r3Setting "psd.fb-gain.x.sum" "PSD feedback gain"
-            (knobA T.psdGains) (_x . sdSum  . stageV3 . mapping fixed16Double)
+            (knobA T.psdGains) (_x . sdSum  . stageV3 . mapping realDouble)
     , r3Setting "psd.fb-gain.y.diff" "PSD feedback gain"
-            (knobA T.psdGains) (_y . sdDiff . stageV3 . mapping fixed16Double)
+            (knobA T.psdGains) (_y . sdDiff . stageV3 . mapping realDouble)
     , r3Setting "psd.fb-gain.y.sum" "PSD feedback gain"
-            (knobA T.psdGains) (_y . sdSum  . stageV3 . mapping fixed16Double)
+            (knobA T.psdGains) (_y . sdSum  . stageV3 . mapping realDouble)
     , [ Setting "psd.fb-setpoint.x.diff" (Just "PSD setpoint gain")
             readParse show (knobA T.psdSetpoint) (_x . sdDiff)
       , Setting "psd.fb-setpoint.x.sum" (Just "PSD setpoint gain")
@@ -526,8 +526,8 @@ settings = concat
             readParse show (knobA T.adcDecimation) id]
     ]
     
-fixed16Double :: Iso' Fixed16 Double
-fixed16Double = iso realToFrac realToFrac
+realDouble :: RealFrac a => Iso' a Double
+realDouble = iso realToFrac realToFrac
 
 showCmd :: Command
 showCmd = command ["show"] help "PATTERN" $ \args->do

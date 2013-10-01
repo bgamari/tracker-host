@@ -124,10 +124,10 @@ stageSetpoint = Knob "stage-setpoint" 0x12 getter 0x13 putter
   where getter = sequence $ pure getInt32le
         putter = mapM_ putInt32le
 
-psdGains :: Knob (Psd (SumDiff (Stage Fixed16)))
+psdGains :: Knob (Psd (SumDiff (Stage Fixed24)))
 psdGains = Knob "psd-gains" 0x14 getter 0x15 putter
-  where getter = mapM (mapM sequence) $ pure $ pure (pure getFixed16le)
-        putter = mapM_ (mapM_ (mapM_ putFixed16le))
+  where getter = mapM (mapM sequence) $ pure $ pure (pure getFixed24le)
+        putter = mapM_ (mapM_ (mapM_ putFixed24le))
 
 psdSetpoint :: Knob (Psd (SumDiff Int32))
 psdSetpoint = Knob "psd-setpoint" 0x16 getter 0x17 putter
