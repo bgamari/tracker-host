@@ -496,14 +496,23 @@ stageSettings = concat
 
 psdSettings :: [Setting]
 psdSettings = concat
-    [ r3Setting "psd.fb-gain.x.diff" "stage feedback gain"
+    [ r3Setting "psd.fb-gain.x.diff" "PSD feedback gain"
             (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping fixed16Double)
-    , r3Setting "psd.fb-gain.x.sum" "stage feedback gain"
+    , r3Setting "psd.fb-gain.x.sum" "PSD feedback gain"
             (knobA T.psdGains) (_x . sdSum  . stageV3 . mapping fixed16Double)
-    , r3Setting "psd.fb-gain.y.diff" "stage feedback gain"
+    , r3Setting "psd.fb-gain.y.diff" "PSD feedback gain"
             (knobA T.psdGains) (_y . sdDiff . stageV3 . mapping fixed16Double)
-    , r3Setting "psd.fb-gain.y.sum" "stage feedback gain"
+    , r3Setting "psd.fb-gain.y.sum" "PSD feedback gain"
             (knobA T.psdGains) (_y . sdSum  . stageV3 . mapping fixed16Double)
+    , [ Setting "psd.fb-setpoint.x.diff" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_x . sdDiff)
+      , Setting "psd.fb-setpoint.x.sum" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_x . sdSum)
+      , Setting "psd.fb-setpoint.y.diff" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_y . sdDiff)
+      , Setting "psd.fb-setpoint.y.sum" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_y . sdSum)
+      ]
     ]
     
 settings :: [Setting] 
