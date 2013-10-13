@@ -28,7 +28,7 @@ pathAcquire _ [] = do
     liftIO $ putStrLn "pathAcquire: Tried to acquire on empty path"
     return V.empty
 pathAcquire freq path = do
-    setKnob feedbackMode NoFeedback
+    setKnob feedbackMode StageFeedback
     -- the firmware will enable triggering upon starting the path
     -- disable triggering so we only see samples from after this point
     setKnob adcTriggerMode TriggerOff
@@ -54,8 +54,9 @@ pathAcquire freq path = do
 
 waitUntilPathFinished :: MonadIO m => EitherT String (TrackerT m) ()
 waitUntilPathFinished = do
+    liftIO $ threadDelay 10000
     done <- isPathRunning
-    when (not done) $ liftIO (threadDelay 10000) >> waitUntilPathFinished
+    when (not done) waitUntilPathFinished
 
 readAllTChan :: TVar Bool -> TChan a -> IO [a]
 readAllTChan running c = go []

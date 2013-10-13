@@ -21,7 +21,7 @@ import qualified Tracker as T
 import TrackerUI.Plot.Types
 import PreAmp
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
-               , RasterScan(..), FineScan(..))
+               , RasterScan(..), FineScan(..), SumDiff(..))
 
 data ExciteChannel = ExcChan { _excChanEnabled :: Bool
                              , _excChanExcitation :: T.Excitation Int
@@ -51,12 +51,15 @@ liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
 liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
 
 data TrackerState
-    = TrackerState { _lastRoughScan  :: Maybe (V.Vector (Sensors Sample))
+    = TrackerState { _centerPos      :: Stage Sample
+                   , _lastRoughScan  :: Maybe (V.Vector (Sensors Sample))
                    , _lastRoughZScan :: Maybe (V.Vector (Sensors Sample))
                    , _roughScanFreq  :: Word32
                    , _roughScan      :: RasterScan Stage Word16
                    , _fineScan       :: FineScan
-                   , _feedbackGains  :: Psd (Stage Double)
+                   , _lastFineScan   :: Maybe (V.Vector (Sensors Sample))
+                   , _fineScale      :: Double
+                   , _feedbackGains  :: Psd (SumDiff (Stage Double))
                    , _preAmp         :: Maybe PreAmp
                    , _stopLogger     :: Maybe (TrackerUI ())
                    , _trackerPlot    :: Maybe TrackerPlot
@@ -67,19 +70,22 @@ makeLenses ''TrackerState
            
 defaultTrackerState :: TrackerState           
 defaultTrackerState =
-    TrackerState { _lastRoughScan  = Nothing
+    TrackerState { _centerPos      = pure 0x3fff
+                 , _lastRoughScan  = Nothing
                  , _lastRoughZScan = Nothing
                  , _roughScanFreq  = 1000
-                 , _roughScan      = RasterScan { _scanCenter = pure 0x7fff
+                 , _roughScan      = RasterScan { _scanCenter = pure 0x3fff
                                                 , _scanSize   = T.mkStage 6000 6000 20000
                                                 , _scanPoints = T.mkStage 40 40 80
                                                 }
-                 , _fineScan       = FineScan { _fineScanRange  = pure 0x500
-                                              , _fineScanCenter = pure 0x7fff
+                 , _fineScan       = FineScan { _fineScanRange  = pure 500
+                                              , _fineScanCenter = pure 0x3fff
                                               , _fineScanPoints = 500
                                               , _fineScanFreq   = 2000
                                               }
-                 , _feedbackGains  = pure $ pure 0
+                 , _lastFineScan   = Nothing
+                 , _fineScale      = 0.1
+                 , _feedbackGains  = pure $ pure $ pure 0
                  , _preAmp         = Nothing
                  , _stopLogger     = Nothing
                  , _trackerPlot    = Nothing

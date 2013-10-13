@@ -69,8 +69,7 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
 
 -- | Return the stage to center
 center :: TrackerUI ()
-center = liftTrackerE $ T.setRawPosition $ Stage $ V3 c c c
-  where c = 0xffff `div` 2
+center = use centerPos >>= liftTrackerE . T.setRawPosition . fmap fromIntegral
 
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->center
@@ -85,12 +84,21 @@ roughScanCmd = command ["rough", "scan"] help "" $ \args->do
     lastRoughScan .= Just scan
     center
   where help = "Perform rough scan"
-    
-roughZScanCmd :: Command
-roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
+  
+roughCenterCmd :: Command
+roughCenterCmd = command ["rough", "center"] help "" $ \args->do
     scan <- use lastRoughScan >>= tryJust "No last rough calibration"
     let c = T.roughCenter scan
     liftInputT $ outputStrLn $ show c
+    roughScan . T.scanCenter .= fmap round c
+    fineScan . T.fineScanCenter .= fmap round c
+    centerPos .= fmap round c
+    center
+  where help = "Find center of particle from XY rough scan"
+  
+roughZScanCmd :: Command
+roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
+    scan <- use lastRoughScan >>= tryJust "No last rough calibration"
     rs <- uses roughScan $ (T.scanSize . _y .~ 0)
                          . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
@@ -98,6 +106,13 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
     lastRoughZScan .= Just zScan
     center
   where help = "Perform rough Z scan"
+ 
+showMatrix :: (Show a, Functor f, F.Foldable f, Functor g, F.Foldable g)
+           => f (g a) -> String
+showMatrix xs = unlines $ F.toList $ fmap (F.fold . fmap pad) xs'
+  where xs' = fmap (fmap show) xs
+        maxLength = F.maximum $ fmap (F.maximum . fmap length) xs'
+        pad x = take (maxLength+4) $ x++repeat ' '
   
 roughFitCmd :: Command
 roughFitCmd = command ["rough", "fit"] help "" $ \args->do
@@ -135,23 +150,47 @@ dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough Z calibration"
 
+fineScanCmd :: Command
+fineScanCmd = command ["fine", "scan"] help "" $ \args->do
+    points <- use fineScan >>= liftTrackerE . T.fineScan
+    lastFineScan ?= points
+  where help = "Perform fine calibration scan"
+
 fineCalCmd :: Command
 fineCalCmd = command ["fine", "cal"] help "" $ \args->do
-    fs <- use fineScan
-    gains <- liftTrackerE $ T.fineCal fs
-    feedbackGains .= gains
+    s <- use fineScale
+    points <- use lastFineScan >>= tryJust "No fine calibration scan"
+    let (psdSetpt, gains) = T.fineCal points
+        gains' = over (mapped . mapped . mapped) (realToFrac . (*s)) gains
+    liftTrackerE $ do
+        T.setKnob T.psdGains gains'
+        T.setKnob T.psdSetpoint $ over (mapped . mapped) round psdSetpt
     let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
-    liftIO $ putStrLn $ unlines $ F.toList
-           $ fmap (F.foldMap (\x->showF x "\t")) gains
-    return ()
-  where help = "Perform fine calibration"
+    liftIO $ putStrLn $ unlines
+           $ fmap (F.foldMap (\x->shows x "\t"))
+           $ concat $ F.toList $ fmap F.toList gains'
+    liftIO $ putStrLn "Feedback setpoint = "
+    liftIO $ putStrLn $ concat $ fmap (F.foldMap (\x->shows x "\t")) $ F.toList psdSetpt
+  where help = "Perform fine calibration regression"
+    
+fineDumpCmd :: Command
+fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
+    let fname = fromMaybe "fine-cal.txt" $ listToMaybe args
+    s <- use lastFineScan >>= tryJust "No fine calibration."
+    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftInputT $ outputStrLn $ "Last fine calibration dumped to "++fname
+  where help = "Dump fine calibration points"
   
 readSensorsCmd :: Command
 readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
     let showSensors s = unlines 
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
-            , "PSD   = "++F.concatMap (F.foldMap (flip showSInt "\t")) (s^.T.psd)
+            , "PSD   = "++intercalate "\t" [ "x-sum="++showSInt (s^.T.psd._x.sdSum) ""
+                                           , "x-diff="++showSInt (s^.T.psd._x.sdDiff) ""
+                                           , "y-sum="++showSInt (s^.T.psd._y.sdSum) ""
+                                           , "y-diff="++showSInt (s^.T.psd._y.sdDiff) ""
+                                           ]
             ]
           where showSInt = showSigned showInt 0
     s <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
@@ -417,49 +456,84 @@ coreSettings name labels a l =
       let label = labels ^. l'
       in Setting (name++"."++label) Nothing readParse show a (l . l')
     
-settings :: [Setting] 
-settings = concat
+roughCalSettings :: [Setting]
+roughCalSettings = concat
     [ r3Setting "rough.size" "rough calibration field size in code-points"
             stateA (roughScan . T.scanSize . stageV3)
     , r3Setting "rough.center" "rough calibration field center in code-points"
             stateA (roughScan . T.scanCenter . stageV3)
     , r3Setting "rough.points" "number of points in rough calibration scan"
             stateA (roughScan . T.scanPoints . stageV3)
-    , r3Setting "stage.output-gain.prop" "stage output proportional gain"
-            (knobA T.outputGain) (incore propGain . stageV3 . mapping fixed16Double)
+    , [pureSetting "rough.freq" (Just "update frequency of rough calibration scan")
+            readParse show roughScanFreq]
+    ]
+    
+fineCalSettings :: [Setting]
+fineCalSettings = concat
+    [ [ pureSetting "fine.points" (Just "number of points in fine calibration")
+            readParse show (fineScan . T.fineScanPoints)]
+    , r3Setting "fine.range" "size of fine calibration in code points"
+            stateA (fineScan . T.fineScanRange . stageV3)
+    , [pureSetting "fine.gain-scale" (Just "factor to scale result of regression by to get feedback gains")
+            readParse show fineScale]
+    ]
+    
+stageSettings :: [Setting]
+stageSettings = concat
+    [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
+            (knobA T.outputGain) (incore propGain . stageV3 . mapping realDouble)
     , r3Setting "stage.output-gain.int" "stage output proportional gain"
-            (knobA T.outputGain) (incore intGain . stageV3 . mapping fixed16Double)
+            (knobA T.outputGain) (incore intGain . stageV3 . mapping realDouble)
     , r3Setting "stage.tau" "stage feedback integration time"
             (knobA T.outputTau) stageV3
     , r3Setting "stage.fb-gain.x" "stage feedback gain"
-            (knobA T.stageGain) (_x . stageV3 . mapping fixed16Double)
+            (knobA T.stageGain) (_x . stageV3 . mapping realDouble)
     , r3Setting "stage.fb-gain.y" "stage feedback gain"
-            (knobA T.stageGain) (_y . stageV3 . mapping fixed16Double)
+            (knobA T.stageGain) (_y . stageV3 . mapping realDouble)
     , r3Setting "stage.fb-gain.z" "stage feedback gain"
-            (knobA T.stageGain) (_z . stageV3 . mapping fixed16Double)
+            (knobA T.stageGain) (_z . stageV3 . mapping realDouble)
     , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
-    ] ++
-    exciteSettings ++
-    [ pureSetting "rough.freq"
-            (Just "update frequency of rough calibration scan")
-            readParse show roughScanFreq
-    , Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
-            readParse show (knobA T.maxError) id
-    , Setting "decimation" (Just "decimation factor of samples")
-            readParse show (knobA T.adcDecimation) id
+    , [Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
+            readParse show (knobA T.maxError) id]
+    ]
+
+psdSettings :: [Setting]
+psdSettings = concat
+    [ r3Setting "psd.fb-gain.x.diff" "PSD feedback gain"
+            (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping realDouble)
+    , r3Setting "psd.fb-gain.x.sum" "PSD feedback gain"
+            (knobA T.psdGains) (_x . sdSum  . stageV3 . mapping realDouble)
+    , r3Setting "psd.fb-gain.y.diff" "PSD feedback gain"
+            (knobA T.psdGains) (_y . sdDiff . stageV3 . mapping realDouble)
+    , r3Setting "psd.fb-gain.y.sum" "PSD feedback gain"
+            (knobA T.psdGains) (_y . sdSum  . stageV3 . mapping realDouble)
+    , [ Setting "psd.fb-setpoint.x.diff" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_x . sdDiff)
+      , Setting "psd.fb-setpoint.x.sum" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_x . sdSum)
+      , Setting "psd.fb-setpoint.y.diff" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_y . sdDiff)
+      , Setting "psd.fb-setpoint.y.sum" (Just "PSD setpoint gain")
+            readParse show (knobA T.psdSetpoint) (_y . sdSum)
+      ]
     ]
     
-fixed16Double :: Iso' Fixed16 Double
-fixed16Double = iso realToFrac realToFrac
+settings :: [Setting] 
+settings = concat
+    [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings, psdSettings
+    , [Setting "decimation" (Just "decimation factor of samples")
+            readParse show (knobA T.adcDecimation) id]
+    ]
+    
+realDouble :: RealFrac a => Iso' a Double
+realDouble = iso realToFrac realToFrac
 
 showCmd :: Command
 showCmd = command ["show"] help "PATTERN" $ \args->do
-    let matching =
+    let matching = filter (\(Setting {..})->isJust sHelp) $
           case listToMaybe args of
-            Just pattern -> filter (\(Setting {..})->pattern `isPrefixOf` sName)
-                            $ filter (\(Setting {..})->isJust sHelp)
-                            $ settings
+            Just pattern -> filter (\(Setting {..})->pattern `isPrefixOf` sName) settings
             Nothing      -> settings
     forM_ matching $ \(Setting {..})->do
         value <- sAccessors^.aGet
@@ -471,11 +545,14 @@ commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
            , roughScanCmd
+           , roughCenterCmd
            , roughZScanCmd
            , roughFitCmd
            , dumpRoughCmd
            , dumpZRoughCmd
+           , fineScanCmd
            , fineCalCmd
+           , fineDumpCmd
            , readSensorsCmd
            , logStartCmd
            , logStopCmd

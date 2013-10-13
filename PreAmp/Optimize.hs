@@ -59,14 +59,13 @@ optimize :: (MonadIO m)
 optimize pa margin channel = do
     let paCh = PreAmp.channels ^. channel
         step :: MonadIO m => GainOffset -> MaybeT (TrackerT m) GainOffset
-        step go = do
-            if go^.gain > maxBound - 10
-              then return go
-              else do go' <- MaybeT $ sweepOffset pa channel go
-                      next <- lift $ runMaybeT $ step $ gain +~ 20 $ go'
-                      case next of
-                        Just x  -> return x
-                        Nothing -> return go
-    result <- runMaybeT $ step $ GO 0 0
+        step go
+          | go ^. gain == 0  = return go
+          | otherwise = do
+              go' <- lift $ sweepOffset pa channel go
+              case go' of
+                Just x  -> return x
+                Nothing -> step $ gain -~ 20 $ go
+    result <- runMaybeT $ step $ GO maxBound 0
     setGainOffset pa paCh $ maybe (GO 0 0) id result
     return result

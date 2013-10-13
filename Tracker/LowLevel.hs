@@ -118,12 +118,12 @@ parseFrames :: BS.ByteString -> V.Vector (Sensors Sample)
 parseFrames a =
     runGet (V.replicateM (BS.length a `div` 16) frame) $ BSL.fromStrict a
   where frame = do stage <- sequenceA $ pure getInt16le :: Get (Stage Sample)
-                   xDiff <- getInt16le
-                   yDiff <- getInt16le
                    xSum  <- getInt16le
+                   xDiff <- getInt16le
                    ySum  <- getInt16le
-                   _ <- getInt16le
-                   let sumDiff = Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff)
+                   yDiff <- getInt16le
+                   _     <- getInt16le
+                   let sumDiff = Psd $ V2 (mkSumDiff xSum xDiff) (mkSumDiff ySum yDiff)
                    return $ Sensors stage sumDiff
 
 sensorListen :: MonadIO m => TrackerT m ()
@@ -137,8 +137,8 @@ sensorListen = forever $ do
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
-cmdTimeout = 100
-dataTimeout = 100
+cmdTimeout = 500   -- milliseconds
+dataTimeout = 100  -- milliseconds
 
 showByteString :: BS.ByteString -> String
 showByteString = intercalate " " . map (pad 2 . flip showHex "" . fromIntegral) . BS.unpack

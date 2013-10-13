@@ -3,6 +3,7 @@
 module Tracker.FineCal ( fineCal
                        , FineScan(..)
                        , fineScanRange, fineScanCenter, fineScanPoints, fineScanFreq
+                       , fineScan
                        ) where
 
 import Data.Traversable as T
@@ -62,29 +63,42 @@ psdsToMatrix v = LA.buildMatrix (V.length v) 4 f
                      3  -> x ^. _y . sdDiff
           where x = v V.! i
 
-feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (Stage a)
-feedbackGainsFromMatrix m =
-    Psd $ V2 (Stage $ V3 (m LA.@@> (0,0)) (m LA.@@> (0,1)) (m LA.@@> (0,2)))
-        (Stage $ V3 (m LA.@@> (1,0)) (m LA.@@> (1,1)) (m LA.@@> (1,2)))
+feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (SumDiff (Stage a))
+feedbackGainsFromMatrix m = mkPsd (mkSumDiff sumX diffX) (mkSumDiff sumY diffY)
+  where sumX  = mkStage (m LA.@@> (0,0)) (m LA.@@> (1,0)) (m LA.@@> (2,0))
+        diffX = mkStage (m LA.@@> (0,1)) (m LA.@@> (1,1)) (m LA.@@> (2,1))
+        sumY  = mkStage (m LA.@@> (0,2)) (m LA.@@> (1,2)) (m LA.@@> (2,2))
+        diffY = mkStage (m LA.@@> (0,3)) (m LA.@@> (1,3)) (m LA.@@> (2,3))
 
-thinSvd' :: (Field a, Element a) => V.Vector (Sensors a) -> Psd (Stage a)
+thinSvd' :: (Field a, Element a) => V.Vector (Sensors a) -> Psd (SumDiff (Stage a))
 thinSvd' xs = 
     let stages = stagesToMatrix $ V.map (^. stage) xs
         psds   = psdsToMatrix $ V.map (^. psd) xs
     in feedbackGainsFromMatrix $ LA.linearSolveLS stages psds
-    
-fineCal :: (Applicative m, MonadIO m)
-        => FineScan -> EitherT String (TrackerT m) (Psd (Stage Double))
-fineCal fs = do
-    points <- fineScan fs
-    let ps' = fmap (fmap (realToFrac)) points
-              :: V.Vector (Sensors Double)
-    return $ thinSvd' ps'
+
+mean :: (Additive f, Fractional a) => V.Vector (f a) -> f a
+mean v =
+    let sum = V.foldl (^+^) zero v
+    in fmap (/ realToFrac (V.length v)) sum
+ 
+fineCal :: V.Vector (Sensors Sample) -> (Psd (SumDiff Double), Psd (SumDiff (Stage Double)))
+fineCal points =
+    let ps' :: V.Vector (Sensors Double)
+        ps' = fmap (fmap (realToFrac)) points
+        meanPsd = mean $ fmap (view psd) ps'
+        meanStage = mean $ fmap (view stage) ps'
+        center = (psd   %~ (`subtract` meanPsd))
+               . (stage %~ (`subtract` meanStage))
+    in (meanPsd, thinSvd' $ fmap center ps')
    
 fineScan :: (Applicative m, MonadIO m)
-         => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Int16))
+         => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
 fineScan fs = do
     path <- liftIO $ withSystemRandom $ asGenIO $ \mwc->do
-        let point = T.sequence $ pure (uniform mwc)
-        replicateM (fs ^. fineScanPoints) (Stage <$> point)
+        let coord :: Word16 -> Word16 -> IO Word16
+            coord center range = let range2 = range `div` 2
+                                 in uniformR (center-range2, center+range2) mwc
+            point :: IO (Stage Word16)
+            point = T.sequence $ coord <$> fs ^. fineScanCenter <*> fs ^. fineScanRange
+        replicateM (fs ^. fineScanPoints) point
     pathAcquire (fs^.fineScanFreq) path

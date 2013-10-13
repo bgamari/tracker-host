@@ -32,7 +32,7 @@ instance Bounded CodePoint where
     minBound = CP 0
     maxBound = CP 255
 
-channels = Psd $ V2 (SumDiff xSum xDiff) (SumDiff ySum yDiff)
+channels = Psd $ V2 (mkSumDiff xSum xDiff) (mkSumDiff ySum yDiff)
 
 xSum  = Ch 0
 xDiff = Ch 1
