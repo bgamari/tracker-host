@@ -34,6 +34,7 @@ gaussian :: (RealFloat a, Metric f)
          => Gaussian f a -> f a -> a
 gaussian (Gaussian m d a) x =
     a * exp (- quadrance (m ^-^ x) / 2 / d^2)
+{-# INLINE gaussian #-}
 
 data Model f a = Model { g1, g2 :: !(Gaussian f a)
                        , offset :: !a
@@ -52,12 +53,15 @@ model :: (RealFloat a, Metric f)
       => Model f a -> f a -> a
 model (Model g1 g2 off) x =
     off + gaussian g1 x + gaussian g2 x
+{-# INLINE model #-}
 
 residual :: (RealFloat a, Metric f) => f a -> a -> Model f a -> a
 residual x y m = model m x - y
+{-# INLINE residual #-}
 
 mean :: Fractional a => V.Vector a -> a
 mean xs = V.sum xs / fromIntegral (V.length xs)
+{-# INLINE mean #-}
 
 initialModel :: (Ord a, Fractional a) => V.Vector (V2 a, a) -> Model V2 a
 initialModel samples =
@@ -74,6 +78,7 @@ initialModel samples =
                              }
              , offset = offset
              }
+{-# INLINE initialModel #-}
  
 -- Gradient by finite difference
 finiteDiff :: (Fractional a, Additive f, Applicative f, Traversable f)
@@ -81,6 +86,7 @@ finiteDiff :: (Fractional a, Additive f, Applicative f, Traversable f)
 finiteDiff h f x = fmap (\y->(y-fx) / h) fdx
   where fx = f x
         fdx = f . (x ^+^) <$> kronecker (pure h)
+{-# INLINE finiteDiff #-}
 
 fit :: (RealFloat a, Traversable f, Applicative f, Metric f)
     => V.Vector (f a, a) -> Model f a -> [Model f a]
@@ -91,10 +97,11 @@ fit samples m0 = conjGrad search beta dChiSq m0
         dChiSq = grad chiSq
         --dChiSq = finiteDiff 1e-2 chiSq
         chiSq m = V.sum $ V.map (\(x,y)->(residual (fmap realToFrac x) (realToFrac y) m)^2) samples
-{-# INLINEABLE fit #-}
+{-# INLINE fit #-}
     
 modelCenter :: Additive f => Model f Double -> f Double
 modelCenter m = lerp 0.5 (gMean $ g1 m) (gMean $ g2 m)
+{-# INLINEABLE modelCenter #-}
 
 modelToGains :: Model V3 Double -> V3 Double -> Psd (Stage Double)
 modelToGains m center =
