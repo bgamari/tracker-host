@@ -17,6 +17,7 @@ import Data.Traversable
 import Control.Error
 import Control.Lens
 import Linear
+import Data.Functor.Rep
 
 import Tracker.Types
 import Tracker.Raster
@@ -44,8 +45,8 @@ asDouble = realToFrac :: Real a => a -> Double
 
 roughCenter :: V.Vector (Sensors Sample) -> Stage Double
 roughCenter v =
-    let Psd (V2 cx cy) = fmap center $ core
+    let Psd (V2 cx cy) = fmap center $ tabulate
                          $ \l->V.map (\s->( fmap asDouble $ s ^. stage
-                                          , s ^. psd . l . sdDiff)
+                                          , s ^. psd . el l . sdDiff)
                                      ) v
     in lerp 0.5 cx cy

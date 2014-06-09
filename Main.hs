@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings, PatternGuards, RankNTypes, RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 import qualified Data.Traversable as Traversable
 import qualified Data.Foldable as F
@@ -20,6 +22,7 @@ import Control.Monad (MonadPlus(..))
 import qualified Control.Error.Safe as Safe
 import Control.Error.Util
 import Data.EitherR (fmapLT)
+import Data.Functor.Rep
 
 import System.IO
 import qualified Data.ByteString as BS
@@ -442,20 +445,22 @@ r3Setting :: (Show a, Read a)
           => String -> String
           -> Accessors TrackerUI b -> Lens' b (V3 a) -> [Setting]
 r3Setting name help a l =
-    [ Setting name         (Just help) readParse show a (l . v3Tuple)
+    [ Setting name (Just help) readParse show a (l . v3Tuple)
     ]++coreSettings name labels a l
   where labels = V3 "x" "y" "z"
   
-coreSettings :: (Show a, Read a, Core f, F.Foldable f)
-            => String -> f String
-            -> Accessors TrackerUI b
-            -> Lens' b (f a)
-            -> [Setting]
+coreSettings :: forall a f b. (Show a, Read a, Representable f, F.Foldable f, Rep f ~ E f)
+             => String -> f String
+             -> Accessors TrackerUI b
+             -> Lens' b (f a)
+             -> [Setting]
 coreSettings name labels a l =
-    F.toList $ core $ \l'->
-      let label = labels ^. l'
-      in Setting (name++"."++label) Nothing readParse show a (l . l')
-    
+    let f :: f Setting
+        f = tabulate $ \l'->
+              let label = labels ^. el l'
+              in Setting (name++"."++label) Nothing readParse show a (l . el l')
+    in F.toList f
+
 roughCalSettings :: [Setting]
 roughCalSettings = concat
     [ r3Setting "rough.size" "rough calibration field size in code-points"
@@ -481,9 +486,9 @@ fineCalSettings = concat
 stageSettings :: [Setting]
 stageSettings = concat
     [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
-            (knobA T.outputGain) (incore propGain . stageV3 . mapping realDouble)
+            (knobA T.outputGain) (column propGain . stageV3 . mapping realDouble)
     , r3Setting "stage.output-gain.int" "stage output proportional gain"
-            (knobA T.outputGain) (incore intGain . stageV3 . mapping realDouble)
+            (knobA T.outputGain) (column intGain . stageV3 . mapping realDouble)
     , r3Setting "stage.tau" "stage feedback integration time"
             (knobA T.outputTau) stageV3
     , r3Setting "stage.fb-gain.x" "stage feedback gain"

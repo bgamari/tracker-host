@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFoldable, DeriveFunctor, DeriveTraversable, TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
 module Tracker.Types ( Sample
                      , module Tracker.Types.Fixed
@@ -24,10 +25,11 @@ module Tracker.Types ( Sample
 import Data.Int
 import Data.Foldable
 import Data.Traversable
+import Data.Functor.Rep
 import Control.Applicative       
 import Data.Distributive (Distributive)
 import Linear       
-import Control.Lens
+import Control.Lens hiding (index)
 import Control.Monad.IO.Class
 import Tracker.Types.Fixed
 
@@ -38,9 +40,14 @@ type Sample = Int16
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
                       , Applicative, Additive, Metric, Distributive
-                      , R1, R2, R3, Core, Num, Fractional
+                      , R1, R2, R3, Num, Fractional
                       )
-        
+
+instance Representable Stage where
+    type Rep Stage = E Stage
+    tabulate f = Stage $ V3 (f ex) (f ey) (f ez)
+    index v (E e) = v ^. e
+
 mkStage :: a -> a -> a -> Stage a
 mkStage x y z = Stage $ V3 x y z
 {-# INLINE mkStage #-}
@@ -55,8 +62,13 @@ stageAxes = mkStage StageX StageY StageZ
 -- | A sum-difference sample
 newtype SumDiff a = SumDiff {unSumDiff :: V2 a}
                   deriving ( Show, Functor, Foldable, Traversable, Applicative
-                           , Additive, Metric, R1, R2, Core, Num, Fractional
+                           , Additive, Metric, Distributive, R1, R2, Num, Fractional
                            )
+
+instance Representable SumDiff where
+    type Rep SumDiff = E SumDiff
+    tabulate f = SumDiff $ V2 (f ex) (f ey)
+    index v (E e) = v ^. e
 
 mkSumDiff :: a -> a -> SumDiff a
 mkSumDiff s d = SumDiff $ V2 s d
@@ -71,8 +83,13 @@ sdDiff = sumDiffIso . _y
 -- | The position-sensitive detector frame
 newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
-                       , Additive, Metric, R1, R2, Core, Num, Fractional
+                       , Additive, Metric, Distributive, R1, R2, Num, Fractional
                        )
+
+instance Representable Psd where
+    type Rep Psd = E Psd
+    tabulate f = Psd $ V2 (f ex) (f ey)
+    index v (E e) = v ^. e
 
 mkPsd :: a -> a -> Psd a
 mkPsd x y = Psd $ V2 x y

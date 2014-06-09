@@ -68,7 +68,7 @@ correlate a b lag = (V.drop lag a V.++ a) `dot` b
 mean :: Fractional a => V.Vector a -> a
 mean v = V.sum v / realToFrac (V.length v)
 
-phaseAmp :: MonadIO m
+phaseAmp :: (MonadIO m, Functor m)
          => Excitation Double -> V.Vector Double -> TrackerT m (Phase, Amplitude)
 phaseAmp excitation samples = do
     let samples' = fmap (\x->x - mean samples) samples
@@ -81,26 +81,26 @@ phaseAmp excitation samples = do
                ]
         (phase, corrNorm) = maximumBy (comparing snd) corr
         amp = correlate (V.take excLen samples) exc phase / correlate exc exc 0
-    plotSVG "corr.svg" $ layout1_plots .~ [Left $ plotPoints corr] $ def
+    plotSVG "corr.svg" $ layout_plots .~ [plotPoints corr] $ def
     plotSVG "phaseAmp.svg"
-      $ layout1_plots .~
-        [ Left $ toPlot
+      $ layout_plots .~
+        [ toPlot
             $ plot_points_values .~
                 (V.toList $ V.indexed $ V.generate sampleLen
                 $ \i->amp * trajectory' excitation i)
             $ plot_points_style . point_color .~ opaque Colours.blue $ def
-        , Left $ toPlot
+        , toPlot
             $ plot_points_values .~
                 (V.toList $ V.indexed $ V.take sampleLen $ V.drop phase samples')
             $ plot_points_style . point_color .~ opaque Colours.red $ def
         ] $ def
     let inPhase = V.drop phase samples'
     let corrected = V.imap (\i _->amp * trajectory' excitation i) inPhase
-    plotSVG "r.svg" $ layout1_plots .~ [Left $ plotPoints $ V.toList $ V.zip inPhase corrected] $ def
+    plotSVG "r.svg" $ layout_plots .~ [plotPoints $ V.toList $ V.zip inPhase corrected] $ def
     return $ (phase, amp)
     
-plotSVG :: (ToRenderable a, MonadIO m) => FilePath -> a -> m ()
-plotSVG fname a = liftIO $ renderableToSVGFile (toRenderable a) 640 480 fname
+plotSVG :: (ToRenderable a, Functor m, MonadIO m) => FilePath -> a -> m ()
+plotSVG fname a = void $ liftIO $ renderableToFile def (toRenderable a) fname
 
 plotPoints :: (PlotValue x, PlotValue y) => [(x,y)] -> Plot x y
 plotPoints pts = toPlot $ plot_points_values .~ pts $ def

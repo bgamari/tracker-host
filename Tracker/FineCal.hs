@@ -36,12 +36,12 @@ isoMatrix :: (Element a)
           -> Iso' (V.Vector (f a)) (LA.Matrix a)
 isoMatrix y0 projections = iso to from
   where proj = V.fromList projections
-        to v = let f (i,j) = let p = reflectLens $ proj V.! j
+        to v = let f (i,j) = let p = runLens $ proj V.! j
                                  x = v V.! i
                              in x ^. p
                in LA.buildMatrix (V.length v) (V.length proj) f
         from m | LA.cols m == V.length proj =
-                 let build = foldl' (\y1 (p,x)->y1 & reflectLens p .~ x) y0
+                 let build = foldl' (\y1 (p,x)->y1 & runLens p .~ x) y0
                              . zip projections
                  in V.fromList $ map build $ LA.toLists m
                | otherwise = error "Incorret matrix size"
