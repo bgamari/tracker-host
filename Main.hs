@@ -137,6 +137,14 @@ showSensors :: Show a => Sensors a -> String
 showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
+setPsdSetpointCmd :: Command
+setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \args->do
+    liftTrackerE $ do
+      s <- lift T.getSensorQueue >>= liftIO . atomically . readTChan
+      let sample = V.head s ^. T.psd
+      T.setKnob T.psdSetpoint (sample & mapped . mapped %~ fromIntegral)
+  where help = "Set PSD feedback setpoint to current sensor values"
+
 dumpRoughCmd :: Command
 dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
@@ -553,6 +561,7 @@ commands = [ helloCmd
            , roughCenterCmd
            , roughZScanCmd
            , roughFitCmd
+           , setPsdSetpointCmd
            , dumpRoughCmd
            , dumpZRoughCmd
            , fineScanCmd
