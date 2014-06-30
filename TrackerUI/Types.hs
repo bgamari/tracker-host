@@ -129,7 +129,9 @@ sortNubOn f = nubBy ((==) `on` f) . sortBy (compare `on` f)
 
 completeCommand :: MonadIO m => [Command] -> CompletionFunc m
 completeCommand commands (left, right) = do
-    let tokens = words (reverse left)++if ' ' == head left then [""] else []
+    let tokens = words (reverse left)++case left of
+                                         ' ':_  -> [""]
+                                         _      -> []
     return ( left
            , sortNubOn replacement $ completions [(c^.cmdName, c) | c <- commands] tokens)
   where completions :: [([String], Command)] -> [String] -> [Completion]
