@@ -27,7 +27,7 @@ import Data.Foldable
 import Data.Traversable
 import Data.Functor.Rep
 import Control.Applicative       
-import Data.Distributive (Distributive)
+import Data.Distributive (Distributive, collect)
 import Linear       
 import Control.Lens hiding (index)
 import Control.Monad.IO.Class
@@ -39,9 +39,20 @@ type Sample = Int16
 -- | The stage coordinate frame
 newtype Stage a = Stage {unStage :: V3 a}
              deriving ( Show, Functor, Foldable, Traversable
-                      , Applicative, Additive, Metric, Distributive
-                      , R1, R2, R3, Num, Fractional
+                      , Applicative, Additive, Metric
+                      , Num, Fractional
                       )
+
+instance Wrapped (Stage a) where
+    type Unwrapped (Stage a) = V3 a
+    _Wrapped' = iso unStage Stage
+
+instance Distributive Stage where
+    collect f = Stage . collect (unStage . f)
+
+instance R1 Stage where _x = _Wrapped' . _x
+instance R2 Stage where _y = _Wrapped' . _y
+instance R3 Stage where _z = _Wrapped' . _z
 
 instance Representable Stage where
     type Rep Stage = E Stage
@@ -62,8 +73,18 @@ stageAxes = mkStage StageX StageY StageZ
 -- | A sum-difference sample
 newtype SumDiff a = SumDiff {unSumDiff :: V2 a}
                   deriving ( Show, Functor, Foldable, Traversable, Applicative
-                           , Additive, Metric, Distributive, R1, R2, Num, Fractional
+                           , Additive, Metric, Num, Fractional
                            )
+
+instance Wrapped (SumDiff a) where
+    type Unwrapped (SumDiff a) = V2 a
+    _Wrapped' = iso unSumDiff SumDiff
+
+instance Distributive SumDiff where
+    collect f = SumDiff . collect (unSumDiff . f)
+
+instance R1 SumDiff where _x = _Wrapped' . _x
+instance R2 SumDiff where _y = _Wrapped' . _y
 
 instance Representable SumDiff where
     type Rep SumDiff = E SumDiff
@@ -83,8 +104,18 @@ sdDiff = sumDiffIso . _y
 -- | The position-sensitive detector frame
 newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
-                       , Additive, Metric, Distributive, R1, R2, Num, Fractional
+                       , Additive, Metric, Num, Fractional
                        )
+
+instance Wrapped (Psd a) where
+    type Unwrapped (Psd a) = V2 a
+    _Wrapped' = iso unPsd Psd
+
+instance Distributive Psd where
+    collect f = Psd . collect (unPsd . f)
+
+instance R1 Psd where _x = _Wrapped' . _x
+instance R2 Psd where _y = _Wrapped' . _y
 
 instance Representable Psd where
     type Rep Psd = E Psd
