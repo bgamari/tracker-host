@@ -590,6 +590,7 @@ prompt = do
     runCommand input
 
 runCommand :: [String] -> TrackerUI Bool
+runCommand [] = return True
 runCommand input = do
     let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
     case cmds of
