@@ -327,13 +327,20 @@ optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
         return ()
   where help = "Automatically optimize pre amplifier gains and offsets"
 
+resetPreAmp :: Command
+resetPreAmp = command ["preamp", "reset"] help "" $ \args->do
+    pa <- tryJust "No pre-amplifier open" =<< use preAmp
+    let reset ch = PreAmp.setOffset pa ch 0 >> PreAmp.setGain pa ch 0
+    void $ liftEitherT $ traverseOf (traverse . traverse) reset PreAmp.channels
+  where help = "Reset pre-amplifier gains and offsets to zero"
+
 preAmpCmds :: [Command]
 preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                     , cmd (_x.sdDiff) "xdiff"
                     , cmd (_y.sdSum) "ysum"
                     , cmd (_y.sdDiff) "ydiff"
                     ]
-             ++ [ openPreAmp, optimizePreAmp ]
+             ++ [ openPreAmp, optimizePreAmp, resetPreAmp ]
   where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> [Command]
         cmd proj name = 
             [ Cmd ["set", "amp."++name++".gain"] 
