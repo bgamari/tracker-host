@@ -1,4 +1,9 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, StandaloneDeriving, FlexibleContexts, RankNTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Tracker.Raster ( RasterScan(..)
                       , scanStart, scanEnd, scanCenter, scanSize, scanPoints
