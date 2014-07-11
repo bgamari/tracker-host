@@ -1,11 +1,12 @@
 {-# LANGUAGE RankNTypes #-}
-                
+
 module TrackerUI.Plot ( startPlot
                       , TrackerPlot
                       , setYSize
                       , setNPoints
                       ) where
-      
+
+import Data.Foldable as F
 import Data.Traversable as T
 import Data.Int
 import Control.Monad
@@ -17,9 +18,10 @@ import qualified Data.Vector.Storable as VS
 import Control.Lens
 
 import Linear
-import Tracker 
+import Tracker
 import TrackerUI.Types
 import TrackerUI.Plot.Types
+import qualified Util.RingBuffer as RB
 
 import Graphics.Rendering.GLPlot
 import qualified Graphics.UI.GLFW as GLFW
@@ -31,34 +33,21 @@ fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
 decimate :: Int -> V.Vector a -> V.Vector a
 decimate n = V.ifilter (\i _->i `mod` n == 0)
 
-psdCurves :: Sensors (VS.Vector Int16) -> [Curve]
-psdCurves pts =
-    [   cColor  .~ Color4 1 0 0 0
-      $ cPoints .~ fixPoints (pts ^. psd ^. _x ^. sdDiff) $ c
-    ,   cColor  .~ Color4 0 1 1 0
-      $ cPoints .~ fixPoints (pts ^. psd ^. _x ^. sdSum) $ c
-    ,   cColor  .~ Color4 0 0 1 0
-      $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdDiff) $ c
-    ,   cColor  .~ Color4 1 0 1 0
-      $ cPoints .~ fixPoints (pts ^. psd ^. _y ^. sdSum) $ c
-    ]
-  where c = cStyle .~ Points $ defaultCurve
-    
-stageCurves :: Sensors (VS.Vector Int16) -> [Curve]
-stageCurves pts =
-    [   cColor  .~ Color4 0.8 0.5 0.3 0
-      $ cPoints .~ fixPoints (pts ^. stage ^. _x) $ c
-    ,   cColor  .~ Color4 0.4 0.8 0.5 0
-      $ cPoints .~ fixPoints (pts ^. stage ^. _y) $ c
-    ,   cColor  .~ Color4 0.4 0.5 0.8 0
-      $ cPoints .~ fixPoints (pts ^. stage ^. _z) $ c
-    ]
-  where c = cStyle .~ Points $ defaultCurve
+psdColors :: Psd (SumDiff (Color4 GLfloat))
+psdColors =
+    Psd $ V2 (mkSumDiff (Color4 1 0 0 0) (Color4 0 1 1 0))
+             (mkSumDiff (Color4 0 0 1 0) (Color4 1 0 1 0))
+
+stageColors :: Stage (Color4 GLfloat)
+stageColors =
+    Stage $ V3 (Color4 0.8 0.5 0.3 0)
+               (Color4 0.4 0.8 0.5 0)
+               (Color4 0.4 0.5 0.8 0)
 
 data UpDown = Up | Down
 
 roundUD :: RealFrac a => UpDown -> a -> a -> a
-roundUD ud k x 
+roundUD ud k x
   | b == 0    = k * realToFrac (a :: Int)
   | otherwise = k * realToFrac a + bump
   where (a, b) = properFraction (x / k)
@@ -72,31 +61,50 @@ plotWorker configVar queue = do
     result <- GLFW.init
     when (not result) $ error "Failed to initialize GLFW"
 
-    psdPlot <- newPlot "Tracker PSD"
-    stagePlot <- newPlot "Tracker Stage"
+    ctx <- newContext
+    psdPlot <- newPlot ctx "Tracker PSD"
+    psdCurves <- traverseOf (traverse . traverse) (\c->newCurve psdPlot $ defaultCurve & cColor .~ c) psdColors
+                 :: IO (Psd (SumDiff Curve))
+    stagePlot <- newPlot ctx "Tracker Stage"
+    stageCurves <- T.traverse (\c->newCurve stagePlot $ defaultCurve & cColor .~ c) stageColors
+    let curves :: Sensors Curve
+        curves = Sensors stageCurves psdCurves
+
+    -- TODO: Update ring size when needed
+    rings <- T.sequence $ pure $ RB.new 30000
+             :: IO (Sensors (RB.RingBuffer VS.Vector GLfloat))
     let updatePlot :: PlotConfig -> Plot -> [Curve] -> IO ()
         updatePlot config plot cs = do
             let step = 1000
-                (miny, maxy) = case config^.pcYSize of
-                                 Just size -> let s = realToFrac size / 2 in (-s, s)
-                                 Nothing   -> let ys = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
-                                              in (minimum ys-2000, maximum ys+2000)
+                (miny, maxy) =
+                  case config^.pcYSize of
+                    Just size -> let s = realToFrac size / 2 in (-s, s)
+                    Nothing   ->
+                      --let ys = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
+                      let ys = [-10000, 10000] -- FIXME
+                      in (F.minimum ys-2000, F.maximum ys+2000)
             setLimits plot $ Rect (V2 0 miny) (V2 (realToFrac $ config^.pcNPoints) maxy)
-            updateCurves plot cs 
 
-        go :: Sensors (VS.Vector Int16) -> IO ()
-        go v = do
-            config <- atomically $ readTVar configVar
-            new <- atomically $ readTChan queue
-            let d = config ^. pcDecimation
-                new' = fmap VS.convert $ T.sequenceA $ decimate d new
-                v' = fmap (VS.take $ config^.pcNPoints)
-                     $ (VS.++) <$> new' <*> v
-            updatePlot config psdPlot $ psdCurves v'
-            updatePlot config stagePlot $ stageCurves v'
-            go v'
-    listener <- forkIO $ go (pure VS.empty)
-    mainLoop [psdPlot, stagePlot]
+    listener <- forkIO $ forever $ do
+        config <- atomically $ readTVar configVar
+        new <- atomically $ readTChan queue
+        let d = config ^. pcDecimation
+            new' :: Sensors (VS.Vector GLfloat)
+            new' = fmap (VS.convert . V.map realToFrac)
+                 $ T.sequenceA $ decimate d new
+        F.sequence_ $ RB.concat <$> new' <*> rings
+
+    drawer <- forkIO $ forever $ do
+        threadDelay $ 1000000 `div` 30
+        let update :: Curve -> RB.RingBuffer VS.Vector GLfloat
+                   -> IO ()
+            update curve rb =
+                RB.withItems rb
+                $ setPoints curve . VS.imap (\i y->V2 (realToFrac i) y)
+        T.sequence (update <$> curves <*> rings)
+        -- FIXME set limits
+
+    forever $ threadDelay 1000000 -- FIXME: Terminate
     killThread listener
     GLFW.terminate
     return ()
@@ -125,4 +133,3 @@ setDecimation = setConfig pcDecimation
 setConfig :: Lens' PlotConfig a -> TrackerPlot -> a -> IO ()
 setConfig lens plot value =
     atomically $ modifyTVar (plot^.tpConfig) $ lens .~ value
-

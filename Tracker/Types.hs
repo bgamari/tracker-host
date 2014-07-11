@@ -130,9 +130,9 @@ mkPsd x y = Psd $ V2 x y
 data Sensors a = Sensors { _stage :: !(Stage a)
                          , _psd   :: !(Psd (SumDiff a))
                          }
-               deriving (Show, Functor)
+               deriving (Show, Functor, Foldable, Traversable)
 makeLenses ''Sensors
-           
+
 instance Applicative Sensors where
     pure x = Sensors (pure x) (pure $ pure x)
     Sensors s1 p1 <*> Sensors s2 p2 = Sensors (s1 <*> s2) (fmap (<*>) p1 <*> p2)

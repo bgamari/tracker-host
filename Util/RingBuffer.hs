@@ -1,5 +1,6 @@
 module Util.RingBuffer ( RingBuffer
                        , new
+                       , clear
                        , append
                        , concat
                        , capacity
@@ -16,6 +17,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Primitive
 
+-- | A concurrent ring buffer
 data RingBuffer v a
     = RingBuffer { ringBuffer :: (VG.Mutable v) (PrimState IO) a
                  , ringState  :: MVar RingState
@@ -23,7 +25,7 @@ data RingBuffer v a
 
 data RingState = RingState { ringFull :: !Bool, ringHead :: !Int }
 
--- | We use the Mutable vector type to ensure injectiveness
+-- | We use the @Mutable@ vector type to ensure injectiveness
 type RingM vm a = StateT RingState (ReaderT (vm (PrimState IO) a) IO)
 
 -- | Atomically perform an action with the ring
@@ -45,12 +47,15 @@ advance n = do
     put $ RingState (full || a > 0) pos'
 
 -- | Create a new ring of a given length
-new :: (Num a, VG.Vector v a) => Int -> IO (RingBuffer v a)
+new :: (VG.Vector v a) => Int -> IO (RingBuffer v a)
 new n = do
     buffer <- VGM.new n
-    VGM.set buffer (-1)
     state <- newMVar $ RingState False 0
     return $ RingBuffer { ringBuffer=buffer, ringState=state }
+
+-- | Reset the ringbuffer to its empty state
+clear :: VG.Vector v a => RingBuffer v a -> IO ()
+clear rb = withRing rb $ put $ RingState False 0
 
 -- | Add an item to the end of the ring
 append :: (VG.Vector v a) => a -> RingBuffer v a -> IO ()
