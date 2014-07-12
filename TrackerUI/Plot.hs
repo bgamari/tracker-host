@@ -33,16 +33,27 @@ fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
 decimate :: Int -> V.Vector a -> V.Vector a
 decimate n = V.ifilter (\i _->i `mod` n == 0)
 
-psdColors :: Psd (SumDiff (Color4 GLfloat))
-psdColors =
-    Psd $ V2 (mkSumDiff (Color4 1 0 0 0) (Color4 0 1 1 0))
-             (mkSumDiff (Color4 0 0 1 0) (Color4 1 0 1 0))
+psdCurveParams :: Psd (SumDiff CurveParams)
+psdCurveParams = Psd $
+    V2 (mkSumDiff (f "sum-x"  $ Color4 1 0 0 1)
+                  (f "diff-x" $ Color4 0 1 1 1))
+       (mkSumDiff (f "sum-y"  $ Color4 0 0 1 1)
+                  (f "diff-y" $ Color4 1 0 1 1))
+  where
+    f name color = cName ?~ name
+                 $ cColor .~ color
+                 $ defaultCurve
 
-stageColors :: Stage (Color4 GLfloat)
-stageColors =
-    Stage $ V3 (Color4 0.8 0.5 0.3 0)
-               (Color4 0.4 0.8 0.5 0)
-               (Color4 0.4 0.5 0.8 0)
+stageCurveParams :: Stage CurveParams
+stageCurveParams =
+    Stage $ V3 (f "x" $ Color4 0.8 0.5 0.3 1)
+               (f "y" $ Color4 0.4 0.8 0.5 1)
+               (f "z" $ Color4 0.4 0.5 0.8 1)
+  where
+    f name color = cName ?~ name
+                 $ cColor .~ color
+                 $ cStyle .~ Lines
+                 $ defaultCurve
 
 data UpDown = Up | Down
 
@@ -57,35 +68,40 @@ roundUD ud k x
 
 plotWorker :: TVar PlotConfig -> TChan (V.Vector (Sensors Int16)) -> IO ()
 plotWorker configVar queue = do
-    GLFW.setErrorCallback $ Just $ \err s->do error s
-    result <- GLFW.init
-    when (not result) $ error "Failed to initialize GLFW"
-
     ctx <- newContext
+    let npts = 4000 -- TODO: Update ring size when needed
     psdPlot <- newPlot ctx "Tracker PSD"
-    psdCurves <- traverseOf (traverse . traverse) (\c->newCurve psdPlot $ defaultCurve & cColor .~ c) psdColors
+    setLimits psdPlot $ Rect (V2 0 (-0x10010)) (V2 (realToFrac npts) (0x10010))
+    psdCurves <- (traverse . traverse) (newCurve psdPlot) psdCurveParams
                  :: IO (Psd (SumDiff Curve))
     stagePlot <- newPlot ctx "Tracker Stage"
-    stageCurves <- T.traverse (\c->newCurve stagePlot $ defaultCurve & cColor .~ c) stageColors
+    setLimits stagePlot $ Rect (V2 0 (-0x10010)) (V2 (realToFrac npts) (0x10010))
+    stageCurves <- traverse (newCurve stagePlot) stageCurveParams
     let curves :: Sensors Curve
         curves = Sensors stageCurves psdCurves
 
-    -- TODO: Update ring size when needed
-    rings <- T.sequence $ pure $ RB.new 30000
+    rings <- T.sequence $ pure $ RB.new npts
              :: IO (Sensors (RB.RingBuffer VS.Vector GLfloat))
     let updatePlot :: PlotConfig -> Plot -> [Curve] -> IO ()
         updatePlot config plot cs = do
-            let step = 1000
-                (miny, maxy) =
+            let (miny, maxy) =
                   case config^.pcYSize of
                     Just size -> let s = realToFrac size / 2 in (-s, s)
-                    Nothing   ->
+                    Nothing   -> (-0xffff, 0xffff)
                       --let ys = map (\c->c^.cPoints^.to VS.head._y.to realToFrac) cs
-                      let ys = [-10000, 10000] -- FIXME
-                      in (F.minimum ys-2000, F.maximum ys+2000)
+                      --in (F.minimum ys-2000, F.maximum ys+2000)
             setLimits plot $ Rect (V2 0 miny) (V2 (realToFrac $ config^.pcNPoints) maxy)
 
-    listener <- forkIO $ forever $ do
+    let go t = do
+        threadDelay $ 1000000 `div` 30
+        let update :: Curve -> RB.RingBuffer VS.Vector GLfloat -> IO ()
+            update curve rb =
+                RB.withItems rb $ setPoints curve . VS.imap (\i y->V2 (realToFrac i) y)
+        T.sequence (update <$> curves <*> rings)
+        go (t + 1e-5)
+    drawer <- forkIO $ go 2
+
+    forever $ do
         config <- atomically $ readTVar configVar
         new <- atomically $ readTChan queue
         let d = config ^. pcDecimation
@@ -94,18 +110,7 @@ plotWorker configVar queue = do
                  $ T.sequenceA $ decimate d new
         F.sequence_ $ RB.concat <$> new' <*> rings
 
-    drawer <- forkIO $ forever $ do
-        threadDelay $ 1000000 `div` 30
-        let update :: Curve -> RB.RingBuffer VS.Vector GLfloat
-                   -> IO ()
-            update curve rb =
-                RB.withItems rb
-                $ setPoints curve . VS.imap (\i y->V2 (realToFrac i) y)
-        T.sequence (update <$> curves <*> rings)
-        -- FIXME set limits
-
     forever $ threadDelay 1000000 -- FIXME: Terminate
-    killThread listener
     GLFW.terminate
     return ()
 
