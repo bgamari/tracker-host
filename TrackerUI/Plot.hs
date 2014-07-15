@@ -71,11 +71,11 @@ plotWorker configVar queue = do
     ctx <- newContext
     let npts = 4000 -- TODO: Update ring size when needed
     psdPlot <- newPlot ctx "Tracker PSD"
-    setLimits psdPlot $ Rect (V2 0 (-0x10010)) (V2 (realToFrac npts) (0x10010))
+    setLimits psdPlot $ Rect (V2 0 (-0x8010)) (V2 (realToFrac npts) (0x10010))
     psdCurves <- (traverse . traverse) (newCurve psdPlot) psdCurveParams
                  :: IO (Psd (SumDiff Curve))
     stagePlot <- newPlot ctx "Tracker Stage"
-    setLimits stagePlot $ Rect (V2 0 (-0x10010)) (V2 (realToFrac npts) (0x10010))
+    setLimits stagePlot $ Rect (V2 0 (-0x8010)) (V2 (realToFrac npts) (0x10010))
     stageCurves <- traverse (newCurve stagePlot) stageCurveParams
     let curves :: Sensors Curve
         curves = Sensors stageCurves psdCurves
