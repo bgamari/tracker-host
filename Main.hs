@@ -11,6 +11,7 @@ import Control.Monad.Error.Class
 import Control.Monad.State
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Either
+import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
@@ -319,12 +320,18 @@ openPreAmp = command ["preamp", "open"] help "DEVICE" $ \args->do
 optimizePreAmp :: Command
 optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
     pa <- tryJust "No pre-amplifier open" =<< use preAmp
-    liftTracker $ do
-        optimize pa 1000 (_x . sdDiff)
-        optimize pa 1000 (_y . sdDiff)
-        optimize pa 1000 (_x . sdSum)
-        optimize pa 1000 (_y . sdSum)
-        return ()
+    let channel :: (forall a. Lens' (Psd (SumDiff a)) a) -> TrackerUI (GainOffset CodePoint)
+        channel l = liftTrackerE $ noteT "Failed to optimize"
+                    $ MaybeT $ optimize pa 1000 l
+
+        actions :: Psd (SumDiff (TrackerUI (GainOffset CodePoint)))
+        actions =
+          Psd $ V2 (mkSumDiff (channel $ _x . sdSum)
+                              (channel $ _x . sdDiff))
+                   (mkSumDiff (channel $ _y . sdSum)
+                              (channel $ _y . sdDiff))
+    values <- traverse Traversable.sequence actions
+    preAmpValues .= values
   where help = "Automatically optimize pre amplifier gains and offsets"
 
 resetPreAmp :: Command

@@ -1,4 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, RankNTypes, ExistentialQuantification #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 module TrackerUI.Types where
 
@@ -20,6 +23,7 @@ import Linear
 import qualified Tracker as T
 import TrackerUI.Plot.Types
 import PreAmp
+import PreAmp.Optimize (GainOffset(..))
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
                , RasterScan(..), FineScan(..), SumDiff(..))
 
@@ -61,6 +65,7 @@ data TrackerState
                    , _fineScale      :: Double
                    , _feedbackGains  :: Psd (SumDiff (Stage Double))
                    , _preAmp         :: Maybe PreAmp
+                   , _preAmpValues   :: Psd (SumDiff (GainOffset CodePoint))
                    , _stopLogger     :: Maybe (TrackerUI ())
                    , _trackerPlot    :: Maybe TrackerPlot
                    , _corrPoints     :: Int
@@ -87,6 +92,7 @@ defaultTrackerState =
                  , _fineScale      = 0.1
                  , _feedbackGains  = pure $ pure $ pure 0
                  , _preAmp         = Nothing
+                 , _preAmpValues   = pure $ pure $ pure 0
                  , _stopLogger     = Nothing
                  , _trackerPlot    = Nothing
                  , _corrPoints     = 4000
