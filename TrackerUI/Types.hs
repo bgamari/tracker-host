@@ -10,8 +10,9 @@ import Data.List (isPrefixOf, stripPrefix, sortBy, nubBy)
 import Data.Maybe (mapMaybe)
 import Data.Word
 import Control.Monad.Error.Class
-import Control.Monad.State
 import Control.Monad.Trans.Either
+import Control.Monad.State
+import Control.Monad.Reader
 import Control.Applicative
 import Control.Concurrent (ThreadId)
 
@@ -26,6 +27,7 @@ import PreAmp
 import PreAmp.Optimize (GainOffset(..))
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
                , RasterScan(..), FineScan(..), SumDiff(..))
+import TrackerUI.Queue
 
 data ExciteChannel = ExcChan { _excChanEnabled :: Bool
                              , _excChanExcitation :: T.Excitation Int
@@ -37,19 +39,31 @@ maybeExciteChannel :: ExciteChannel -> Maybe (T.Excitation Int)
 maybeExciteChannel (ExcChan True exc) = Just exc
 maybeExciteChannel _                  = Nothing
 
-newtype TrackerUI a = TUI (EitherT String (StateT TrackerState (InputT (TrackerT IO))) a)
-                    deriving ( Functor, Applicative, Monad, MonadIO
-                             , MonadState TrackerState, MonadError String
-                             )
+newtype TrackerUI a =
+    TUI
+      (EitherT String
+        (StateT TrackerState
+          (InputT
+            (ReaderT TrackerQueue IO)
+          )
+        )
+       a
+      )
+    deriving ( Functor, Applicative, Monad, MonadIO
+             , MonadState TrackerState, MonadError String
+             )
 
-liftEitherT :: EitherT String (StateT TrackerState (InputT (TrackerT IO))) a -> TrackerUI a
+liftEitherT :: EitherT String (StateT TrackerState (InputT (ReaderT TrackerQueue IO))) a -> TrackerUI a
 liftEitherT = TUI            
 
-liftInputT :: InputT (TrackerT IO) a -> TrackerUI a
+liftInputT :: InputT (ReaderT TrackerQueue IO) a -> TrackerUI a
 liftInputT = TUI . lift . lift
 
+getTrackerQueue :: TrackerUI TrackerQueue
+getTrackerQueue = TUI $ lift $ lift $ lift $ ask
+
 liftTracker :: TrackerT IO a -> TrackerUI a
-liftTracker = TUI . lift . lift . lift
+liftTracker action = getTrackerQueue >>= \tq->liftIO $ runTrackerQ tq action
 
 liftTrackerE :: EitherT String (TrackerT IO) a -> TrackerUI a
 liftTrackerE m = liftTracker (runEitherT m) >>= liftEitherT . either left right
@@ -158,10 +172,11 @@ completeCommand commands (left, right) = do
     
 runTrackerUI :: [Command] -> TrackerUI a -> IO (Either String a)
 runTrackerUI commands (TUI a) =
-    join <$> ( T.withTracker
-             $ runInputT settings
-             $ flip evalStateT defaultTrackerState
-             $ runEitherT a)
+    withTrackerQueue $ \tq->
+      flip runReaderT tq
+    $ runInputT settings
+    $ flip evalStateT defaultTrackerState
+    $ runEitherT a
   where settings = Settings { complete    = completeCommand commands
                             , historyFile = Just "~/.tracker.history"
                             , autoAddHistory = True
