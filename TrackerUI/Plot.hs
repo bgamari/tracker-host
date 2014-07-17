@@ -10,6 +10,7 @@ import Data.Foldable as F
 import Data.Traversable as T
 import Data.Int
 import Control.Monad
+import Control.Monad.Trans.Either
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -18,8 +19,9 @@ import qualified Data.Vector.Storable as VS
 import Control.Lens
 
 import Linear
-import Tracker
+import Tracker as T
 import TrackerUI.Types
+import TrackerUI.Queue
 import TrackerUI.Plot.Types
 import qualified Util.RingBuffer as RB
 
@@ -33,6 +35,9 @@ fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
 decimate :: Int -> V.Vector a -> V.Vector a
 decimate n = V.ifilter (\i _->i `mod` n == 0)
 
+hello :: Psd (SumDiff (a -> b)) -> Psd (SumDiff a) -> Psd (SumDiff b)
+hello f a = fmap (<*>) f <*> a
+
 psdCurveParams :: Psd (SumDiff CurveParams)
 psdCurveParams = Psd $
     V2 (mkSumDiff (f "sum-x"  $ Color4 1 0 0 1)
@@ -42,6 +47,7 @@ psdCurveParams = Psd $
   where
     f name color = cName ?~ name
                  $ cColor .~ color
+                 $ cStyle .~ Lines
                  $ defaultCurve
 
 stageCurveParams :: Stage CurveParams
@@ -66,14 +72,18 @@ roundUD ud k x
               Up     ->  1
               Down   -> -1
 
-plotWorker :: TVar PlotConfig -> TChan (V.Vector (Sensors Int16)) -> IO ()
-plotWorker configVar queue = do
+plotWorker :: TrackerQueue
+           -> TVar PlotConfig
+           -> TChan (V.Vector (Sensors Int16)) -> IO ()
+plotWorker tq configVar queue = do
     ctx <- newContext
     let npts = 4000 -- TODO: Update ring size when needed
     psdPlot <- newPlot ctx "Tracker PSD"
     setLimits psdPlot $ Rect (V2 0 (-0x8010)) (V2 (realToFrac npts) (0x10010))
     psdCurves <- (traverse . traverse) (newCurve psdPlot) psdCurveParams
                  :: IO (Psd (SumDiff Curve))
+    psdSetpointCurves <- (traverse . traverse) (newCurve psdPlot) psdCurveParams
+                      :: IO (Psd (SumDiff Curve))
     stagePlot <- newPlot ctx "Tracker Stage"
     setLimits stagePlot $ Rect (V2 0 (-0x8010)) (V2 (realToFrac npts) (0x10010))
     stageCurves <- traverse (newCurve stagePlot) stageCurveParams
@@ -101,6 +111,19 @@ plotWorker configVar queue = do
         go (t + 1e-5)
     drawer <- forkIO $ go 2
 
+    forkIO $ forever $ do
+        threadDelay $ 1000000 `div` 2
+        setpoints <- runTrackerQ tq $ runEitherT $ getKnob T.psdSetpoint
+        case setpoints of
+          Left err -> print $ "failed to fetch PSD setpoints: "++err
+          Right s ->
+            let go y curve = setPoints curve
+                             $ VS.fromList
+                               [ V2 0 (fromIntegral y)
+                               , V2 (fromIntegral npts) (fromIntegral y)]
+            in void $ traverse F.sequence_
+               $ pure (pure go) `hello` s `hello` psdSetpointCurves
+
     forever $ do
         config <- atomically $ readTVar configVar
         new <- atomically $ readTChan queue
@@ -114,16 +137,18 @@ plotWorker configVar queue = do
     GLFW.terminate
     return ()
 
-startPlot :: MonadIO m => TrackerT m TrackerPlot
+startPlot :: TrackerUI TrackerPlot
 startPlot = do
-    queue <- getSensorQueue
+    queue <- liftTracker getSensorQueue
+    tq <- getTrackerQueue
     liftIO $ do
-        config <- liftIO $ newTVarIO
+        config <- newTVarIO
                   $ PlotConfig { _pcYSize   = Nothing
                                , _pcNPoints = 10000
                                , _pcDecimation = 10
                                }
-        worker <- forkOS $ plotWorker config queue
+
+        worker <- forkOS $ plotWorker tq config queue
         return $ TrackerPlot worker config
 
 setYSize :: TrackerPlot -> Maybe Int16 -> IO ()

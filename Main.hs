@@ -214,7 +214,7 @@ startPlotCmd = command ["plot", "start"] help "" $ \args->do
     plot <- use trackerPlot
     case plot of
       Nothing -> do 
-        plot' <- liftTracker startPlot
+        plot' <- startPlot
         trackerPlot .= Just plot'
       Just _  -> do
         throwError $ "Plot already running"
