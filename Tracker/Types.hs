@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFoldable, DeriveFunctor, DeriveTraversable, TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Tracker.Types ( Sample
                      , module Tracker.Types.Fixed
@@ -125,6 +126,23 @@ instance Representable Psd where
 mkPsd :: a -> a -> Psd a
 mkPsd x y = Psd $ V2 x y
 {-# INLINE mkPsd #-}
+
+-- | PSD channels with more convenient instances
+newtype PsdChannels a = PsdChan {unPsdChan :: Psd (SumDiff a)}
+                      deriving (Show, Functor, Foldable, Traversable)
+
+instance Applicative PsdChannels where
+    pure = PsdChan . pure . pure
+    PsdChan a <*> PsdChan b = PsdChan $ fmap (<*>) a <*> b
+
+instance Additive PsdChannels where
+    zero = pure 0
+
+instance Metric PsdChannels
+
+instance Wrapped (PsdChannels a) where
+    type Unwrapped (PsdChannels a) = Psd (SumDiff a)
+    _Wrapped' = iso unPsdChan PsdChan
 
 -- | Stage and PSD input
 data Sensors a = Sensors { _stage :: !(Stage a)
