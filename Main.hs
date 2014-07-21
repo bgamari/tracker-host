@@ -41,7 +41,7 @@ import Tracker.RoughCal.Model as Model
 import TrackerUI.Types
 import TrackerUI.Plot
 import PreAmp       
-import PreAmp.Optimize
+import PreAmp.Optimize as PreAmp
 
 tryHead :: String -> [a] -> TrackerUI a
 tryHead err []    = throwError err
@@ -355,12 +355,22 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
                 liftEitherT $ PreAmp.setGain pa ch $ fromIntegral gain
+                preAmpValues . proj . PreAmp.gain .= fromIntegral gain
+                return True
+            , Cmd ["get", "amp."++name++".gain"]
+                  (Just "Get pre-amplifier gain") "" $ \args -> do
+                uses (preAmpValues . proj . gain) print
                 return True
             , Cmd ["set", "amp."++name++".offset"] 
                   (Just "Set pre-amplifier offset") "[OFFSET]" $ \args -> do
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 offset <- tryHead "expected offset" args >>= tryRead "invalid offset"
                 liftEitherT $ PreAmp.setOffset pa ch $ fromIntegral offset
+                preAmpValues . proj . PreAmp.offset .= fromIntegral offset
+                return True
+            , Cmd ["get", "amp."++name++".offset"]
+                  (Just "Get pre-amplifier offset") "" $ \args -> do
+                uses (preAmpValues . proj . PreAmp.offset) print
                 return True
             ]
           where ch = PreAmp.channels ^. proj
