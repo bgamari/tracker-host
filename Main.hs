@@ -79,6 +79,17 @@ centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->center
   where help = "Set stage at center position"
 
+scanCmd :: Command
+scanCmd = command ["scan"] help "[file]" $ \args -> do
+    fname <- tryHead "expected file name" args
+    rs <- use roughScan
+    freq <- use roughScanFreq
+    scan <- liftTrackerE $ T.roughScan freq rs
+    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList scan
+    liftInputT $ outputStrLn $ "Scan dumped to "++fname
+    center
+  where help = "Perform a scan and dump to file (uses rough scan parameters)"
+
 roughScanCmd :: Command
 roughScanCmd = command ["rough", "scan"] help "" $ \args->do
     rs <- uses roughScan $ (T.scanSize . _z .~ 0)
@@ -581,6 +592,7 @@ commands :: [Command]
 commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
+           , scanCmd
            , roughScanCmd
            , roughCenterCmd
            , roughZScanCmd
