@@ -33,7 +33,7 @@ data ExciteChannel = ExcChan { _excChanEnabled :: Bool
                              , _excChanExcitation :: T.Excitation Int
                              }
                    deriving (Show, Read)
-makeLenses ''ExciteChannel     
+makeLenses ''ExciteChannel
 
 maybeExciteChannel :: ExciteChannel -> Maybe (T.Excitation Int)
 maybeExciteChannel (ExcChan True exc) = Just exc
@@ -54,7 +54,7 @@ newtype TrackerUI a =
              )
 
 liftEitherT :: EitherT String (StateT TrackerState (InputT (ReaderT TrackerQueue IO))) a -> TrackerUI a
-liftEitherT = TUI            
+liftEitherT = TUI
 
 liftInputT :: InputT (ReaderT TrackerQueue IO) a -> TrackerUI a
 liftInputT = TUI . lift . lift
@@ -86,8 +86,8 @@ data TrackerState
                    , _excitation     :: Stage ExciteChannel
                    }
 makeLenses ''TrackerState
-           
-defaultTrackerState :: TrackerState           
+
+defaultTrackerState :: TrackerState
 defaultTrackerState =
     TrackerState { _centerPos      = pure 0x3fff
                  , _lastRoughScan  = Nothing
@@ -132,7 +132,7 @@ data Setting = forall a s. Setting { sName      :: String
                                    , sAccessors :: Accessors TrackerUI s
                                    , sLens      :: Lens' s a
                                    }
-     
+
 pureSetting :: String -> Maybe String -> ([String] -> Maybe a) -> (a -> String) -> Lens' TrackerState a -> Setting
 pureSetting name help parse format l =
     Setting name help parse format stateA l
@@ -145,7 +145,7 @@ data Command = Cmd { _cmdName   :: [String]
 makeLenses ''Command
 
 sortNubOn :: (Eq b, Ord b) => (a -> b) -> [a] -> [a]
-sortNubOn f = nubBy ((==) `on` f) . sortBy (compare `on` f)          
+sortNubOn f = nubBy ((==) `on` f) . sortBy (compare `on` f)
 
 completeCommand :: MonadIO m => [Command] -> CompletionFunc m
 completeCommand commands (left, right) = do
@@ -169,7 +169,7 @@ completeCommand commands (left, right) = do
                          $ filter (\c->not $ c ^. _1 . to null)
                          $ cmds
             in completions (matching & mapped . _1 %~ tail) tokens
-    
+
 runTrackerUI :: [Command] -> TrackerUI a -> IO (Either String a)
 runTrackerUI commands (TUI a) =
     withTrackerQueue $ \tq->
@@ -181,4 +181,3 @@ runTrackerUI commands (TUI a) =
                             , historyFile = Just "~/.tracker.history"
                             , autoAddHistory = True
                             }
-

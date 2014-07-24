@@ -27,12 +27,12 @@ module Tracker.Types ( Sample
                        -- * Convenient re-exports
                      , MonadIO, liftIO
                      ) where
-       
+
 import Data.Int
 import Data.Foldable
 import Data.Traversable
 import Data.Functor.Rep
-import Control.Applicative       
+import Control.Applicative
 import Control.Monad (mzero)
 import Control.Monad.IO.Class
 
@@ -44,7 +44,7 @@ import Linear
 
 import Tracker.Types.Fixed
 
--- | An ADC sample       
+-- | An ADC sample
 type Sample = Int16
 
 -- | The stage coordinate frame
@@ -167,7 +167,7 @@ instance Applicative Sensors where
 
 instance Csv.ToField a => Csv.ToRecord (Sensors a) where
     toRecord = Csv.record . toList . fmap Csv.toField
-    
+
 instance Csv.FromField a => Csv.FromRecord (Sensors a) where
     parseRecord v
       | V.length v == 7 = sensors <$> v .! 0 <*> v .! 1 <*> v .! 2
@@ -180,7 +180,7 @@ instance Csv.FromField a => Csv.FromRecord (Sensors a) where
           Sensors (mkStage x y z)
                   (mkPsd (mkSumDiff sumX diffX)
                          (mkSumDiff sumY diffY))
-        
+
 
 data PropInt a = PropInt { _propGain, _intGain :: a }
                deriving (Show, Read, Eq, Ord, Functor, Traversable, Foldable)
@@ -188,4 +188,4 @@ makeLenses ''PropInt
 
 instance Applicative PropInt where
     pure x = PropInt x x
-    PropInt a b <*> PropInt x y = PropInt (a x) (b y)           
+    PropInt a b <*> PropInt x y = PropInt (a x) (b y)
