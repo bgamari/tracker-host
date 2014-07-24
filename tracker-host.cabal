@@ -36,6 +36,7 @@ executable tracker-host
                        serialport,
                        errors,
                        either,
+                       cassava,
                        gl-plot,
                        OpenGL, GLFW-b,
                        Chart, Chart-cairo, data-default, colour

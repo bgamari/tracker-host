@@ -29,6 +29,7 @@ import System.IO
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
+import qualified Data.Csv as Csv
 
 import Linear
 import System.Console.Haskeline
@@ -85,7 +86,7 @@ scanCmd = command ["scan"] help "[file]" $ \args -> do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList scan
+    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList scan
     liftInputT $ outputStrLn $ "Scan dumped to "++fname
     center
   where help = "Perform a scan and dump to file (uses rough scan parameters)"
@@ -161,7 +162,7 @@ dumpRoughCmd :: Command
 dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughScan >>= tryJust "No rough calibration."
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
 
@@ -169,7 +170,7 @@ dumpZRoughCmd :: Command
 dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-zcal.txt" $ listToMaybe args
     s <- use lastRoughZScan >>= tryJust "No rough Z calibration."
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough Z calibration"
 
@@ -201,7 +202,7 @@ fineDumpCmd :: Command
 fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
     let fname = fromMaybe "fine-cal.txt" $ listToMaybe args
     s <- use lastFineScan >>= tryJust "No fine calibration."
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList s
     liftInputT $ outputStrLn $ "Last fine calibration dumped to "++fname
   where help = "Dump fine calibration points"
   
