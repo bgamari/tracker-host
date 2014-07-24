@@ -15,6 +15,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
+import Data.Char (ord)
 import Numeric
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -43,6 +44,10 @@ import TrackerUI.Types
 import TrackerUI.Plot
 import PreAmp
 import PreAmp.Optimize as PreAmp
+
+writeTsv :: Csv.ToRecord a => FilePath -> [a] -> IO ()
+writeTsv fname = BSL.writeFile fname . Csv.encodeWith opts
+    where opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
 
 tryHead :: String -> [a] -> TrackerUI a
 tryHead err []    = throwError err
@@ -86,7 +91,7 @@ scanCmd = command ["scan"] help "[file]" $ \args -> do
     rs <- use roughScan
     freq <- use roughScanFreq
     scan <- liftTrackerE $ T.roughScan freq rs
-    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList scan
+    liftIO $ writeTsv fname $ V.toList scan
     liftInputT $ outputStrLn $ "Scan dumped to "++fname
     center
   where help = "Perform a scan and dump to file (uses rough scan parameters)"
@@ -162,7 +167,7 @@ dumpRoughCmd :: Command
 dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughScan >>= tryJust "No rough calibration."
-    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList s
+    liftIO $ writeTsv fname $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
 
@@ -170,7 +175,7 @@ dumpZRoughCmd :: Command
 dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-zcal.txt" $ listToMaybe args
     s <- use lastRoughZScan >>= tryJust "No rough Z calibration."
-    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList s
+    liftIO $ writeTsv fname $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough Z calibration"
 
@@ -202,7 +207,7 @@ fineDumpCmd :: Command
 fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
     let fname = fromMaybe "fine-cal.txt" $ listToMaybe args
     s <- use lastFineScan >>= tryJust "No fine calibration."
-    liftIO $ BSL.writeFile fname $ Csv.encode $ V.toList s
+    liftIO $ writeTsv fname $ V.toList s
     liftInputT $ outputStrLn $ "Last fine calibration dumped to "++fname
   where help = "Dump fine calibration points"
 
