@@ -18,6 +18,7 @@ module Tracker.Types ( Sample
                      , sdSum, sdDiff
                      , Psd(Psd, unPsd)
                      , mkPsd
+                     , PsdChannels
                        -- * Sensor inputs
                      , Sensors(Sensors)
                      , stage, psd
