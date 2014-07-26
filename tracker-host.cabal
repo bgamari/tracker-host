@@ -14,6 +14,8 @@ cabal-version:       >=1.8
 library
   exposed-modules:     Tracker.Types,
                        Tracker.Types.Fixed,
+                       Tracker.LowLevel,
+                       Tracker.Commands
 
   build-depends:       base >=4.6,
                        transformers >=0.3 && <0.5,
