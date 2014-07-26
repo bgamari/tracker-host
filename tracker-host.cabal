@@ -33,6 +33,7 @@ library
                        lens >=3.9,
                        distributive >=0.3 && <0.5,
                        adjunctions >=4.0 && <4.2,
+                       cassava,
                        errors,
                        either
 
