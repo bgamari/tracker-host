@@ -30,19 +30,24 @@ module Tracker.Types ( -- * Fixed point numbers
                        -- * Convenient re-exports
                      , MonadIO, liftIO
                      ) where
-       
+
 import Data.Int
 import Data.Foldable
 import Data.Traversable
 import Data.Functor.Rep
-import Control.Applicative       
-import Data.Distributive (Distributive, collect)
-import Linear       
-import Control.Lens hiding (index)
+import Control.Applicative
+import Control.Monad (mzero)
 import Control.Monad.IO.Class
+
+import Control.Lens hiding (index)
+import qualified Data.Vector as V
+import Data.Distributive (Distributive, collect)
+import qualified Data.Csv as Csv
+import Linear
+
 import Tracker.Types.Fixed
 
--- | An ADC sample       
+-- | An ADC sample
 type Sample = Int16
 
 -- | The stage coordinate frame
@@ -165,6 +170,23 @@ instance Applicative Sensors where
     pure x = Sensors (pure x) (pure $ pure x)
     Sensors s1 p1 <*> Sensors s2 p2 = Sensors (s1 <*> s2) (fmap (<*>) p1 <*> p2)
 
+instance Csv.ToField a => Csv.ToRecord (Sensors a) where
+    toRecord = Csv.record . toList . fmap Csv.toField
+
+instance Csv.FromField a => Csv.FromRecord (Sensors a) where
+    parseRecord v
+      | V.length v == 7 = sensors <$> v .! 0 <*> v .! 1 <*> v .! 2
+                                  <*> v .! 3 <*> v .! 4
+                                  <*> v .! 5 <*> v .! 6
+      | otherwise = mzero
+      where
+        (.!) = (Csv..!)
+        sensors x y z sumX diffX sumY diffY =
+          Sensors (mkStage x y z)
+                  (mkPsd (mkSumDiff sumX diffX)
+                         (mkSumDiff sumY diffY))
+
+
 -- | Proportional and integral gains
 data PropInt a = PropInt { _propGain, _intGain :: a }
                deriving (Show, Read, Eq, Ord, Functor, Traversable, Foldable)
@@ -172,4 +194,4 @@ makeLenses ''PropInt
 
 instance Applicative PropInt where
     pure x = PropInt x x
-    PropInt a b <*> PropInt x y = PropInt (a x) (b y)           
+    PropInt a b <*> PropInt x y = PropInt (a x) (b y)

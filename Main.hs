@@ -15,6 +15,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
 import Control.Applicative
 import Data.Int
+import Data.Char (ord)
 import Numeric
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -29,6 +30,7 @@ import System.IO
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
+import qualified Data.Csv as Csv
 
 import Linear
 import System.Console.Haskeline
@@ -40,8 +42,12 @@ import Tracker.Types
 import Tracker.RoughCal.Model as Model
 import TrackerUI.Types
 import TrackerUI.Plot
-import PreAmp       
+import PreAmp
 import PreAmp.Optimize as PreAmp
+
+writeTsv :: Csv.ToRecord a => FilePath -> [a] -> IO ()
+writeTsv fname = BSL.writeFile fname . Csv.encodeWith opts
+    where opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
 
 tryHead :: String -> [a] -> TrackerUI a
 tryHead err []    = throwError err
@@ -52,7 +58,7 @@ tryRead err = maybe (throwError err) return . Safe.readZ
 
 tryJust :: String -> Maybe a -> TrackerUI a
 tryJust err Nothing  = throwError err
-tryJust _   (Just a) = return a        
+tryJust _   (Just a) = return a
 
 command :: [String] -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd name (Just help) args (\a->action a >> return True)
@@ -79,6 +85,17 @@ centerCmd :: Command
 centerCmd = command ["center"] help "" $ \args->center
   where help = "Set stage at center position"
 
+scanCmd :: Command
+scanCmd = command ["scan"] help "[file]" $ \args -> do
+    fname <- tryHead "expected file name" args
+    rs <- use roughScan
+    freq <- use roughScanFreq
+    scan <- liftTrackerE $ T.roughScan freq rs
+    liftIO $ writeTsv fname $ V.toList scan
+    liftInputT $ outputStrLn $ "Scan dumped to "++fname
+    center
+  where help = "Perform a scan and dump to file (uses rough scan parameters)"
+
 roughScanCmd :: Command
 roughScanCmd = command ["rough", "scan"] help "" $ \args->do
     rs <- uses roughScan $ (T.scanSize . _z .~ 0)
@@ -88,7 +105,7 @@ roughScanCmd = command ["rough", "scan"] help "" $ \args->do
     lastRoughScan .= Just scan
     center
   where help = "Perform rough scan"
-  
+
 roughCenterCmd :: Command
 roughCenterCmd = command ["rough", "center"] help "" $ \args->do
     scan <- use lastRoughScan >>= tryJust "No last rough calibration"
@@ -99,7 +116,7 @@ roughCenterCmd = command ["rough", "center"] help "" $ \args->do
     centerPos .= fmap round c
     center
   where help = "Find center of particle from XY rough scan"
-  
+
 roughZScanCmd :: Command
 roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
     scan <- use lastRoughScan >>= tryJust "No last rough calibration"
@@ -110,14 +127,14 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
     lastRoughZScan .= Just zScan
     center
   where help = "Perform rough Z scan"
- 
+
 showMatrix :: (Show a, Functor f, F.Foldable f, Functor g, F.Foldable g)
            => f (g a) -> String
 showMatrix xs = unlines $ F.toList $ fmap (F.fold . fmap pad) xs'
   where xs' = fmap (fmap show) xs
         maxLength = F.maximum $ fmap (F.maximum . fmap length) xs'
         pad x = take (maxLength+4) $ x++repeat ' '
-  
+
 roughFitCmd :: Command
 roughFitCmd = command ["rough", "fit"] help "" $ \args->do
     scan <- use lastRoughScan >>= tryJust "No rough calibration"
@@ -150,7 +167,7 @@ dumpRoughCmd :: Command
 dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
     s <- use lastRoughScan >>= tryJust "No rough calibration."
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftIO $ writeTsv fname $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough calibration"
 
@@ -158,7 +175,7 @@ dumpZRoughCmd :: Command
 dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
     let fname = fromMaybe "rough-zcal.txt" $ listToMaybe args
     s <- use lastRoughZScan >>= tryJust "No rough Z calibration."
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftIO $ writeTsv fname $ V.toList s
     liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
   where help = "Dump last rough Z calibration"
 
@@ -185,18 +202,18 @@ fineCalCmd = command ["fine", "cal"] help "" $ \args->do
     liftIO $ putStrLn "Feedback setpoint = "
     liftIO $ putStrLn $ concat $ fmap (F.foldMap (\x->shows x "\t")) $ F.toList psdSetpt
   where help = "Perform fine calibration regression"
-    
+
 fineDumpCmd :: Command
 fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
     let fname = fromMaybe "fine-cal.txt" $ listToMaybe args
     s <- use lastFineScan >>= tryJust "No fine calibration."
-    liftIO $ writeFile fname $ unlines $ map showSensors $ V.toList s
+    liftIO $ writeTsv fname $ V.toList s
     liftInputT $ outputStrLn $ "Last fine calibration dumped to "++fname
   where help = "Dump fine calibration points"
-  
+
 readSensorsCmd :: Command
 readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
-    let showSensors s = unlines 
+    let showSensors s = unlines
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++intercalate "\t" [ "x-sum="++showSInt (s^.T.psd._x.sdSum) ""
                                            , "x-diff="++showSInt (s^.T.psd._x.sdDiff) ""
@@ -208,22 +225,22 @@ readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
     s <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
     liftInputT $ outputStr $ showSensors $ V.head s
   where help = "Read sensors values"
-  
+
 startPlotCmd :: Command
 startPlotCmd = command ["plot", "start"] help "" $ \args->do
     plot <- use trackerPlot
     case plot of
-      Nothing -> do 
+      Nothing -> do
         plot' <- startPlot
         trackerPlot .= Just plot'
       Just _  -> do
         throwError $ "Plot already running"
   where help = "Start plot view"
-  
+
 setPlotNPointsCmd :: Command
 setPlotNPointsCmd = command ["set", "plot.npoints"] help "" $ \args->do
     plot <- use trackerPlot >>= tryJust "No plot"
-    tryHead "Expected number of points" args >>= tryRead "Invalid number of points" >>= liftIO . setNPoints plot 
+    tryHead "Expected number of points" args >>= tryRead "Invalid number of points" >>= liftIO . setNPoints plot
   where help = "Set number of points in plot"
 
 setYSizeCmd :: Command
@@ -247,7 +264,7 @@ logger h decimation queue countVar = forever $ do
     let decimated = V.ifilter (\i _->i `mod` decimation == 0) v
     atomically $ modifyTVar countVar (+V.length decimated)
     V.mapM_ (hPutStrLn h . showSensors) decimated
-    
+
 killLogger :: Handle -> ThreadId -> TVar Int -> TrackerUI ()
 killLogger h thread countVar = do
     liftIO $ killThread thread
@@ -271,15 +288,15 @@ logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
 logStopCmd :: Command
 logStopCmd = command ["log","stop"] help "" $ \args->do
     stop <- use stopLogger
-    case stop of 
+    case stop of
         Nothing   -> throwError "Not currently logging"
         Just x    -> x >> stopLogger .= Nothing
   where help = "Stop logging of sensor samples"
-  
+
 sourceCmd :: Command
 sourceCmd = command ["source"] help "FILE" $ \args->do
     fname <- liftEitherT $ Safe.tryAt "Expected filename" args 0
-    cmds <- liftEitherT $ fmapLT show $ tryIO $ readFile fname          
+    cmds <- liftEitherT $ fmapLT show $ tryIO $ readFile fname
     mapM_ (runCommand . words) $ lines cmds
   where help = "Execute commands from the given file"
 
@@ -288,12 +305,12 @@ resetCmd = command ["reset"] help "" $ \args->do
     liftTrackerE T.reset
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
-  
+
 eventCountersCmd :: Command
 eventCountersCmd = command ["event-counters"] help "" $ \args->do
     liftTrackerE T.getEventCounters >>= liftInputT . outputStrLn . show
   where help = "Show event counters"
-  
+
 helpCmd :: Command
 helpCmd = command ["help"] help "[CMD]" $ \args->
     let cmdFilter :: [Command] -> [Command]
@@ -302,14 +319,14 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
                       _  -> filter (\c->(c^.cmdName) `isPrefixOf` args)
         cmds = cmdFilter commands
         formatCmd :: Command -> Maybe String
-        formatCmd c = case c ^. cmdHelp of 
+        formatCmd c = case c ^. cmdHelp of
                          Just help -> Just $ take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ') ++ help
                          Nothing   -> Nothing
     in case cmds of
            []  -> throwError "No matching commands"
            _   -> liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
-  
+
 openPreAmp :: Command
 openPreAmp = command ["preamp", "open"] help "DEVICE" $ \args->do
     device <- tryHead "expected device" args
@@ -349,8 +366,8 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                     ]
              ++ [ openPreAmp, optimizePreAmp, resetPreAmp ]
   where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> [Command]
-        cmd proj name = 
-            [ Cmd ["set", "amp."++name++".gain"] 
+        cmd proj name =
+            [ Cmd ["set", "amp."++name++".gain"]
                   (Just "Set pre-amplifier gain") "[GAIN]" $ \args -> do
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
@@ -361,7 +378,7 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
                   (Just "Get pre-amplifier gain") "" $ \args -> do
                 uses (preAmpValues . proj . gain) print
                 return True
-            , Cmd ["set", "amp."++name++".offset"] 
+            , Cmd ["set", "amp."++name++".offset"]
                   (Just "Set pre-amplifier offset") "[OFFSET]" $ \args -> do
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 offset <- tryHead "expected offset" args >>= tryRead "invalid offset"
@@ -376,8 +393,8 @@ preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
           where ch = PreAmp.channels ^. proj
 
 exciteCmds :: [Command]
-exciteCmds = 
-    [ command ["excite", "start"] 
+exciteCmds =
+    [ command ["excite", "start"]
       "Start excitation" "" $ \args->
         use excitation >>= liftTrackerE . T.configureExcitation . fmap maybeExciteChannel
     , command ["excite", "stop"]
@@ -395,7 +412,7 @@ exciteCmds =
         liftIO $ withFile "r.txt" WriteMode $ \h->
             V.mapM_ (hPutStrLn h . showSensors) samples
     ]
-    
+
 exciteSettings :: [Setting]
 exciteSettings =
     concat [ f "x" _x, f "y" _y, f "z" _z ]++
@@ -480,7 +497,7 @@ r3Setting name help a l =
     [ Setting name (Just help) readParse show a (l . v3Tuple)
     ]++coreSettings name labels a l
   where labels = V3 "x" "y" "z"
-  
+
 coreSettings :: forall a f b. (Show a, Read a, Representable f, F.Foldable f, Rep f ~ E f)
              => String -> f String
              -> Accessors TrackerUI b
@@ -504,7 +521,7 @@ roughCalSettings = concat
     , [pureSetting "rough.freq" (Just "update frequency of rough calibration scan")
             readParse show roughScanFreq]
     ]
-    
+
 fineCalSettings :: [Setting]
 fineCalSettings = concat
     [ [ pureSetting "fine.points" (Just "number of points in fine calibration")
@@ -514,7 +531,7 @@ fineCalSettings = concat
     , [pureSetting "fine.gain-scale" (Just "factor to scale result of regression by to get feedback gains")
             readParse show fineScale]
     ]
-    
+
 stageSettings :: [Setting]
 stageSettings = concat
     [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
@@ -555,14 +572,14 @@ psdSettings = concat
             readParse show (knobA T.psdSetpoint) (_y . sdSum)
       ]
     ]
-    
-settings :: [Setting] 
+
+settings :: [Setting]
 settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings, psdSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
     ]
-    
+
 realDouble :: RealFrac a => Iso' a Double
 realDouble = iso realToFrac realToFrac
 
@@ -574,13 +591,14 @@ showCmd = command ["show"] help "PATTERN" $ \args->do
             Nothing      -> settings
     forM_ matching $ \(Setting {..})->do
         value <- sAccessors^.aGet
-        liftInputT $ outputStrLn $ sName++" = "++views sLens sFormat value 
+        liftInputT $ outputStrLn $ sName++" = "++views sLens sFormat value
   where help = "Show values of settings matching pattern"
 
 commands :: [Command]
 commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
+           , scanCmd
            , roughScanCmd
            , roughCenterCmd
            , roughZScanCmd

@@ -84,4 +84,3 @@ primePath (points:rest) = do
       Just running -> if running then error "primePath: Attempted to prime while already running"
                                  else primePath rest
       Nothing      -> return rest
-
