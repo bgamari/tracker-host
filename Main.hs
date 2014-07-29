@@ -573,9 +573,15 @@ psdSettings = concat
       ]
     ]
 
+searchStepSettings :: [Setting]
+searchStepSettings =
+    r3Setting "search.step" "Search feedback step size"
+              (knobA T.searchStep) stageV3
+
 settings :: [Setting]
 settings = concat
-    [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings, psdSettings
+    [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
+    , psdSettings, searchStepSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
     ]
