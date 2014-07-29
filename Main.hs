@@ -452,6 +452,8 @@ feedbackCmds =
         liftTrackerE $ T.setKnob T.feedbackMode T.PsdFeedback
     , command ["feedback", "stage"] "Start stage feedback" "" $ \args->
         liftTrackerE $ T.setKnob T.feedbackMode T.StageFeedback
+    , command ["feedback", "search"] "Start particle search feedback" "" $ \args->
+        liftTrackerE $ T.setKnob T.feedbackMode T.SearchFeedback
     , command ["feedback", "status"] "Show feedback status" "" $ \args->
         liftTrackerE (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
     ]
