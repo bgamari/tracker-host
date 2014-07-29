@@ -7,18 +7,21 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Tracker.Types ( Sample
+module Tracker.Types ( -- * Fixed point numbers
+                       Sample
                      , module Tracker.Types.Fixed
+                       -- * Stage coordinate frame
                      , Stage(..)
                      , mkStage
                      , StageAxis(..)
                      , stageAxes
-                       -- * Modelling position sensitive photodiode
+                       -- * Position sensitive photodiode sample space
                      , SumDiff, mkSumDiff
                      , sdSum, sdDiff
                      , Psd(Psd, unPsd)
                      , mkPsd
-                       -- * Sensor inputs
+                     , PsdChannels
+                       -- * Sensor input space
                      , Sensors(Sensors)
                      , stage, psd
                        -- * Feedback
@@ -74,6 +77,7 @@ mkStage :: a -> a -> a -> Stage a
 mkStage x y z = Stage $ V3 x y z
 {-# INLINE mkStage #-}
 
+-- | An axis of the stage
 data StageAxis = StageX | StageY | StageZ
                deriving (Show, Eq, Ord, Bounded, Enum)
 
@@ -112,7 +116,7 @@ sdSum, sdDiff :: Lens' (SumDiff a) a
 sdSum = sumDiffIso . _x
 sdDiff = sumDiffIso . _y
 
--- | The position-sensitive detector frame
+-- | The position-sensitive detector coordinate frame
 newtype Psd a = Psd {unPsd :: V2 a}
               deriving ( Show, Functor, Foldable, Traversable, Applicative
                        , Additive, Metric, Num, Fractional
@@ -137,7 +141,8 @@ mkPsd :: a -> a -> Psd a
 mkPsd x y = Psd $ V2 x y
 {-# INLINE mkPsd #-}
 
--- | PSD channels with more convenient instances
+-- | PSD channels with more convenient instances.
+-- Construct with 'Wrapped' instance.
 newtype PsdChannels a = PsdChan {unPsdChan :: Psd (SumDiff a)}
                       deriving (Show, Functor, Foldable, Traversable)
 
@@ -182,6 +187,7 @@ instance Csv.FromField a => Csv.FromRecord (Sensors a) where
                          (mkSumDiff sumY diffY))
 
 
+-- | Proportional and integral gains
 data PropInt a = PropInt { _propGain, _intGain :: a }
                deriving (Show, Read, Eq, Ord, Functor, Traversable, Foldable)
 makeLenses ''PropInt
