@@ -18,6 +18,7 @@ module Tracker.Commands ( -- * Types
                         , adcDecimation
                         , FeedbackMode(..)
                         , feedbackMode
+                        , searchStep
                           -- * Commands
                         , echo
                         , reset
@@ -221,6 +222,7 @@ setFeedbackFreq freq = do
 data FeedbackMode = NoFeedback
                   | PsdFeedback
                   | StageFeedback
+                  | SearchFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
 
 feedbackMode :: Knob FeedbackMode
@@ -265,3 +267,8 @@ startPath :: MonadIO m => Word32 -> Bool -> EitherT String (TrackerT m) ()
 startPath freq syncAdc = do
     writeCommand 0x42 $ putWord32le freq >> putWord8 (if syncAdc then 1 else 0)
     readAck "startPath"
+
+searchStep :: Knob (Stage Word16)
+searchStep = Knob "search-step" 0x43 getter 0x44 putter
+  where getter = sequence $ pure getWord16le
+        putter = mapM_ putWord16le
