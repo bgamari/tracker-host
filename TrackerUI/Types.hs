@@ -79,7 +79,7 @@ data TrackerState
                    , _fineScale      :: Double
                    , _feedbackGains  :: Psd (SumDiff (Stage Double))
                    , _preAmp         :: Maybe PreAmp
-                   , _preAmpValues   :: Psd (SumDiff (GainOffset CodePoint))
+                   , _preAmpValues   :: T.PsdChannels (GainOffset CodePoint)
                    , _stopLogger     :: Maybe (TrackerUI ())
                    , _trackerPlot    :: Maybe TrackerPlot
                    , _corrPoints     :: Int
@@ -106,7 +106,7 @@ defaultTrackerState =
                  , _fineScale      = 0.1
                  , _feedbackGains  = pure $ pure $ pure 0
                  , _preAmp         = Nothing
-                 , _preAmpValues   = pure $ pure $ pure 0
+                 , _preAmpValues   = pure $ pure 0
                  , _stopLogger     = Nothing
                  , _trackerPlot    = Nothing
                  , _corrPoints     = 4000

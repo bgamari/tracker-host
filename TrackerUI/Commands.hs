@@ -336,17 +336,19 @@ openPreAmp = command ["preamp", "open"] help "DEVICE" $ \args->do
 optimizePreAmp :: Command
 optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
     pa <- tryJust "No pre-amplifier open" =<< use preAmp
-    let channel :: (forall a. Lens' (Psd (SumDiff a)) a) -> TrackerUI (GainOffset CodePoint)
+    let channel :: (forall a. Lens' (PsdChannels a) a)
+                -> TrackerUI (GainOffset CodePoint)
         channel l = liftTrackerE $ noteT "Failed to optimize"
                     $ MaybeT $ optimize pa 1000 l
 
-        actions :: Psd (SumDiff (TrackerUI (GainOffset CodePoint)))
+        actions :: PsdChannels (TrackerUI (GainOffset CodePoint))
         actions =
-          Psd $ V2 (mkSumDiff (channel $ _x . sdSum)
-                              (channel $ _x . sdDiff))
-                   (mkSumDiff (channel $ _y . sdSum)
-                              (channel $ _y . sdDiff))
-    values <- traverse sequence actions
+          PsdChans
+          $ Psd $ V2 (mkSumDiff (channel $ _Wrapping' PsdChans . _x . sdSum)
+                                (channel $ _Wrapping' PsdChans . _x . sdDiff))
+                     (mkSumDiff (channel $ _Wrapping' PsdChans . _y . sdSum)
+                                (channel $ _Wrapping' PsdChans . _y . sdDiff))
+    values <- sequence actions
     preAmpValues .= values
   where help = "Automatically optimize pre amplifier gains and offsets"
 
@@ -354,17 +356,17 @@ resetPreAmp :: Command
 resetPreAmp = command ["preamp", "reset"] help "" $ \args->do
     pa <- tryJust "No pre-amplifier open" =<< use preAmp
     let reset ch = PreAmp.setOffset pa ch 0 >> PreAmp.setGain pa ch 0
-    void $ liftEitherT $ traverseOf (traverse . traverse) reset PreAmp.channels
+    void $ liftEitherT $ traverse reset PreAmp.channels
   where help = "Reset pre-amplifier gains and offsets to zero"
 
 preAmpCmds :: [Command]
-preAmpCmds = concat [ cmd (_x.sdSum) "xsum"
-                    , cmd (_x.sdDiff) "xdiff"
-                    , cmd (_y.sdSum) "ysum"
-                    , cmd (_y.sdDiff) "ydiff"
+preAmpCmds = concat [ cmd (_Wrapping' PsdChans . _x . sdSum) "xsum"
+                    , cmd (_Wrapping' PsdChans . _x . sdDiff) "xdiff"
+                    , cmd (_Wrapping' PsdChans . _y . sdSum) "ysum"
+                    , cmd (_Wrapping' PsdChans . _y . sdDiff) "ydiff"
                     ]
              ++ [ openPreAmp, optimizePreAmp, resetPreAmp ]
-  where cmd :: (forall a. Lens' (Psd (SumDiff a)) a) -> String -> [Command]
+  where cmd :: (forall a. Lens' (PsdChannels a) a) -> String -> [Command]
         cmd proj name =
             [ Cmd ["set", "amp."++name++".gain"]
                   (Just "Set pre-amplifier gain") "[GAIN]" $ \args -> do

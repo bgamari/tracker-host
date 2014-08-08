@@ -33,6 +33,7 @@ library
                        lens >=3.9,
                        distributive >=0.3 && <0.5,
                        adjunctions >=4.0 && <4.2,
+                       statistics,
                        cassava,
                        errors,
                        either
@@ -65,4 +66,5 @@ executable tracker-host
                        cassava,
                        gl-plot,
                        OpenGL, GLFW-b,
+                       statistics,
                        Chart, Chart-cairo, data-default, colour

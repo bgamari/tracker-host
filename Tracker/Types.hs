@@ -20,7 +20,7 @@ module Tracker.Types ( -- * Fixed point numbers
                      , sdSum, sdDiff
                      , Psd(Psd, unPsd)
                      , mkPsd
-                     , PsdChannels
+                     , PsdChannels(PsdChans)
                        -- * Sensor input space
                      , Sensors(Sensors)
                      , stage, psd
@@ -143,12 +143,12 @@ mkPsd x y = Psd $ V2 x y
 
 -- | PSD channels with more convenient instances.
 -- Construct with 'Wrapped' instance.
-newtype PsdChannels a = PsdChan {unPsdChan :: Psd (SumDiff a)}
+newtype PsdChannels a = PsdChans {unPsdChan :: Psd (SumDiff a)}
                       deriving (Show, Functor, Foldable, Traversable)
 
 instance Applicative PsdChannels where
-    pure = PsdChan . pure . pure
-    PsdChan a <*> PsdChan b = PsdChan $ fmap (<*>) a <*> b
+    pure = PsdChans . pure . pure
+    PsdChans a <*> PsdChans b = PsdChans $ fmap (<*>) a <*> b
 
 instance Additive PsdChannels where
     zero = pure 0
@@ -157,7 +157,7 @@ instance Metric PsdChannels
 
 instance Wrapped (PsdChannels a) where
     type Unwrapped (PsdChannels a) = Psd (SumDiff a)
-    _Wrapped' = iso unPsdChan PsdChan
+    _Wrapped' = iso unPsdChan PsdChans
 
 -- | Stage and PSD input
 data Sensors a = Sensors { _stage :: !(Stage a)
