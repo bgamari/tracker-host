@@ -74,20 +74,22 @@ sampleConfig pa paCh go = do
            $ sequenceA (V.map (^. (psd . _Unwrapped')) s)
 
 sweepOffset :: (MonadIO m)
-            => PreAmp -> PsdLens -> GainOffset CodePoint
+            => PreAmp -> PsdLens -> Double -> GainOffset CodePoint
             -> TrackerT m (Maybe (GainOffset CodePoint))
-sweepOffset pa channel go = do
+sweepOffset pa channel maxSigma2 go = do
     let xs = map (\o->go & offset .~ o) [minBound..]
         paCh = PreAmp.channels ^. channel
     ys <- mapM (sampleConfig pa paCh) xs
     case minimumBy (compare `on` (\y->abs $ y^._2.channel.mean))
-         $ filter (\y->y^._2.channel.var < 4000) (zip xs ys) of
+         $ filter (\y->y^._2.channel.var < maxSigma2) (zip xs ys) of
         (x,y) | abs (y^.channel.mean) < 1000  -> return $ Just x
         _                                     -> return $ Nothing
 
 sweepGain :: (MonadIO m)
-          => PreAmp -> PsdLens -> TrackerT m (Maybe (GainOffset CodePoint))
-sweepGain pa channel = runMaybeT $ step (GainOffset maxBound 0)
+          => PreAmp -> PsdLens -> Double
+          -> TrackerT m (Maybe (GainOffset CodePoint))
+sweepGain pa channel maxSigma2 =
+    runMaybeT $ step (GainOffset maxBound 0)
   where
     step :: (MonadIO m)
          => GainOffset CodePoint
@@ -95,16 +97,16 @@ sweepGain pa channel = runMaybeT $ step (GainOffset maxBound 0)
     step go
       | go ^. gain == 0  = return go
       | otherwise = do
-          go' <- lift $ sweepOffset pa channel go
+          go' <- lift $ sweepOffset pa channel maxSigma2 go
           case go' of
             Just x  -> return x
             Nothing -> step $ gain -~ 2 $ go
 
 optimize :: (MonadIO m)
-         => PreAmp -> Sample -> PsdLens
+         => PreAmp -> PsdLens -> Double
          -> TrackerT m (Maybe (GainOffset CodePoint))
-optimize pa margin channel = do
+optimize pa channel maxSigma2 = do
     let paCh = PreAmp.channels ^. channel
-    result <- sweepGain pa channel
+    result <- sweepGain pa channel maxSigma2
     setGainOffset pa paCh $ maybe (GainOffset 0 0) id result
     return result

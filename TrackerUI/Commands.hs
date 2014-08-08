@@ -336,10 +336,11 @@ openPreAmp = command ["preamp", "open"] help "DEVICE" $ \args->do
 optimizePreAmp :: Command
 optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
     pa <- tryJust "No pre-amplifier open" =<< use preAmp
+    maxVar <- use preAmpMaxSigma2
     let channel :: (forall a. Lens' (PsdChannels a) a)
                 -> TrackerUI (GainOffset CodePoint)
         channel l = liftTrackerE $ noteT "Failed to optimize"
-                    $ MaybeT $ optimize pa 1000 l
+                    $ MaybeT $ optimize pa l maxVar
 
         actions :: PsdChannels (TrackerUI (GainOffset CodePoint))
         actions =
@@ -587,6 +588,8 @@ settings = concat
     , psdSettings, searchStepSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
+    , [Setting "preamp.optimize.maxVar" (Just "Maximum variance allowed in PSD signal")
+            readParse show stateA preAmpMaxSigma2]
     ]
 
 realDouble :: RealFrac a => Iso' a Double
