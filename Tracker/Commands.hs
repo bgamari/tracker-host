@@ -20,6 +20,7 @@ module Tracker.Commands ( -- * Types
                         , feedbackMode
                         , searchStep
                         , searchObjGains
+                        , searchObjThresh
                           -- * Commands
                         , echo
                         , reset
@@ -278,3 +279,6 @@ searchObjGains :: Knob (PsdChannels Fixed16)
 searchObjGains = Knob "search-obj-gains" 0x45 getter 0x46 putter
   where getter = sequence $ pure getFixed16le
         putter = mapM_ putFixed16le
+
+searchObjThresh :: Knob Word16
+searchObjThresh = Knob "search-obj-thresh" 0x47 getWord16le 0x48 putWord16le

@@ -589,6 +589,8 @@ searchSettings = concat
             readParse show (knobA T.searchObjGains) (_Wrapped' . _y . sdDiff)
       , Setting "search.gains.y.sum" (Just "Search objective gain")
             readParse show (knobA T.searchObjGains) (_Wrapped' . _y . sdSum)
+      , Setting "search.obj-thresh" (Just "Search objective function threshold")
+            readParse show (knobA T.searchObjThresh) id
       ]
     ]
 
