@@ -269,11 +269,11 @@ startPath freq syncAdc = do
     readAck "startPath"
 
 searchStep :: Knob (Stage Word16)
-searchStep = Knob "search-step" 0x43 getter 0x44 putter
+searchStep = Knob "search-step" 0x43 getter 0x45 putter
   where getter = sequence $ pure getWord16le
         putter = mapM_ putWord16le
 
 searchObjGains :: Knob (PsdChannels Fixed16)
-searchObjGains = Knob "search-obj-gains" 0x43 getter 0x44 putter
+searchObjGains = Knob "search-obj-gains" 0x46 getter 0x44 putter
   where getter = sequence $ pure getFixed16le
         putter = mapM_ putFixed16le
