@@ -19,6 +19,7 @@ module Tracker.Commands ( -- * Types
                         , FeedbackMode(..)
                         , feedbackMode
                         , searchStep
+                        , searchObjGains
                           -- * Commands
                         , echo
                         , reset

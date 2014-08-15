@@ -582,13 +582,13 @@ searchSettings = concat
     [ r3Setting "search.step" "Search feedback step size"
             (knobA T.searchStep) stageV3
     , [ Setting "search.gains.x.diff" (Just "Search objective gain")
-            readParse show (knobA T.psdSetpoint) (_x . sdDiff)
+            readParse show (knobA T.searchObjGains) (_Wrapped' . _x . sdDiff)
       , Setting "search.gains.x.sum" (Just "Search objective gain")
-            readParse show (knobA T.psdSetpoint) (_x . sdSum)
+            readParse show (knobA T.searchObjGains) (_Wrapped' . _x . sdSum)
       , Setting "search.gains.y.diff" (Just "Search objective gain")
-            readParse show (knobA T.psdSetpoint) (_y . sdDiff)
+            readParse show (knobA T.searchObjGains) (_Wrapped' . _y . sdDiff)
       , Setting "search.gains.y.sum" (Just "Search objective gain")
-            readParse show (knobA T.psdSetpoint) (_y . sdSum)
+            readParse show (knobA T.searchObjGains) (_Wrapped' . _y . sdSum)
       ]
     ]
 
