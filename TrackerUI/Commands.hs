@@ -577,15 +577,25 @@ psdSettings = concat
       ]
     ]
 
-searchStepSettings :: [Setting]
-searchStepSettings =
-    r3Setting "search.step" "Search feedback step size"
-              (knobA T.searchStep) stageV3
+searchSettings :: [Setting]
+searchSettings = concat
+    [ r3Setting "search.step" "Search feedback step size"
+            (knobA T.searchStep) stageV3
+    , [ Setting "search.gains.x.diff" (Just "Search objective gain")
+            readParse show (knobA T.psdSetpoint) (_x . sdDiff)
+      , Setting "search.gains.x.sum" (Just "Search objective gain")
+            readParse show (knobA T.psdSetpoint) (_x . sdSum)
+      , Setting "search.gains.y.diff" (Just "Search objective gain")
+            readParse show (knobA T.psdSetpoint) (_y . sdDiff)
+      , Setting "search.gains.y.sum" (Just "Search objective gain")
+            readParse show (knobA T.psdSetpoint) (_y . sdSum)
+      ]
+    ]
 
 settings :: [Setting]
 settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
-    , psdSettings, searchStepSettings
+    , psdSettings, searchSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
     , [Setting "preamp.optimize.maxVar" (Just "Maximum variance allowed in PSD signal")
