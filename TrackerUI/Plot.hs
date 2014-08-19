@@ -4,6 +4,7 @@ module TrackerUI.Plot ( startPlot
                       , TrackerPlot
                       , setYSize
                       , setNPoints
+                      , setDecimation
                       ) where
 
 import Data.Foldable as F
@@ -106,12 +107,12 @@ plotWorker tq configVar queue = do
         threadDelay $ 1000000 `div` 30
         let update :: Curve -> RB.RingBuffer VS.Vector GLfloat -> IO ()
             update curve rb =
-                RB.withItems rb $ setPoints curve . VS.imap (\i y->V2 (realToFrac i) y)
+                void $ RB.withItems rb $ setPoints curve . VS.imap (\i y->V2 (realToFrac i) y)
         T.sequence (update <$> curves <*> rings)
         go (t + 1e-5)
     drawer <- forkIO $ go 2
 
-    forkIO $ forever $ do
+    void $ forkIO $ forever $ do
         threadDelay $ 1000000 `div` 2
         setpoints <- runTrackerQ tq $ runEitherT $ getKnob T.psdSetpoint
         case setpoints of
@@ -124,7 +125,7 @@ plotWorker tq configVar queue = do
             in void $ traverse F.sequence_
                $ pure (pure go) `hello` s `hello` psdSetpointCurves
 
-    forever $ do
+    void $ forever $ do
         config <- atomically $ readTVar configVar
         new <- atomically $ readTChan queue
         let d = config ^. pcDecimation
@@ -133,7 +134,7 @@ plotWorker tq configVar queue = do
                  $ T.sequenceA $ decimate d new
         F.sequence_ $ RB.concat <$> new' <*> rings
 
-    forever $ threadDelay 1000000 -- FIXME: Terminate
+    void $ forever $ threadDelay 1000000 -- FIXME: Terminate
     GLFW.terminate
     return ()
 
@@ -161,5 +162,5 @@ setDecimation :: TrackerPlot -> Int -> IO ()
 setDecimation = setConfig pcDecimation
 
 setConfig :: Lens' PlotConfig a -> TrackerPlot -> a -> IO ()
-setConfig lens plot value =
-    atomically $ modifyTVar (plot^.tpConfig) $ lens .~ value
+setConfig l plot value =
+    atomically $ modifyTVar (plot^.tpConfig) $ l .~ value
