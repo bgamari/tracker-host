@@ -58,7 +58,8 @@ tabulatePsdChannels f = PsdChans $ mkPsd
 
 writeTsv :: Csv.ToRecord a => FilePath -> [a] -> IO ()
 writeTsv fname = BSL.writeFile fname . Csv.encodeWith opts
-    where opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
+    where
+      opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
 
 tryHead :: String -> [a] -> TrackerUI a
 tryHead e []    = throwError e
@@ -265,7 +266,9 @@ logger h decimation queue countVar = forever $ do
     v <- atomically $ readTChan queue
     let decimated = V.ifilter (\i _->i `mod` decimation == 0) v
     atomically $ modifyTVar countVar (+V.length decimated)
-    BSL.hPutStr h $ Csv.encode $ V.toList decimated
+    BSL.hPutStr h $ Csv.encodeWith opts $ V.toList decimated
+  where
+      opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
 
 killLogger :: Handle -> ThreadId -> TVar Int -> TrackerUI ()
 killLogger h thread countVar = do
