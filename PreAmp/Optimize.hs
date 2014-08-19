@@ -44,9 +44,10 @@ instance Applicative GainOffset where
 readLastTChan :: TChan a -> STM a
 readLastTChan tchan = do
     a <- readTChan tchan
-    empty <- isEmptyTChan tchan
-    if empty then return a
-             else readLastTChan tchan
+    isEmpty <- isEmptyTChan tchan
+    if isEmpty
+      then return a
+      else readLastTChan tchan
 
 failE :: Monad m => EitherT String m a -> m a
 failE m = either error id `liftM` runEitherT m
