@@ -1,25 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Control.Monad.Error.Class
 import Control.Monad.State
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Either
-import Control.Monad.IO.Class
 import Control.Applicative
-import Control.Concurrent
-
-import Control.Monad (MonadPlus(..))
-import Control.Error.Util
-import Data.EitherR (fmapLT)
-import Data.Functor.Rep
-
-import System.IO
-import qualified Data.ByteString as BS
 
 import Linear
 import System.Console.Haskeline
-import Data.Binary.Get
-import Control.Lens
 
 import qualified Tracker as T
 import Tracker.Types
