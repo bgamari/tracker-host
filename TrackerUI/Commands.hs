@@ -274,7 +274,7 @@ logger h decimation queue countVar = forever $ do
     v <- atomically $ readTChan queue
     let decimated = V.ifilter (\i _->i `mod` decimation == 0) v
     atomically $ modifyTVar countVar (+V.length decimated)
-    V.mapM_ (hPutStrLn h . showSensors) decimated
+    BSL.hPutStr h $ Csv.encode $ V.toList decimated
 
 killLogger :: Handle -> ThreadId -> TVar Int -> TrackerUI ()
 killLogger h thread countVar = do
