@@ -69,7 +69,8 @@ plotWorker tq configVar queue = do
     setLimits psdPlot $ Rect (V2 0 (-0x8010)) (V2 (realToFrac npts) (0x10010))
     psdCurves <- (traverse . traverse) (newCurve psdPlot) psdCurveParams
                  :: IO (Psd (SumDiff Curve))
-    psdSetpointCurves <- (traverse . traverse) (newCurve psdPlot) psdCurveParams
+    psdSetpointCurves <- (traverse . traverse) (newCurve psdPlot) 
+                         (psdCurveParams & mapped . mapped . cName .~ Nothing)
                       :: IO (Psd (SumDiff Curve))
     stagePlot <- newPlot ctx "Tracker Stage"
     setLimits stagePlot $ Rect (V2 0 (-0x8010)) (V2 (realToFrac npts) (0x10010))
