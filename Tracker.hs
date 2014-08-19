@@ -29,6 +29,3 @@ import Tracker.RoughCal
 import Tracker.FineCal
 import Tracker.LowLevel
 import Tracker.Excitation
-
-import qualified Data.Vector as V
-
