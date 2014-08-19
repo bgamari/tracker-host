@@ -438,23 +438,24 @@ exciteCmds =
 exciteSettings :: [Setting]
 exciteSettings =
     concat [ f "x" _x, f "y" _y, f "z" _z ]++
-    [ Setting "excite.corr-points" (Just "number of points to use in correlation")
-              readParse show stateA corrPoints
+    [ setting "excite.corr-points"
+              "number of points to use in correlation"
+              stateA corrPoints
     ]
   where f :: String
           -> Lens' (Stage ExciteChannel) ExciteChannel
           -> [Setting]
-        f n l = [ Setting ("excite."++n++".period")
-                          (Just "excitation period")
-                          readParse show stateA
+        f n l = [ setting ("excite."++n++".period")
+                          "excitation period"
+                          stateA
                           (excitation . l . excChanExcitation . T.excitePeriod)
-                , Setting ("excite."++n++".amp")
-                          (Just "excitation amplitude")
-                          readParse show stateA
+                , setting ("excite."++n++".amp")
+                          "excitation amplitude"
+                          stateA
                           (excitation . l . excChanExcitation . T.exciteAmp)
-                , Setting ("excite."++n++".enabled")
-                          (Just "excitation enabled")
-                          readParse show stateA
+                , setting ("excite."++n++".enabled")
+                          "excitation enabled"
+                          stateA
                           (excitation . l . excChanEnabled)
                 ]
 
@@ -516,20 +517,26 @@ settingCommands (Setting {..}) = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value
 
+setting :: (Show a, Read a)
+        => String -> String
+        -> Accessors TrackerUI b -> Lens' b a -> Setting
+setting name help a l =
+    Setting name (Just help) readParse show a l
+
 r3Setting :: (Show a, Read a)
           => String -> String
           -> Accessors TrackerUI b -> Lens' b (V3 a) -> [Setting]
 r3Setting name help a l =
-    [ Setting name (Just help) readParse show a (l . v3Tuple)
-    ]++coreSettings name labels a l
-  where labels = V3 "x" "y" "z"
+    setting name help a (l . v3Tuple) : repSettings name labels a l
+  where
+    labels = V3 "x" "y" "z"
 
-coreSettings :: forall a f b. (Show a, Read a, Representable f, Foldable f, Rep f ~ E f)
-             => String -> f String
-             -> Accessors TrackerUI b
-             -> Lens' b (f a)
-             -> [Setting]
-coreSettings name labels a l =
+repSettings :: forall a f b. (Show a, Read a, Representable f, Foldable f, Rep f ~ E f)
+            => String -> f String
+            -> Accessors TrackerUI b
+            -> Lens' b (f a)
+            -> [Setting]
+repSettings name labels a l =
     let f :: f Setting
         f = tabulate $ \l'->
               let label = labels ^. el l'
@@ -574,8 +581,9 @@ stageSettings = concat
             (knobA T.stageGain) (_z . stageV3 . mapping realDouble)
     , r3Setting "stage.setpoint" "stage feedback setpoint"
             (knobA T.stageSetpoint) stageV3
-    , [Setting "stage.max-error" (Just "maximum tolerable error signal before killing feedback")
-            readParse show (knobA T.maxError) id]
+    , [setting "stage.max-error"
+               "maximum tolerable error signal before killing feedback"
+               (knobA T.maxError) id]
     ]
 
 psdSettings :: [Setting]
@@ -586,9 +594,8 @@ psdSettings = concat $ toList $ tabulatePsdChannels channel
         [ r3Setting ("psd.fb-gain."<>name) "PSD feedback gain"
                     (knobA T.psdGains)
                     (_Unwrapped' . l . stageV3 . mapping realDouble)
-        , [Setting ("psd.fb-setpoint."<>name)
-                   (Just "PSD feedback setpoint")
-                   readParse show
+        , [setting ("psd.fb-setpoint."<>name)
+                   "PSD feedback setpoint"
                    (knobA T.psdSetpoint) (_Unwrapped' . l)]
         ]
       where
@@ -598,16 +605,16 @@ searchSettings :: [Setting]
 searchSettings = concat
     [ r3Setting "search.step" "Search feedback step size"
                 (knobA T.searchStep) stageV3
-    , [Setting "search.obj-thresh"
-              (Just "Search objective function threshold")
-              readParse show (knobA T.searchObjThresh) id]
+    , [setting "search.obj-thresh"
+               "Search objective function threshold"
+               (knobA T.searchObjThresh) id]
     , toList $ tabulatePsdChannels gain
     ]
   where
     gain :: (forall a. Lens' (PsdChannels a) a) -> Setting
     gain l =
-        Setting ("search.gains."<>name) (Just "Search objective gain")
-                readParse show (knobA T.searchObjGains) l
+        setting ("search.gains."<>name) "Search objective gain"
+                (knobA T.searchObjGains) l
       where
         name = psdChannelNames ^. l
 
@@ -615,7 +622,7 @@ coarseFbSettings :: [Setting]
 coarseFbSettings = concat $ toList $ tabulatePsdChannels go
   where
     go :: (forall a. Lens' (PsdChannels a) a) -> [Setting]
-    go l = concat 
+    go l = concat
         [ r3Setting ("coarse."<>name<>".high.step")
                     "Coarse feedback high step"
                     (knobA T.coarseFbParams)
@@ -624,8 +631,7 @@ coarseFbSettings = concat $ toList $ tabulatePsdChannels go
                     "Coarse feedback low step"
                     (knobA T.coarseFbParams)
                     (l . T.coarseStepLow)
-        , [Setting "coarse.tol" (Just "Coarse feedback low step")
-                  readParse show
+        , [setting "coarse.tol" "Coarse feedback low step"
                   (knobA T.coarseFbParams)
                   (l . T.coarseTolerance)]
         ]
@@ -636,10 +642,12 @@ settings :: [Setting]
 settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
     , psdSettings, searchSettings, coarseFbSettings
-    , [Setting "decimation" (Just "decimation factor of samples")
-            readParse show (knobA T.adcDecimation) id]
-    , [Setting "preamp.optimize.maxVar" (Just "Maximum variance allowed in PSD signal")
-            readParse show stateA preAmpMaxSigma2]
+    , [setting "decimation"
+               "decimation factor of samples"
+               (knobA T.adcDecimation) id]
+    , [setting "preamp.optimize.maxVar"
+               "Maximum variance allowed in PSD signal"
+               stateA preAmpMaxSigma2]
     ]
 
 realDouble :: RealFrac a => Iso' a Double
