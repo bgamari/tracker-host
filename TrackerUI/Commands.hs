@@ -631,7 +631,8 @@ coarseFbSettings = concat $ toList $ tabulatePsdChannels go
                     "Coarse feedback low step"
                     (knobA T.coarseFbParams)
                     (l . T.coarseStepLow)
-        , [setting "coarse."<>name<>".tol" "Coarse feedback low step"
+        , [setting ("coarse."<>name<>".tol")
+                   "Coarse feedback low step"
                    (knobA T.coarseFbParams)
                    (l . T.coarseTolerance)]
         ]
