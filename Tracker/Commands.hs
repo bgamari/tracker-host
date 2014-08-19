@@ -21,6 +21,8 @@ module Tracker.Commands ( -- * Types
                         , searchStep
                         , searchObjGains
                         , searchObjThresh
+                        , CoarseFbChannel(..)
+                        , coarseFbParams
                           -- * Commands
                         , echo
                         , reset
@@ -282,3 +284,21 @@ searchObjGains = Knob "search-obj-gains" 0x45 getter 0x46 putter
 
 searchObjThresh :: Knob Word16
 searchObjThresh = Knob "search-obj-thresh" 0x47 getWord16le 0x48 putWord16le
+
+data CoarseFbChannel
+    = CoarseFbChan { coarseStepHigh  :: V3 Word16
+                   , coarseStepLow   :: V3 Word16
+                   , coarseTolerance :: Word16
+                   }
+    deriving (Show, Eq, Ord)
+
+coarseFbParams :: Knob CoarseFbChannel
+coarseFbParams = Knob "coarse-fb-params" 0x49 getter 0x4a putter
+  where
+    getter = CoarseFbChan <$> getV3 <*> getV3 <*> getWord16le
+    getV3 :: Get (V3 Word16)
+    getV3 = sequence $ pure getWord16le
+    putter (CoarseFbChan h l t) = do
+        traverse putWord16le h
+        traverse putWord16le l
+        putWord16le t
