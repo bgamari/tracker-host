@@ -227,6 +227,7 @@ data FeedbackMode = NoFeedback
                   | PsdFeedback
                   | StageFeedback
                   | SearchFeedback
+                  | CoarseFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
 
 feedbackMode :: Knob FeedbackMode
