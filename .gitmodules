@@ -4,3 +4,6 @@
 [submodule "mdaq"]
 	path = mdaq
 	url = git@github.com:bgamari/mdaq
+[submodule "psd-preamp"]
+	path = psd-preamp
+	url = git@github.com:bgamari/psd-preamp
