@@ -339,8 +339,16 @@ optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
     maxVar <- use preAmpMaxSigma2
     let channel :: (forall a. Lens' (PsdChannels a) a)
                 -> TrackerUI (GainOffset CodePoint)
-        channel l = liftTrackerE $ noteT "Failed to optimize"
-                    $ MaybeT $ optimize pa l maxVar
+        channel l = do
+            liftIO $ putStr $ "Optimizing "++views l show names++": "
+            res <- liftTrackerE $ noteT "Failed to optimize"
+                                $ MaybeT $ optimize pa l maxVar
+            liftIO $ print res
+            return res
+
+        names :: PsdChannels String
+        names = PsdChans $ mkPsd (mkSumDiff "sumX" "diffX")
+                                 (mkSumDiff "sumY" "diffY")
 
         actions :: PsdChannels (TrackerUI (GainOffset CodePoint))
         actions =
