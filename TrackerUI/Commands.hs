@@ -8,6 +8,7 @@ module TrackerUI.Commands (commands, runCommand) where
 import Prelude hiding (concatMap, concat, sequence, mapM_)
 
 import Data.Maybe
+import Data.Monoid ((<>))
 import Data.Char (ord)
 import Data.Int
 import Numeric
@@ -43,6 +44,17 @@ import TrackerUI.Types
 import TrackerUI.Plot
 import PreAmp
 import PreAmp.Optimize as PreAmp
+
+psdChannelNames :: PsdChannels String
+psdChannelNames =
+    PsdChans $ mkPsd (mkSumDiff "x.sum" "x.diff")
+                     (mkSumDiff "y.sum" "y.diff")
+
+tabulatePsdChannels :: ((forall a. Lens' (PsdChannels a) a) -> b)
+                    -> PsdChannels b
+tabulatePsdChannels f = PsdChans $ mkPsd
+    (mkSumDiff (f (_Wrapped' . _x . sdSum)) (f (_Wrapped' . _x . sdDiff)))
+    (mkSumDiff (f (_Wrapped' . _y . sdSum)) (f (_Wrapped' . _y . sdDiff)))
 
 writeTsv :: Csv.ToRecord a => FilePath -> [a] -> IO ()
 writeTsv fname = BSL.writeFile fname . Csv.encodeWith opts
@@ -567,64 +579,63 @@ stageSettings = concat
     ]
 
 psdSettings :: [Setting]
-psdSettings = concat
-    [ r3Setting "psd.fb-gain.x.diff" "PSD feedback gain"
-            (knobA T.psdGains) (_x . sdDiff . stageV3 . mapping realDouble)
-    , r3Setting "psd.fb-gain.x.sum" "PSD feedback gain"
-            (knobA T.psdGains) (_x . sdSum  . stageV3 . mapping realDouble)
-    , r3Setting "psd.fb-gain.y.diff" "PSD feedback gain"
-            (knobA T.psdGains) (_y . sdDiff . stageV3 . mapping realDouble)
-    , r3Setting "psd.fb-gain.y.sum" "PSD feedback gain"
-            (knobA T.psdGains) (_y . sdSum  . stageV3 . mapping realDouble)
-    , [ Setting "psd.fb-setpoint.x.diff" (Just "PSD setpoint gain")
-            readParse show (knobA T.psdSetpoint) (_x . sdDiff)
-      , Setting "psd.fb-setpoint.x.sum" (Just "PSD setpoint gain")
-            readParse show (knobA T.psdSetpoint) (_x . sdSum)
-      , Setting "psd.fb-setpoint.y.diff" (Just "PSD setpoint gain")
-            readParse show (knobA T.psdSetpoint) (_y . sdDiff)
-      , Setting "psd.fb-setpoint.y.sum" (Just "PSD setpoint gain")
-            readParse show (knobA T.psdSetpoint) (_y . sdSum)
-      ]
-    ]
+psdSettings = concat $ toList $ tabulatePsdChannels channel
+  where
+    channel :: (forall a. Lens' (PsdChannels a) a) -> [Setting]
+    channel l = concat
+        [ r3Setting ("psd.fb-gain."<>name) "PSD feedback gain"
+                    (knobA T.psdGains)
+                    (_Unwrapped' . l . stageV3 . mapping realDouble)
+        , [Setting ("psd.fb-setpoint."<>name)
+                   (Just "PSD feedback setpoint")
+                   readParse show
+                   (knobA T.psdSetpoint) (_Unwrapped' . l)]
+        ]
+      where
+        name = psdChannelNames ^. l
 
 searchSettings :: [Setting]
 searchSettings = concat
     [ r3Setting "search.step" "Search feedback step size"
-            (knobA T.searchStep) stageV3
-    , [ Setting "search.gains.x.diff" (Just "Search objective gain")
-            readParse show (knobA T.searchObjGains) (_Wrapped' . _x . sdDiff)
-      , Setting "search.gains.x.sum" (Just "Search objective gain")
-            readParse show (knobA T.searchObjGains) (_Wrapped' . _x . sdSum)
-      , Setting "search.gains.y.diff" (Just "Search objective gain")
-            readParse show (knobA T.searchObjGains) (_Wrapped' . _y . sdDiff)
-      , Setting "search.gains.y.sum" (Just "Search objective gain")
-            readParse show (knobA T.searchObjGains) (_Wrapped' . _y . sdSum)
-      , Setting "search.obj-thresh" (Just "Search objective function threshold")
-            readParse show (knobA T.searchObjThresh) id
-      ]
+                (knobA T.searchStep) stageV3
+    , [Setting "search.obj-thresh"
+              (Just "Search objective function threshold")
+              readParse show (knobA T.searchObjThresh) id]
+    , toList $ tabulatePsdChannels gain
     ]
-    
+  where
+    gain :: (forall a. Lens' (PsdChannels a) a) -> Setting
+    gain l =
+        Setting ("search.gains."<>name) (Just "Search objective gain")
+                readParse show (knobA T.searchObjGains) l
+      where
+        name = psdChannelNames ^. l
+
 coarseFbSettings :: [Setting]
-coarseFbSettings =
-       go (_Wrapped' . _x . sdDiff)
-    ++ go (_Wrapped' . _x . sdSum)
-    ++ go (_Wrapped' . _y . sdDiff)
-    ++ go (_Wrapped' . _y . sdSum)
+coarseFbSettings = concat $ toList $ tabulatePsdChannels go
   where
     go :: (forall a. Lens' (PsdChannels a) a) -> [Setting]
     go l = concat 
-      [ r3Setting "coarse.high.step" "Coarse feedback high step"
-                  (knobA T.coarseFbParams) (l . T.coarseStepHigh)
-      , r3Setting "coarse.low.step" "Coarse feedback low step"
-                  (knobA T.coarseFbParams) (l . T.coarseStepLow)
-      , [Setting "coarse.tol" (Just "Coarse feedback low step")
-                readParse show (knobA T.coarseFbParams) (l . T.coarseTolerance)]
-      ]
+        [ r3Setting ("coarse."<>name<>".high.step")
+                    "Coarse feedback high step"
+                    (knobA T.coarseFbParams)
+                    (l . T.coarseStepHigh)
+        , r3Setting ("coarse."<>name<>".low.step")
+                    "Coarse feedback low step"
+                    (knobA T.coarseFbParams)
+                    (l . T.coarseStepLow)
+        , [Setting "coarse.tol" (Just "Coarse feedback low step")
+                  readParse show
+                  (knobA T.coarseFbParams)
+                  (l . T.coarseTolerance)]
+        ]
+      where
+        name = psdChannelNames ^. l
 
 settings :: [Setting]
 settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
-    , psdSettings, searchSettings
+    , psdSettings, searchSettings, coarseFbSettings
     , [Setting "decimation" (Just "decimation factor of samples")
             readParse show (knobA T.adcDecimation) id]
     , [Setting "preamp.optimize.maxVar" (Just "Maximum variance allowed in PSD signal")
