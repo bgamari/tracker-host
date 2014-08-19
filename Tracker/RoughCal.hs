@@ -5,15 +5,11 @@ module Tracker.RoughCal ( roughScan
                         , roughCenter
                         ) where
 
-import Prelude hiding (product, sum, sequenceA, foldr)
-import Data.Function (on)
+import Prelude hiding (product, sum, foldr)
 import Control.Applicative
 import qualified Data.Vector as V
 import Data.Word
-import Data.Foldable
-import Data.Monoid
 import Data.Ord (comparing)
-import Data.Traversable
 import Control.Error
 import Control.Lens
 import Linear
@@ -23,7 +19,7 @@ import Tracker.Types
 import Tracker.Raster
 import Tracker.PathAcquire
 import Tracker.LowLevel
-import Tracker.RoughCal.Model
+--import Tracker.RoughCal.Model
 
 roughScan :: MonadIO m
           => Word32 -> RasterScan Stage Word16
@@ -41,7 +37,8 @@ center v =
         (maxPos,_) = V.maximumBy (comparing snd) v
     in lerp 0.5 minPos maxPos
 
-asDouble = realToFrac :: Real a => a -> Double
+asDouble :: Real a => a -> Double
+asDouble = realToFrac
 
 roughCenter :: V.Vector (Sensors Sample) -> Stage Double
 roughCenter v =
