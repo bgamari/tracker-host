@@ -40,7 +40,7 @@ library
 
 executable tracker-host
   main-is:             Main.hs
-  ghc-options:         -threaded
+  ghc-options:         -threaded -Wall
   build-depends:       base >=4.6,
                        transformers >=0.3 && <0.5,
                        binary ==0.7.*,
