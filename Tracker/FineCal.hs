@@ -13,7 +13,6 @@ import Control.Lens
 import Control.Monad
 import Data.List (foldl')
 import Data.Word
-import Data.Int
 import qualified Data.Vector as V
 import Linear
 import System.Random.MWC
@@ -78,8 +77,8 @@ thinSvd' xs =
 
 mean :: (Additive f, Fractional a) => V.Vector (f a) -> f a
 mean v =
-    let sum = V.foldl (^+^) zero v
-    in fmap (/ realToFrac (V.length v)) sum
+    let sum_ = V.foldl (^+^) zero v
+    in fmap (/ realToFrac (V.length v)) sum_
  
 fineCal :: V.Vector (Sensors Sample) -> (Psd (SumDiff Double), Psd (SumDiff (Stage Double)))
 fineCal points =
@@ -92,13 +91,15 @@ fineCal points =
     in (meanPsd, thinSvd' $ fmap center ps')
    
 fineScan :: (Applicative m, MonadIO m)
-         => FineScan -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
+         => FineScan
+         -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
 fineScan fs = do
     path <- liftIO $ withSystemRandom $ asGenIO $ \mwc->do
         let coord :: Word16 -> Word16 -> IO Word16
             coord center range = let range2 = range `div` 2
                                  in uniformR (center-range2, center+range2) mwc
-            point :: IO (Stage Word16)
-            point = T.sequence $ coord <$> fs ^. fineScanCenter <*> fs ^. fineScanRange
-        replicateM (fs ^. fineScanPoints) point
+            doPoint :: IO (Stage Word16)
+            doPoint = T.sequence
+                    $ coord <$> fs ^. fineScanCenter <*> fs ^. fineScanRange
+        replicateM (fs ^. fineScanPoints) doPoint
     pathAcquire (fs^.fineScanFreq) path

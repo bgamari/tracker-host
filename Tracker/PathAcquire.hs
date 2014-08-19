@@ -2,7 +2,6 @@ module Tracker.PathAcquire ( pathAcquire ) where
 
 import Control.Applicative
 import Control.Monad (when)
-import Data.Maybe (fromMaybe)
 import Data.Word
 import qualified Data.Vector as V
 import Control.Error
