@@ -2,7 +2,10 @@
 
 module Tracker.FineCal ( fineCal
                        , FineScan(..)
-                       , fineScanRange, fineScanCenter, fineScanPoints, fineScanFreq
+                       , fineScanRange
+                       , fineScanCenter
+                       , fineScanPoints
+                       , fineScanFreq
                        , fineScan
                        ) where
 
