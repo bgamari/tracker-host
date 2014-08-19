@@ -30,9 +30,6 @@ import Graphics.Rendering.GLPlot
 import qualified Graphics.UI.GLFW as GLFW
 import Graphics.Rendering.OpenGL.GL (GLfloat, Color4(..))
 
-fixPoints :: (VS.Storable a, Real a) => VS.Vector a -> VS.Vector (V2 GLfloat)
-fixPoints = VS.imap (\x y->V2 (realToFrac x) (realToFrac y))
-
 decimate :: Int -> V.Vector a -> V.Vector a
 decimate n = V.ifilter (\i _->i `mod` n == 0)
 
@@ -61,17 +58,6 @@ stageCurveParams =
                  $ cColor .~ color
                  $ cStyle .~ Lines
                  $ defaultCurve
-
-data UpDown = Up | Down
-
-roundUD :: RealFrac a => UpDown -> a -> a -> a
-roundUD ud k x
-  | b == 0    = k * realToFrac (a :: Int)
-  | otherwise = k * realToFrac a + bump
-  where (a, b) = properFraction (x / k)
-        bump = case ud of
-              Up     ->  1
-              Down   -> -1
 
 plotWorker :: TrackerQueue
            -> TVar PlotConfig
@@ -108,7 +94,7 @@ plotWorker tq configVar queue = do
         let update :: Curve -> RB.RingBuffer VS.Vector GLfloat -> IO ()
             update curve rb =
                 void $ RB.withItems rb $ setPoints curve . VS.imap (\i y->V2 (realToFrac i) y)
-        T.sequence (update <$> curves <*> rings)
+        F.sequence_ (update <$> curves <*> rings)
         go (t + 1e-5)
     drawer <- forkIO $ go 2
 
