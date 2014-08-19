@@ -61,15 +61,15 @@ writeTsv fname = BSL.writeFile fname . Csv.encodeWith opts
     where opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
 
 tryHead :: String -> [a] -> TrackerUI a
-tryHead err []    = throwError err
-tryHead _   (x:_) = return x
+tryHead e []    = throwError e
+tryHead _ (x:_) = return x
 
 tryRead :: Read a => String -> String -> TrackerUI a
-tryRead err = maybe (throwError err) return . Safe.readZ
+tryRead e = maybe (throwError e) return . Safe.readZ
 
 tryJust :: String -> Maybe a -> TrackerUI a
-tryJust err Nothing  = throwError err
-tryJust _   (Just a) = return a
+tryJust e Nothing  = throwError e
+tryJust _ (Just a) = return a
 
 command :: [String] -> String -> String -> ([String] -> TrackerUI ()) -> Command
 command name help args action = Cmd name (Just help) args (\a->action a >> return True)
@@ -93,7 +93,7 @@ center :: TrackerUI ()
 center = use centerPos >>= liftTrackerE . T.setRawPosition . fmap fromIntegral
 
 centerCmd :: Command
-centerCmd = command ["center"] help "" $ \args->center
+centerCmd = command ["center"] help "" $ \_->center
   where help = "Set stage at center position"
 
 scanCmd :: Command
@@ -108,7 +108,7 @@ scanCmd = command ["scan"] help "[file]" $ \args -> do
   where help = "Perform a scan and dump to file (uses rough scan parameters)"
 
 roughScanCmd :: Command
-roughScanCmd = command ["rough", "scan"] help "" $ \args->do
+roughScanCmd = command ["rough", "scan"] help "" $ \_->do
     rs <- uses roughScan $ (T.scanSize . _z .~ 0)
                          . (T.scanPoints . _z .~ 1)
     freq <- use roughScanFreq
@@ -118,7 +118,7 @@ roughScanCmd = command ["rough", "scan"] help "" $ \args->do
   where help = "Perform rough scan"
 
 roughCenterCmd :: Command
-roughCenterCmd = command ["rough", "center"] help "" $ \args->do
+roughCenterCmd = command ["rough", "center"] help "" $ \_->do
     scan <- use lastRoughScan >>= tryJust "No last rough calibration"
     let c = T.roughCenter scan
     liftInputT $ outputStrLn $ show c
@@ -129,8 +129,7 @@ roughCenterCmd = command ["rough", "center"] help "" $ \args->do
   where help = "Find center of particle from XY rough scan"
 
 roughZScanCmd :: Command
-roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
-    scan <- use lastRoughScan >>= tryJust "No last rough calibration"
+roughZScanCmd = command ["rough", "zscan"] help "" $ \_->do
     rs <- uses roughScan $ (T.scanSize . _y .~ 0)
                          . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
@@ -138,13 +137,6 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \args->do
     lastRoughZScan .= Just zScan
     center
   where help = "Perform rough Z scan"
-
-showMatrix :: (Show a, Functor f, Foldable f, Functor g, Foldable g)
-           => f (g a) -> String
-showMatrix xs = unlines $ F.toList $ fmap (F.fold . fmap pad) xs'
-  where xs' = fmap (fmap show) xs
-        maxLength = F.maximum $ fmap (F.maximum . fmap length) xs'
-        pad x = take (maxLength+4) $ x++repeat ' '
 
 roughFitCmd :: Command
 roughFitCmd = command ["rough", "fit"] help "" $ \args->do
@@ -167,7 +159,7 @@ showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]+
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 setPsdSetpointCmd :: Command
-setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \args->do
+setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
     liftTrackerE $ do
       s <- lift T.getSensorQueue >>= liftIO . atomically . readTChan
       let sample = V.head s ^. T.psd
@@ -191,13 +183,13 @@ dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
   where help = "Dump last rough Z calibration"
 
 fineScanCmd :: Command
-fineScanCmd = command ["fine", "scan"] help "" $ \args->do
+fineScanCmd = command ["fine", "scan"] help "" $ \_->do
     points <- use fineScan >>= liftTrackerE . T.fineScan
     lastFineScan ?= points
   where help = "Perform fine calibration scan"
 
 fineCalCmd :: Command
-fineCalCmd = command ["fine", "cal"] help "" $ \args->do
+fineCalCmd = command ["fine", "cal"] help "" $ \_->do
     s <- use fineScale
     points <- use lastFineScan >>= tryJust "No fine calibration scan"
     let (psdSetpt, gains) = T.fineCal points
@@ -205,7 +197,6 @@ fineCalCmd = command ["fine", "cal"] help "" $ \args->do
     liftTrackerE $ do
         T.setKnob T.psdGains gains'
         T.setKnob T.psdSetpoint $ over (mapped . mapped) round psdSetpt
-    let showF = showSigned (showEFloat (Just 2)) 1
     liftIO $ putStrLn "Feedback gains = "
     liftIO $ putStrLn $ unlines
            $ fmap (F.foldMap (\x->shows x "\t"))
@@ -223,7 +214,7 @@ fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
   where help = "Dump fine calibration points"
 
 readSensorsCmd :: Command
-readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
+readSensorsCmd = command ["sensors", "read"] help "" $ \_->do
     let showSensors s = unlines
             [ "Stage = "++F.foldMap (flip showSInt "\t") (s^.T.stage)
             , "PSD   = "++intercalate "\t" [ "x-sum="++showSInt (s^.T.psd._x.sdSum) ""
@@ -238,7 +229,7 @@ readSensorsCmd = command ["sensors", "read"] help "" $ \args->do
   where help = "Read sensors values"
 
 startPlotCmd :: Command
-startPlotCmd = command ["plot", "start"] help "" $ \args->do
+startPlotCmd = command ["plot", "start"] help "" $ \_->do
     plot <- use trackerPlot
     case plot of
       Nothing -> do
@@ -297,7 +288,7 @@ logStartCmd = command ["log","start"] help "FILE [DECIMATION]" $ \args->do
   where help = "Start logging sensor samples to given file"
 
 logStopCmd :: Command
-logStopCmd = command ["log","stop"] help "" $ \args->do
+logStopCmd = command ["log","stop"] help "" $ \_->do
     stop <- use stopLogger
     case stop of
         Nothing   -> throwError "Not currently logging"
@@ -312,13 +303,13 @@ sourceCmd = command ["source"] help "FILE" $ \args->do
   where help = "Execute commands from the given file"
 
 resetCmd :: Command
-resetCmd = command ["reset"] help "" $ \args->do
+resetCmd = command ["reset"] help "" $ \_->do
     liftTrackerE T.reset
     -- TODO: Quit or reconnect
   where help = "Perform hardware reset"
 
 eventCountersCmd :: Command
-eventCountersCmd = command ["event-counters"] help "" $ \args->do
+eventCountersCmd = command ["event-counters"] help "" $ \_->do
     liftTrackerE T.getEventCounters >>= liftInputT . outputStrLn . show
   where help = "Show event counters"
 
@@ -374,7 +365,7 @@ optimizePreAmp = command ["preamp", "optimize"] help "" $ \args->do
   where help = "Automatically optimize pre amplifier gains and offsets"
 
 resetPreAmp :: Command
-resetPreAmp = command ["preamp", "reset"] help "" $ \args->do
+resetPreAmp = command ["preamp", "reset"] help "" $ \_->do
     pa <- tryJust "No pre-amplifier open" =<< use preAmp
     let reset ch = PreAmp.setOffset pa ch 0 >> PreAmp.setGain pa ch 0
     void $ liftEitherT $ traverse reset PreAmp.channels
@@ -397,8 +388,8 @@ preAmpCmds = concat [ cmd (_Wrapping' PsdChans . _x . sdSum) "xsum"
                 preAmpValues . proj . PreAmp.gain .= fromIntegral gain
                 return True
             , Cmd ["get", "amp."++name++".gain"]
-                  (Just "Get pre-amplifier gain") "" $ \args -> do
-                uses (preAmpValues . proj . gain) print
+                  (Just "Get pre-amplifier gain") "" $ \_ -> do
+                void $ uses (preAmpValues . proj . gain) print
                 return True
             , Cmd ["set", "amp."++name++".offset"]
                   (Just "Set pre-amplifier offset") "[OFFSET]" $ \args -> do
@@ -408,8 +399,8 @@ preAmpCmds = concat [ cmd (_Wrapping' PsdChans . _x . sdSum) "xsum"
                 preAmpValues . proj . PreAmp.offset .= fromIntegral offset
                 return True
             , Cmd ["get", "amp."++name++".offset"]
-                  (Just "Get pre-amplifier offset") "" $ \args -> do
-                uses (preAmpValues . proj . PreAmp.offset) print
+                  (Just "Get pre-amplifier offset") "" $ \_ -> do
+                void $ uses (preAmpValues . proj . PreAmp.offset) print
                 return True
             ]
           where ch = PreAmp.channels ^. proj
@@ -417,13 +408,13 @@ preAmpCmds = concat [ cmd (_Wrapping' PsdChans . _x . sdSum) "xsum"
 exciteCmds :: [Command]
 exciteCmds =
     [ command ["excite", "start"]
-      "Start excitation" "" $ \args->
+      "Start excitation" "" $ \_->
         use excitation >>= liftTrackerE . T.configureExcitation . fmap maybeExciteChannel
     , command ["excite", "stop"]
-      "Stop excitation" "" $ \args->do
+      "Stop excitation" "" $ \_->do
         liftTrackerE $ T.configureExcitation (pure Nothing)
     , command ["excite", "cal"]
-      "Run calibration" "" $ \args->do
+      "Run calibration" "" $ \_->do
         samples <- use corrPoints >>= liftTracker . fetchPoints
         let test = fmap (view (psd . _x . sdDiff)) samples
         decimation <- liftTrackerE $ T.getKnob T.adcDecimation
@@ -469,17 +460,17 @@ fetchPoints n = do
 
 feedbackCmds :: [Command]
 feedbackCmds =
-    [ command ["feedback", "stop"] "Stop feedback" "" $ \args->
+    [ command ["feedback", "stop"] "Stop feedback" "" $ \_->
         liftTrackerE $ T.setKnob T.feedbackMode T.NoFeedback
-    , command ["feedback", "psd"] "Start PSD feedback" "" $ \args->
+    , command ["feedback", "psd"] "Start PSD feedback" "" $ \_->
         liftTrackerE $ T.setKnob T.feedbackMode T.PsdFeedback
-    , command ["feedback", "stage"] "Start stage feedback" "" $ \args->
+    , command ["feedback", "stage"] "Start stage feedback" "" $ \_->
         liftTrackerE $ T.setKnob T.feedbackMode T.StageFeedback
-    , command ["feedback", "search"] "Start particle search feedback" "" $ \args->
+    , command ["feedback", "search"] "Start particle search feedback" "" $ \_->
         liftTrackerE $ T.setKnob T.feedbackMode T.SearchFeedback
-    , command ["feedback", "coarse"] "Start coarse feedback" "" $ \args->
+    , command ["feedback", "coarse"] "Start coarse feedback" "" $ \_->
         liftTrackerE $ T.setKnob T.feedbackMode T.CoarseFeedback
-    , command ["feedback", "status"] "Show feedback status" "" $ \args->
+    , command ["feedback", "status"] "Show feedback status" "" $ \_->
         liftTrackerE (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
     ]
 
@@ -493,19 +484,11 @@ readParse :: Read a => [String] -> Maybe a
 readParse [] = Nothing
 readParse (a:_) = Safe.readZ a
 
-readParse' :: (Read a, Traversable f, Applicative f)
-           => [String] -> Either String (f a)
-readParse' = sequence . evalState go
-  where go = sequence (pure $ state parse)
-        --parse :: [String] -> (Either String a, [String])
-        parse []     = (Left "Too few arguments",               [])
-        parse (x:xs) = (note "Unable to parse" $ Safe.readZ x,  xs)
-
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
   where get = sAccessors ^. aGet
         put = sAccessors ^. aPut
-        getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \args->
+        getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \_->
                    get >>= showValue . view sLens >> return True
         setter = Cmd ["set",sName] (("Set "++) <$> sHelp) "VALUE" $ \args->
                    case sParse args of
@@ -703,8 +686,8 @@ runCommand input = do
     let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
     case cmds of
       cmd:[]  -> do let Just rest = stripPrefix (cmd^.cmdName) input
-                    catchError (cmd^.cmdAction $ rest) $ \err->do
-                        liftInputT $ outputStrLn $ "error: "++err
+                    catchError (cmd^.cmdAction $ rest) $ \e->do
+                        liftInputT $ outputStrLn $ "error: "++e
                         return True
       []      -> do liftInputT $ outputStrLn $ "Unknown command: "++unwords input
                     return True
