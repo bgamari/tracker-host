@@ -11,7 +11,6 @@ import Tracker.Types
 import Tracker.LowLevel
 import Tracker.Commands
 import qualified Data.Vector as V
-import Data.Int
 import Data.List (maximumBy)
 import Data.Ord (comparing)
 import Control.Applicative

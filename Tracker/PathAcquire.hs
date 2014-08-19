@@ -1,7 +1,7 @@
 module Tracker.PathAcquire ( pathAcquire ) where
 
 import Control.Applicative
-import Control.Monad (when, liftM)
+import Control.Monad (when)
 import Data.Maybe (fromMaybe)
 import Data.Word
 import qualified Data.Vector as V
@@ -11,7 +11,6 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, wait)
 import Control.Concurrent.STM ( TChan, atomically, tryReadTChan
                               , TVar, newTVarIO, writeTVar, readTVar)
-import Linear
 
 import Tracker.LowLevel
 import Tracker.Commands

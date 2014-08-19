@@ -13,7 +13,6 @@ import System.Hardware.Serialport
 import System.IO
 import Tracker.Types
 import Linear
-import Control.Applicative
 import Control.Error.Util (tryIO)
 import Control.Monad.Trans.Either
 import Control.Monad.Trans

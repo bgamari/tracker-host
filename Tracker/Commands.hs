@@ -44,8 +44,6 @@ import Prelude hiding (mapM_, sequence, sequence_, mapM)
 import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get
-import Data.Maybe
-import Data.Word
 import Data.Int
 import Data.Traversable
 import Data.Foldable
@@ -54,10 +52,8 @@ import Data.ByteString (ByteString)
 import qualified Data.Vector as V       
 import Control.Error
 import Control.Applicative
-import Control.Monad (liftM)
 import Control.Monad.IO.Class
 
-import Control.Lens
 import Linear
 
 import Tracker.LowLevel
@@ -268,7 +264,7 @@ enqueuePoints points
       case r of 
         Nothing                     -> return Nothing
         Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
-        otherwise                   -> return Nothing
+        _                           -> return Nothing
 
 isPathRunning :: MonadIO m => EitherT String (TrackerT m) Bool
 isPathRunning = do

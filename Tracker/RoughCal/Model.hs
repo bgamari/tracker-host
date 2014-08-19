@@ -6,7 +6,6 @@ import Control.Applicative
 import Data.Ord
 import Data.Foldable
 import Data.Traversable
-import Data.Monoid
 import qualified Data.Vector as V
 import Linear
 import Optimization.LineSearch.ConjugateGradient
