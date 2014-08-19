@@ -456,6 +456,8 @@ feedbackCmds =
         liftTrackerE $ T.setKnob T.feedbackMode T.StageFeedback
     , command ["feedback", "search"] "Start particle search feedback" "" $ \args->
         liftTrackerE $ T.setKnob T.feedbackMode T.SearchFeedback
+    , command ["feedback", "coarse"] "Start coarse feedback" "" $ \args->
+        liftTrackerE $ T.setKnob T.feedbackMode T.CoarseFeedback
     , command ["feedback", "status"] "Show feedback status" "" $ \args->
         liftTrackerE (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
     ]
@@ -593,6 +595,23 @@ searchSettings = concat
             readParse show (knobA T.searchObjThresh) id
       ]
     ]
+    
+coarseFbSettings :: [Setting]
+coarseFbSettings =
+       go (_Wrapped' . _x . sdDiff)
+    ++ go (_Wrapped' . _x . sdSum)
+    ++ go (_Wrapped' . _y . sdDiff)
+    ++ go (_Wrapped' . _y . sdSum)
+  where
+    go :: (forall a. Lens' (PsdChannels a) a) -> [Setting]
+    go l = concat 
+      [ r3Setting "coarse.high.step" "Coarse feedback high step"
+                  (knobA T.coarseFbParams) (l . T.coarseStepHigh)
+      , r3Setting "coarse.low.step" "Coarse feedback low step"
+                  (knobA T.coarseFbParams) (l . T.coarseStepLow)
+      , [Setting "coarse.tol" (Just "Coarse feedback low step")
+                readParse show (knobA T.coarseFbParams) (l . T.coarseTolerance)]
+      ]
 
 settings :: [Setting]
 settings = concat
