@@ -79,6 +79,12 @@ putInt32le = putWord32le . fromIntegral
 getInt32le :: Get Int32
 getInt32le = fromIntegral <$> getWord32le
 
+putInt16le :: Int16 -> Put
+putInt16le = putWord16le . fromIntegral
+
+getInt16le :: Get Int16
+getInt16le = fromIntegral <$> getWord16le
+
 data Knob a = Knob { _knobName    :: String 
                    , _knobGetCmd  :: CmdId
                    , _knobDecode  :: Get a
@@ -292,11 +298,11 @@ searchObjThresh = Knob "search-obj-thresh" 0x47 getWord16le 0x48 putWord16le
 instance Binary CoarseFbChannel where
     get = CoarseFbChan <$> getV3 <*> getV3 <*> getWord16le
       where
-        getV3 :: Get (V3 Word16)
-        getV3 = sequence $ pure getWord16le
+        getV3 :: Get (V3 Int16)
+        getV3 = sequence $ pure getInt16le
     put (CoarseFbChan h l t) = do
-        traverse putWord16le h
-        traverse putWord16le l
+        traverse putInt16le h
+        traverse putInt16le l
         putWord16le t
 
 coarseFbParams :: Knob (PsdChannels CoarseFbChannel)
