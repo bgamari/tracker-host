@@ -16,6 +16,8 @@ library
 
   other-modules:       Tracker.Commands.Types
 
+  ghc-options:         -Wall
+
   build-depends:       base >=4.6,
                        transformers >=0.3 && <0.5,
                        binary ==0.7.*,
