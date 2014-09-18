@@ -3,6 +3,7 @@
 module Tracker.LowLevel
     ( TrackerT
     , withTracker
+    , SensorQueue
     , getSensorQueue
     , CmdId
     , writeCommand
