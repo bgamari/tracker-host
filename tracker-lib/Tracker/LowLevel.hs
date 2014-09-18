@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving #-}
-               
+
 module Tracker.LowLevel
     ( TrackerT
     , withTracker
@@ -16,7 +16,7 @@ module Tracker.LowLevel
 import System.USB
 import Control.Applicative
 import Control.Monad.IO.Class
-import Control.Monad (liftM)
+import Control.Monad (liftM, forever, when)
 import Data.Word
 import Data.Int
 import Data.Traversable
@@ -30,9 +30,9 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
 
 import Control.Error
-import Control.Monad.Morph
-import Control.Monad.Reader
 import System.Console.Haskeline.MonadException
+import Control.Monad.Morph
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Concurrent.STM
 import Control.Concurrent.Async
