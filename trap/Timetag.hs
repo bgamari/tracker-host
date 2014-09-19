@@ -28,12 +28,23 @@ open :: FilePath -> IO Timetag
 open path = do
     s <- socket AF_UNIX Stream defaultProtocol
     connect s (SockAddrUnix path)
+    --ready <- liftIO $ recv s 128
+    recvUntil '\n' s >>= print
     return $ Timetag s
+
+recvUntil :: Char -> Socket -> IO BS.ByteString
+recvUntil term s = go BS.empty
+  where
+    go accum = do
+        c <- liftIO $ recv s 1
+        if c == BS.singleton term
+          then return accum
+          else go (accum <> c)
 
 command :: BS.ByteString -> Timetag -> EitherT String IO (Maybe BS.ByteString)
 command cmd (Timetag s) = do
     liftIO $ void $ send s cmd
-    reply <- liftIO $ recv s 128
+    reply <- liftIO $ recvUntil '\n' s
     case () of
       _ | BS.null reply                 -> left "timetag_acquire connection terminated"
       _ | "= " `BS.isPrefixOf` reply    -> return $ Just $ BS.drop 2 reply
