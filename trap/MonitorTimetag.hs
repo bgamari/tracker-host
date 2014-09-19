@@ -29,7 +29,6 @@ monitor tt name = bracket start cleanup go
     start = failEitherT $ do
         (readFd, writeFd) <- liftIO $ createPipe
         addOutputFd tt name writeFd
-        liftIO $ closeFd writeFd
         liftIO $ fdToHandle readFd
 
     cleanup readH = failEitherT $ do
