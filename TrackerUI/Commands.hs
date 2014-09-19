@@ -163,8 +163,9 @@ setPsdSetpointCmd :: Command
 setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
     liftTrackerE $ do
       s <- lift T.getSensorQueue >>= liftIO . atomically . readTChan
-      let sample = V.head s ^. T.psd
-      T.setKnob T.psdSetpoint (sample & mapped . mapped %~ fromIntegral)
+      let sum_ = V.foldl (\acc x->acc ^+^ (x ^. T.psd)) zero s
+          n = fromIntegral $ V.length s
+      T.setKnob T.psdSetpoint (sum_ & mapped . mapped %~ \x->fromIntegral x `div` n)
   where help = "Set PSD feedback setpoint to current sensor values"
 
 dumpRoughCmd :: Command
