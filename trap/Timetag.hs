@@ -7,7 +7,7 @@ module Timetag
     , stopCapture
     , resetCounter
     , isCaptureRunning
-    , OutputName (..)
+    , OutputId
     , addOutputFd
     , removeOutput
     ) where
@@ -43,15 +43,22 @@ recvUntil term s = go BS.empty
           else go (accum <> c)
 
 command :: BS.ByteString -> Timetag -> EitherT String IO (Maybe BS.ByteString)
-command cmd (Timetag s) = do
+command cmd tt@(Timetag s) = do
     liftIO $ send s cmd
+    readReply tt
+
+readReply :: Timetag -> EitherT String IO (Maybe BS.ByteString)
+readReply (Timetag s) = do
     reply <- liftIO $ recvUntil '\n' s
     case () of
-      _ | BS.null reply                 -> left "timetag_acquire connection terminated"
+      _ | BS.null reply                 ->
+          left "Timetag.readReply: timetag_acquire connection terminated"
       _ | "= " `BS.isPrefixOf` reply    -> return $ Just $ BS.drop 2 reply
       _ | "ready" `BS.isPrefixOf` reply -> return Nothing
-      _ | "error" `BS.isPrefixOf` reply -> left $ "error reply: "++show reply
-      _ | otherwise                     -> left $ "unknown reply: "++show reply
+      _ | "error" `BS.isPrefixOf` reply ->
+          left $ "Timetag.readReply: error reply: "++show reply
+      _ | otherwise                     ->
+          left $ "Timetag.readReply: unknown reply: "++show reply
 
 startCapture :: Timetag -> EitherT String IO ()
 startCapture = void . command "start_capture\n"
@@ -62,17 +69,29 @@ stopCapture = void . command "stop_capture\n"
 resetCounter :: Timetag -> EitherT String IO ()
 resetCounter = void . command "reset_counter\n"
 
-newtype OutputName = OutputName BS.ByteString
+newtype OutputId = OutputId Int deriving (Show, Eq, Ord)
 
-addOutputFd :: Timetag -> OutputName -> Fd -> EitherT String IO ()
-addOutputFd tt@(Timetag s) (OutputName name) (Fd fd) = do
+addOutputFd :: Timetag
+            -> BS.ByteString  -- ^ Friendly name
+            -> Fd             -- ^ The fd to recieve the output
+            -> EitherT String IO OutputId
+addOutputFd tt@(Timetag s) name (Fd fd) = do
     liftIO $ send s ("add_output_fd "<>name<>"\n")
     liftIO $ threadDelay 10000
     liftIO $ sendFd s fd
+    reply <- readReply tt
+    case reply of
+      Just reply'
+        | [(outputId,_)] <- reads $ BS.unpack reply' ->
+          return $ OutputId outputId
+        | otherwise ->
+          left "Timetag.addOutputFd: Couldn't parse reply"
+      Nothing        ->
+          left "Timetag.addOutputFd: Expected reply"
 
-removeOutput :: Timetag -> OutputName -> EitherT String IO ()
-removeOutput tt (OutputName name) = do
-    void $ command ("remove_output "<>name<>"\n") tt
+removeOutput :: Timetag -> OutputId -> EitherT String IO ()
+removeOutput tt (OutputId outputId) = do
+    void $ command ("remove_output "<>BS.pack (show outputId)<>"\n") tt
 
 isCaptureRunning :: Timetag -> EitherT String IO Bool
 isCaptureRunning tt = do

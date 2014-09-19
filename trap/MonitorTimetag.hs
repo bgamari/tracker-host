@@ -8,6 +8,8 @@ import Control.Lens
 import System.Posix.IO.ByteString
 import System.IO (Handle)
 
+import qualified Data.ByteString as BS
+
 import Pipes
 import Pipes.Safe
 import Pipes.Binary
@@ -23,19 +25,20 @@ failEitherT m = do
       Left e -> fail e
       Right r -> return r
 
-monitor :: Timetag -> OutputName -> Producer Record (SafeT IO) ()
+monitor :: Timetag -> BS.ByteString -> Producer Record (SafeT IO) ()
 monitor tt name = bracket start cleanup go
   where
     start = failEitherT $ do
         (readFd, writeFd) <- liftIO $ createPipe
-        addOutputFd tt name writeFd
-        liftIO $ fdToHandle readFd
+        outputId <- addOutputFd tt name writeFd
+        readH <- liftIO $ fdToHandle readFd
+        return (readH, outputId)
 
-    cleanup readH = failEitherT $ do
-        removeOutput tt name
+    cleanup (_, outputId) = failEitherT $ do
+        removeOutput tt outputId
 
-    go :: Handle -> Producer Record (SafeT IO) ()
-    go readH = do
+    go :: (Handle, OutputId) -> Producer Record (SafeT IO) ()
+    go (readH, _) = do
         res <- PBS.fromHandle readH ^. decoded
         case res of
           Left (e,_) -> fail $ show e

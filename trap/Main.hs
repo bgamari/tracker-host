@@ -41,7 +41,7 @@ scan = RasterScan { _scanCenter = zero
 
 main = do
     tt <- TT.open "/tmp/timetag.sock"
-    let mon = monitor tt (OutputName "trapping")
+    let mon = monitor tt "trapping"
     counts <- newBroadcastTChanIO :: IO (TChan BinCount)
     forkIO $ runSafeT $ runEffect $ mon >-> binRecords binWidth >-> toTChan counts
     let config = TrapC { bleached = (< 200)
