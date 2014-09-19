@@ -1,0 +1,32 @@
+name:                trap
+version:             0.1.0.0
+synopsis:            Particle trapping
+-- description:         
+license:             BSD3
+license-file:        LICENSE
+author:              Ben Gamari
+maintainer:          bgamari@gmail.com
+copyright:           (c) 2014 Ben Gamari
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable trap
+  main-is:             Main.hs
+  other-extensions:    OverloadedStrings
+  build-depends:       base >=4.7 && <4.8,
+                       errors >=1.4 && <1.5,
+                       transformers >=0.4 && <0.5,
+                       bytestring >=0.10 && <0.11,
+                       network >=2.5 && <2.7,
+                       unix,
+                       stm,
+                       vector,
+                       lens >=4.3 && <4.5,
+                       linear,
+                       pipes >=4.1 && <4.2,
+                       pipes-bytestring >=2.1 && <2.2,
+                       pipes-binary,
+                       pipes-safe,
+                       hphoton-fpga-timetagger,
+                       tracker-lib
+  default-language:    Haskell2010

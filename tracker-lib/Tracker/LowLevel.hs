@@ -1,8 +1,9 @@
 {-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving #-}
-               
+
 module Tracker.LowLevel
     ( TrackerT
     , withTracker
+    , SensorQueue
     , getSensorQueue
     , CmdId
     , writeCommand
@@ -16,7 +17,7 @@ module Tracker.LowLevel
 import System.USB
 import Control.Applicative
 import Control.Monad.IO.Class
-import Control.Monad (liftM)
+import Control.Monad (liftM, forever, when)
 import Data.Word
 import Data.Int
 import Data.Traversable
@@ -30,9 +31,9 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Vector as V
 
 import Control.Error
-import Control.Monad.Morph
-import Control.Monad.Reader
 import System.Console.Haskeline.MonadException
+import Control.Monad.Morph
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Concurrent.STM
 import Control.Concurrent.Async
@@ -42,24 +43,24 @@ import Linear
 import Tracker.Types
 
 type SensorQueue = TChan (V.Vector (Sensors Int16))
-       
-type CmdId = Word8 
+
+type CmdId = Word8
 
 data Env = Env { _device         :: DeviceHandle
                , _sensorQueue    :: SensorQueue
                }
 makeLenses ''Env
-     
+
 newtype TrackerT m a = TrackerT {getTrackerT :: ReaderT Env m a}
                      deriving ( Functor, Applicative, Monad , MonadIO, MonadException )
-        
+
 instance MonadTrans TrackerT where
     lift = TrackerT . lift
 
 instance MFunctor TrackerT where
     hoist f (TrackerT m) = TrackerT $ ReaderT $ \r->f $ runReaderT m r
 
--- | This is required for async which is monomorphic in IO            
+-- | This is required for async which is monomorphic in IO
 liftThrough :: MonadIO m => (IO a -> IO b) -> TrackerT IO a -> TrackerT m b
 liftThrough f (TrackerT a) = TrackerT $ do
     r <- ask
@@ -98,7 +99,7 @@ withTracker m = do
     case toList devices of
       []     -> return $ Left "No device found"
       dev:_  -> Right `liftM` withTracker' dev m
-    
+
 withTracker' :: MonadIO m => Device -> TrackerT m a -> m a
 withTracker' device m = do
     h <- liftIO $ openDevice device
@@ -110,7 +111,7 @@ withTracker' device m = do
 
 getSensorQueue :: MonadIO m => TrackerT m SensorQueue
 getSensorQueue = TrackerT (view sensorQueue) >>= liftIO . atomically . dupTChan
-    
+
 getInt16le :: Get Int16
 getInt16le = fromIntegral `fmap` getWord16le
 
@@ -171,7 +172,7 @@ readReply = EitherT $ withDeviceIO $ \h->do
         _ | BS.length d < 2    -> Left "Reply too short"
           | statusCode == 0x06 -> Right $ Just $ BS.drop 2 d
           | otherwise          -> Right Nothing
-                       
+
 readAck :: MonadIO m => String -> EitherT String (TrackerT m) ()
 readAck when = do
     a <- readReply

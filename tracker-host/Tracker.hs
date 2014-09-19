@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}                
+{-# LANGUAGE RecordWildCards #-}
 
 module Tracker
     ( -- * Tracker monad
