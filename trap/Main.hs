@@ -35,7 +35,7 @@ data TrapConfig = TrapC { bleached :: BinCount -> Bool
 
 scan :: RasterScan T.Stage Double
 scan = RasterScan { _scanCenter = zero
-                  , _scanSize   = T.mkStage 6000 6000 0
+                  , _scanSize   = T.mkStage 30000 30000 0
                   , _scanPoints = T.mkStage 100 100 1
                   }
 
@@ -50,22 +50,31 @@ main = do
     result <- T.withTracker $ runEitherT $ do
          T.setKnob T.feedbackMode T.StageFeedback
          T.setKnob T.stageSetpoint zero
-         runStateT (run config counts)
+         T.setKnob T.adcDecimation 10
+         T.startAdcStream
+         T.setKnob T.adcTriggerMode T.TriggerAuto
+         runStateT (run config tt counts)
                    (cycle $ map (fmap round) $ rasterScan sequenceA scan)
     either print (const $ return ()) result
     return ()
 
-run :: TrapConfig -> TChan BinCount
+liftEitherIO :: MonadIO m => EitherT e IO a -> EitherT e m a
+liftEitherIO m = liftIO (runEitherT m) >>= EitherT . return
+
+run :: TrapConfig -> Timetag -> TChan BinCount
     -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) r
-run config counts = forever $ do
+run config tt counts = forever $ do
     findParticle config
+    lift $ liftEitherIO $ TT.startCapture tt
     liftIO (waitUntilBleached config counts)
+    lift $ liftEitherIO $ TT.stopCapture tt
 
 findParticle :: TrapConfig -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
 findParticle config = do
     let go = do
             p:rest <- get
             put rest
+            liftIO $ putStrLn $ "Position = "++show p
             lift $ T.setKnob T.stageSetpoint p
             queue <- lift $ lift T.getSensorQueue
             s <- liftIO $ atomically $ readTChan queue
@@ -79,6 +88,7 @@ waitUntilBleached config countsChan = do
     ch <- atomically $ dupTChan countsChan
     let go = do
             count <- atomically $ readTChan ch
+            putStrLn $ "bin count = "++show count
             when (not $ bleached config count) go
     go
     return ()

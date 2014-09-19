@@ -17,6 +17,7 @@ import Control.Monad (void)
 import Control.Monad.IO.Class
 import Data.Monoid
 import qualified Data.ByteString.Char8 as BS
+import Control.Concurrent (threadDelay)
 
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString
@@ -43,7 +44,7 @@ recvUntil term s = go BS.empty
 
 command :: BS.ByteString -> Timetag -> EitherT String IO (Maybe BS.ByteString)
 command cmd (Timetag s) = do
-    liftIO $ void $ send s cmd
+    liftIO $ send s cmd
     reply <- liftIO $ recvUntil '\n' s
     case () of
       _ | BS.null reply                 -> left "timetag_acquire connection terminated"
@@ -65,7 +66,8 @@ newtype OutputName = OutputName BS.ByteString
 
 addOutputFd :: Timetag -> OutputName -> Fd -> EitherT String IO ()
 addOutputFd tt@(Timetag s) (OutputName name) (Fd fd) = do
-    command ("add_output_fd "<>name<>"\n") tt
+    liftIO $ send s ("add_output_fd "<>name<>"\n")
+    liftIO $ threadDelay 10000
     liftIO $ sendFd s fd
 
 removeOutput :: Timetag -> OutputName -> EitherT String IO ()
