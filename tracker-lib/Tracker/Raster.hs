@@ -17,7 +17,7 @@ import Data.Traversable
 import Data.Foldable
 import Linear
 import Control.Lens
-    
+
 data RasterScan f a = RasterScan { _scanCenter :: f a
                                  , _scanSize   :: f a
                                  , _scanPoints :: f Int
@@ -61,8 +61,7 @@ rasterScan sequenceA s =
 
 rasterSine :: (RealFloat a, Foldable f, Applicative f)
            => f a -> f a -> f a -> Int -> [f a]
-rasterSine center amp period n = 
+rasterSine center amp period n =
     map (\i->f $ realToFrac i / realToFrac n * t) [0..n-1]
   where t = maximum period
         f t = (\c a p->c + a/2 * sin (2*pi*t/p)) <$> center <*> amp <*> period
-
