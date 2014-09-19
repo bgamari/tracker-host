@@ -12,7 +12,8 @@ library
   exposed-modules:     Tracker.Types,
                        Tracker.Types.Fixed,
                        Tracker.LowLevel,
-                       Tracker.Commands
+                       Tracker.Commands,
+                       Tracker.Raster
 
   other-modules:       Tracker.Commands.Types
 
