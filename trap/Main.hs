@@ -44,7 +44,7 @@ main = do
     let mon = monitor tt (OutputName "trapping")
     counts <- newBroadcastTChanIO :: IO (TChan BinCount)
     forkIO $ runSafeT $ runEffect $ mon >-> binRecords binWidth >-> toTChan counts
-    let config = TrapC { bleached = (>200)
+    let config = TrapC { bleached = (< 200)
                        , foundParticle = const True
                        }
     result <- T.withTracker $ runEitherT $ do
