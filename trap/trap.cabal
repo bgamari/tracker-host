@@ -20,6 +20,7 @@ executable trap
                        network >=2.5 && <2.7,
                        unix,
                        stm,
+                       async,
                        vector,
                        lens >=4.2 && <4.5,
                        linear,

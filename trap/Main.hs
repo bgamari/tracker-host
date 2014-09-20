@@ -7,7 +7,7 @@ import Control.Monad.Trans.State
 import Data.Traversable
 import Data.Word
 import Data.Int
-import Control.Concurrent (forkIO)
+import Control.Concurrent.Async
 import Control.Concurrent.STM
 
 import qualified Data.Vector as V
@@ -43,7 +43,7 @@ main = do
     tt <- TT.open "/tmp/timetag.sock"
     let mon = monitor tt "trapping"
     counts <- newBroadcastTChanIO :: IO (TChan BinCount)
-    forkIO $ runSafeT $ runEffect $ mon >-> binRecords binWidth >-> toTChan counts
+    async $ runSafeT $ runEffect $ mon >-> binRecords binWidth >-> toTChan counts
     let config = TrapC { bleached = (< 200)
                        , foundParticle = const True
                        }
