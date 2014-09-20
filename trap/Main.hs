@@ -50,7 +50,7 @@ main = do
     result <- T.withTracker $ runEitherT $ do
          T.setKnob T.feedbackMode T.StageFeedback
          T.setKnob T.stageSetpoint zero
-         T.setKnob T.adcDecimation 10
+         T.setKnob T.adcDecimation 2
          T.startAdcStream
          T.setKnob T.adcTriggerMode T.TriggerAuto
          runStateT (run config tt counts)
