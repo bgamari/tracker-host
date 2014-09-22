@@ -16,6 +16,7 @@ import Control.Lens
 import Linear
 import Pipes
 import Pipes.Safe
+import qualified Pipes.Prelude as PP
 
 import qualified Tracker.LowLevel as T
 import qualified Tracker.Commands as T
@@ -23,7 +24,8 @@ import qualified Tracker.Types as T
 import Tracker.Raster
 import MonitorTimetag
 import Timetag as TT
-import HPhoton.IO.FpgaTimetagger
+import HPhoton.IO.FpgaTimetagger.Pipes
+import HPhoton.Types (Time)
 
 type BinCount = Int
 
@@ -43,7 +45,13 @@ main = do
     tt <- TT.open "/tmp/timetag.sock"
     let mon = monitor tt "trapping"
     counts <- newBroadcastTChanIO :: IO (TChan BinCount)
-    async $ runSafeT $ runEffect $ mon >-> binRecords binWidth >-> toTChan counts
+    async $ runSafeT
+          $ runEffect $ mon
+                    >-> unwrapRecords
+                    >-> PP.map snd
+                    >-> binRecords binWidth
+                    >-> toTChan counts
+
     let config = TrapC { bleached = (< 200)
                        , foundParticle = const True
                        }
@@ -93,12 +101,12 @@ waitUntilBleached config countsChan = do
     go
     return ()
 
-binRecords :: Monad m => Word64 -> Pipe Record Int m r
+binRecords :: MonadIO m => Time -> Pipe Time Int m r
 binRecords binWidth = go 0 0
   where
     go count bin = do
-      r <- await
-      let t = r ^. recTime
+      t <- await
+      liftIO $ print t
       if t `div` binWidth > bin
         then yield count >> go 0 (t `div` binWidth)
         else go (count+1) bin
