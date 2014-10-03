@@ -90,6 +90,7 @@ run :: TrapConfig -> Timetag -> TChan BinCount
     -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) r
 run config tt counts = forever $ do
     findParticle config
+
     lift $ liftEitherIO $ TT.startCapture tt
     liftIO $ threadDelay $ 1000*1000
     liftIO $ setExcitation True
@@ -97,17 +98,24 @@ run config tt counts = forever $ do
     liftIO $ setExcitation False
     liftIO $ threadDelay $ 1000*1000
     lift $ liftEitherIO $ TT.stopCapture tt
+
     liftIO $ setTrap True
-    liftIO $ threadDelay $ 1000*1000
+    advancePoints 10
+    liftIO $ threadDelay $ 1000*100
     liftIO $ setTrap False
+
+advancePoints :: Int -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
+advancePoints n = do
+    pts <- get
+    let p:rest = drop n pts
+    put rest
+    liftIO $ putStrLn $ "Position = "++show p
+    lift $ T.setKnob T.stageSetpoint p
 
 findParticle :: TrapConfig -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
 findParticle config = do
     let go = do
-            p:rest <- get
-            put rest
-            liftIO $ putStrLn $ "Position = "++show p
-            lift $ T.setKnob T.stageSetpoint p
+            advancePoints 1
             queue <- lift $ lift T.getSensorQueue
             s <- liftIO $ atomically $ readTChan queue
             let psd = V.map (^. (T.psd . _Unwrapped')) s
