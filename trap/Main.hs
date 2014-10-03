@@ -46,11 +46,12 @@ scan = RasterScan { _scanCenter = zero
                   , _scanPoints = T.mkStage 100 100 1
                   }
 
-setTrap :: Bool -> IO ()
-setTrap on = callProcess "thorlabs-laser" [if on then "--on" else "--off"]
+setTrap :: MonadIO m => Bool -> m ()
+setTrap on =
+    liftIO $ callProcess "thorlabs-laser" [if on then "--on" else "--off"]
 
-setExcitation :: Bool -> IO ()
-setExcitation on = do
+setExcitation :: MonadIO m => Bool -> m ()
+setExcitation on = liftIO $ do
     let args = ["set", "-c1", if on then "--on" else "--off"]
     callProcess "aotf-config" args
 
@@ -86,23 +87,26 @@ main = do
 liftEitherIO :: MonadIO m => EitherT e IO a -> EitherT e m a
 liftEitherIO m = liftIO (runEitherT m) >>= EitherT . return
 
+delayMillis :: MonadIO m => Int -> m ()
+delayMillis n = liftIO $ threadDelay (n*1000)
+
 run :: TrapConfig -> Timetag -> TChan BinCount
     -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) r
 run config tt counts = forever $ do
     findParticle config
 
     lift $ liftEitherIO $ TT.startCapture tt
-    liftIO $ threadDelay $ 1000*1000
-    liftIO $ setExcitation True
-    liftIO (waitUntilBleached config counts)
-    liftIO $ setExcitation False
-    liftIO $ threadDelay $ 1000*1000
+    delayMillis 1000
+    setExcitation True
+    waitUntilBleached config counts
+    setExcitation False
+    delayMillis 1000
     lift $ liftEitherIO $ TT.stopCapture tt
 
-    liftIO $ setTrap True
+    setTrap True
     advancePoints 10
-    liftIO $ threadDelay $ 1000*100
-    liftIO $ setTrap False
+    delayMillis 100
+    setTrap False
 
 advancePoints :: Int -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
 advancePoints n = do
@@ -123,8 +127,8 @@ findParticle config = do
     liftIO $ putStrLn "Searching for particle"
     go
 
-waitUntilBleached :: TrapConfig -> TChan BinCount -> IO ()
-waitUntilBleached config countsChan = do
+waitUntilBleached :: MonadIO m => TrapConfig -> TChan BinCount -> m ()
+waitUntilBleached config countsChan = liftIO $ do
     putStrLn "Waiting until bleached"
     ch <- atomically $ dupTChan countsChan
     let go = do
