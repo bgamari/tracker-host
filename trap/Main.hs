@@ -30,36 +30,40 @@ import MonitorTimetag
 import Timetag as TT
 import HPhoton.IO.FpgaTimetagger.Pipes
 import HPhoton.Types (Time)
+import qualified Aotf
 
 type BinCount = Int
 
 binWidth = round $ 1 * 128e6
 
 type ParticleFoundCriterion = Vector (T.PsdChannels Int16) -> Bool
-data TrapConfig = TrapC { bleached :: BinCount -> Bool
+data TrapConfig = TrapC { bleached      :: BinCount -> Bool
                         , foundParticle :: ParticleFoundCriterion
+                        , aotf          :: Aotf.Aotf
+                        , aotfChannel   :: Aotf.Channel
                         }
 
 scan :: RasterScan T.Stage Double
 scan = RasterScan { _scanCenter = zero
-                  , _scanSize   = T.mkStage 30000 30000 0
-                  , _scanPoints = T.mkStage 100 100 1
+                  , _scanSize   = T.mkStage 60000 60000 0
+                  , _scanPoints = T.mkStage 30 30 1
                   }
 
 setTrap :: MonadIO m => Bool -> m ()
 setTrap on =
     liftIO $ callProcess "thorlabs-laser" [if on then "--on" else "--off"]
 
-setExcitation :: MonadIO m => Bool -> m ()
-setExcitation on = liftIO $ do
-    let args = ["set", "-c1", if on then "--on" else "--off"]
-    callProcess "aotf-config" args
+setExcitation :: MonadIO m => TrapConfig -> Bool -> m ()
+setExcitation cfg on = do
+    let mode = if on then Aotf.On else Aotf.Off
+    Aotf.setMode (aotf cfg) (aotfChannel cfg) mode
 
 stdDevFound :: Double -> ParticleFoundCriterion
 stdDevFound s =
     (> s) . stdDev . V.map (^. (_Wrapped' . _x . T.sdSum . to realToFrac))
 
 main = do
+    Right aotf_ <- runEitherT $ Aotf.open "/dev/ttyUSB.aotf"
     tt <- TT.open "/tmp/timetag.sock"
     let mon = monitor tt "trapping"
     counts <- newBroadcastTChanIO :: IO (TChan BinCount)
@@ -72,10 +76,13 @@ main = do
 
     let config = TrapC { bleached = (< 200)
                        , foundParticle = stdDevFound 10
+                       , aotf = aotf_
+                       , aotfChannel = maybe (error "bad channel") id
+                                       $ Aotf.channel 0
                        }
     result <- T.withTracker $ runEitherT $ do
-         T.setKnob T.feedbackMode T.StageFeedback
          T.setKnob T.stageSetpoint zero
+         T.setKnob T.feedbackMode T.StageFeedback
          T.setKnob T.adcDecimation 2
          T.startAdcStream
          T.setKnob T.adcTriggerMode T.TriggerAuto
@@ -97,9 +104,9 @@ run config tt counts = forever $ do
 
     lift $ liftEitherIO $ TT.startCapture tt
     delayMillis 1000
-    setExcitation True
+    setExcitation config True
     waitUntilBleached config counts
-    setExcitation False
+    setExcitation config False
     delayMillis 1000
     lift $ liftEitherIO $ TT.stopCapture tt
 
