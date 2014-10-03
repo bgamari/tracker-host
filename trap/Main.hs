@@ -7,8 +7,12 @@ import Control.Monad.Trans.State
 import Data.Traversable
 import Data.Word
 import Data.Int
+import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 import Control.Concurrent.STM
+import System.Process (callProcess)
+import Data.Vector (Vector)
+import Statistics.Sample (stdDev)
 
 import qualified Data.Vector as V
 import Control.Error
@@ -31,8 +35,9 @@ type BinCount = Int
 
 binWidth = round $ 1 * 128e6
 
+type ParticleFoundCriterion = Vector (T.PsdChannels Int16) -> Bool
 data TrapConfig = TrapC { bleached :: BinCount -> Bool
-                        , foundParticle :: T.PsdChannels Int16 -> Bool
+                        , foundParticle :: ParticleFoundCriterion
                         }
 
 scan :: RasterScan T.Stage Double
@@ -40,6 +45,18 @@ scan = RasterScan { _scanCenter = zero
                   , _scanSize   = T.mkStage 30000 30000 0
                   , _scanPoints = T.mkStage 100 100 1
                   }
+
+setTrap :: Bool -> IO ()
+setTrap on = callProcess "thorlabs-laser" [if on then "--on" else "--off"]
+
+setExcitation :: Bool -> IO ()
+setExcitation on = do
+    let args = ["set", "-c1", if on then "--on" else "--off"]
+    callProcess "aotf-config" args
+
+stdDevFound :: Double -> ParticleFoundCriterion
+stdDevFound s =
+    (> s) . stdDev . V.map (^. (_Wrapped' . _x . T.sdSum . to realToFrac))
 
 main = do
     tt <- TT.open "/tmp/timetag.sock"
@@ -53,7 +70,7 @@ main = do
                     >-> toTChan counts
 
     let config = TrapC { bleached = (< 200)
-                       , foundParticle = const True
+                       , foundParticle = stdDevFound 10
                        }
     result <- T.withTracker $ runEitherT $ do
          T.setKnob T.feedbackMode T.StageFeedback
@@ -74,8 +91,15 @@ run :: TrapConfig -> Timetag -> TChan BinCount
 run config tt counts = forever $ do
     findParticle config
     lift $ liftEitherIO $ TT.startCapture tt
+    liftIO $ threadDelay $ 1000*1000
+    liftIO $ setExcitation True
     liftIO (waitUntilBleached config counts)
+    liftIO $ setExcitation False
+    liftIO $ threadDelay $ 1000*1000
     lift $ liftEitherIO $ TT.stopCapture tt
+    liftIO $ setTrap True
+    liftIO $ threadDelay $ 1000*1000
+    liftIO $ setTrap False
 
 findParticle :: TrapConfig -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
 findParticle config = do
@@ -86,7 +110,8 @@ findParticle config = do
             lift $ T.setKnob T.stageSetpoint p
             queue <- lift $ lift T.getSensorQueue
             s <- liftIO $ atomically $ readTChan queue
-            when (not $ foundParticle config (s ^. to V.last . T.psd . _Unwrapped')) go
+            let psd = V.map (^. (T.psd . _Unwrapped')) s
+            when (not $ foundParticle config psd) go
     liftIO $ putStrLn "Searching for particle"
     go
 
