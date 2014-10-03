@@ -103,10 +103,10 @@ run config tt counts = forever $ do
     delayMillis 1000
     lift $ liftEitherIO $ TT.stopCapture tt
 
-    setTrap True
+    setTrap False
     advancePoints 10
     delayMillis 100
-    setTrap False
+    setTrap True
 
 advancePoints :: Int -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
 advancePoints n = do
