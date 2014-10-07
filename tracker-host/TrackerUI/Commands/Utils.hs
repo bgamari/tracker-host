@@ -84,3 +84,6 @@ repSettings name labels a l =
 showSensors :: Show a => T.Sensors a -> String
 showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
+
+realDouble :: RealFrac a => Iso' a Double
+realDouble = iso realToFrac realToFrac

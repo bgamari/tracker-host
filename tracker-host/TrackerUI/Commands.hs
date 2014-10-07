@@ -8,7 +8,6 @@ module TrackerUI.Commands (commands, runCommand) where
 import Prelude hiding (concatMap, concat, sequence, mapM_)
 
 import Data.Maybe
-import Data.Monoid ((<>))
 import Numeric
 import Data.Foldable as F
 import Data.List (isPrefixOf, stripPrefix, intercalate)
@@ -39,17 +38,8 @@ import TrackerUI.Commands.RoughCal
 import TrackerUI.Commands.FineCal
 import TrackerUI.Commands.Excite
 import TrackerUI.Commands.Log
-
-psdChannelNames :: PsdChannels String
-psdChannelNames =
-    PsdChans $ mkPsd (mkSumDiff "x.sum" "x.diff")
-                     (mkSumDiff "y.sum" "y.diff")
-
-tabulatePsdChannels :: ((forall a. Lens' (PsdChannels a) a) -> b)
-                    -> PsdChannels b
-tabulatePsdChannels f = PsdChans $ mkPsd
-    (mkSumDiff (f (_Wrapped' . _x . sdSum)) (f (_Wrapped' . _x . sdDiff)))
-    (mkSumDiff (f (_Wrapped' . _y . sdSum)) (f (_Wrapped' . _y . sdDiff)))
+import TrackerUI.Commands.Feedback
+import TrackerUI.Commands.Stage
 
 exitCmd :: Command
 exitCmd = Cmd ["exit"] (Just "Exit the program") "" $ const $ return False
@@ -58,12 +48,6 @@ helloCmd :: Command
 helloCmd = command ["hello"] help ""
     $ const $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
-
-setRawPositionCmd :: Command
-setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
-    pos <- tryHead "expected position" args >>= tryRead "invalid position"
-    liftTrackerE $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
-  where help = "Set raw stage position"
 
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \_->center
@@ -79,15 +63,6 @@ scanCmd = command ["scan"] help "[file]" $ \args -> do
     liftInputT $ outputStrLn $ "Scan dumped to "++fname
     center
   where help = "Perform a scan and dump to file (uses rough scan parameters)"
-
-setPsdSetpointCmd :: Command
-setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
-    liftTrackerE $ do
-      s <- lift T.getSensorQueue >>= liftIO . atomically . readTChan
-      let sum_ = V.foldl (\acc x->acc ^+^ (x ^. T.psd)) zero s
-          n = fromIntegral $ V.length s
-      T.setKnob T.psdSetpoint (sum_ & mapped . mapped %~ \x->fromIntegral x `div` n)
-  where help = "Set PSD feedback setpoint to current sensor values"
 
 readSensorsCmd :: Command
 readSensorsCmd = command ["sensors", "read"] help "" $ \_->do
@@ -138,22 +113,6 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
            _   -> liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
 
-feedbackCmds :: [Command]
-feedbackCmds =
-    [ command ["feedback", "stop"] "Stop feedback" "" $ \_->
-        liftTrackerE $ T.setKnob T.feedbackMode T.NoFeedback
-    , command ["feedback", "psd"] "Start PSD feedback" "" $ \_->
-        liftTrackerE $ T.setKnob T.feedbackMode T.PsdFeedback
-    , command ["feedback", "stage"] "Start stage feedback" "" $ \_->
-        liftTrackerE $ T.setKnob T.feedbackMode T.StageFeedback
-    , command ["feedback", "search"] "Start particle search feedback" "" $ \_->
-        liftTrackerE $ T.setKnob T.feedbackMode T.SearchFeedback
-    , command ["feedback", "coarse"] "Start coarse feedback" "" $ \_->
-        liftTrackerE $ T.setKnob T.feedbackMode T.CoarseFeedback
-    , command ["feedback", "status"] "Show feedback status" "" $ \_->
-        liftTrackerE (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
-    ]
-
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
   where get = sAccessors ^. aGet
@@ -170,84 +129,10 @@ settingCommands (Setting {..}) = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value
 
-stageSettings :: [Setting]
-stageSettings = concat
-    [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
-            (knobA T.outputGain) (column propGain . stageV3 . mapping realDouble)
-    , r3Setting "stage.output-gain.int" "stage output proportional gain"
-            (knobA T.outputGain) (column intGain . stageV3 . mapping realDouble)
-    , r3Setting "stage.tau" "stage feedback integration time"
-            (knobA T.outputTau) stageV3
-    , r3Setting "stage.fb-gain.x" "stage feedback gain"
-            (knobA T.stageGain) (_x . stageV3 . mapping realDouble)
-    , r3Setting "stage.fb-gain.y" "stage feedback gain"
-            (knobA T.stageGain) (_y . stageV3 . mapping realDouble)
-    , r3Setting "stage.fb-gain.z" "stage feedback gain"
-            (knobA T.stageGain) (_z . stageV3 . mapping realDouble)
-    , r3Setting "stage.setpoint" "stage feedback setpoint"
-            (knobA T.stageSetpoint) stageV3
-    , [setting "stage.max-error"
-               "maximum tolerable error signal before killing feedback"
-               (knobA T.maxError) id]
-    ]
-
-psdSettings :: [Setting]
-psdSettings = concat $ toList $ tabulatePsdChannels channel
-  where
-    channel :: (forall a. Lens' (PsdChannels a) a) -> [Setting]
-    channel l = concat
-        [ r3Setting ("psd.fb-gain."<>name) "PSD feedback gain"
-                    (knobA T.psdGains)
-                    (_Unwrapped' . l . stageV3 . mapping realDouble)
-        , [setting ("psd.fb-setpoint."<>name)
-                   "PSD feedback setpoint"
-                   (knobA T.psdSetpoint) (_Unwrapped' . l)]
-        ]
-      where
-        name = psdChannelNames ^. l
-
-searchSettings :: [Setting]
-searchSettings = concat
-    [ r3Setting "search.step" "Search feedback step size"
-                (knobA T.searchStep) stageV3
-    , [setting "search.obj-thresh"
-               "Search objective function threshold"
-               (knobA T.searchObjThresh) id]
-    , toList $ tabulatePsdChannels gain
-    ]
-  where
-    gain :: (forall a. Lens' (PsdChannels a) a) -> Setting
-    gain l =
-        setting ("search.gains."<>name) "Search objective gain"
-                (knobA T.searchObjGains) l
-      where
-        name = psdChannelNames ^. l
-
-coarseFbSettings :: [Setting]
-coarseFbSettings = concat $ toList $ tabulatePsdChannels go
-  where
-    go :: (forall a. Lens' (PsdChannels a) a) -> [Setting]
-    go l = concat
-        [ r3Setting ("coarse."<>name<>".high.step")
-                    "Coarse feedback high step"
-                    (knobA T.coarseFbParams)
-                    (l . T.coarseStepHigh)
-        , r3Setting ("coarse."<>name<>".low.step")
-                    "Coarse feedback low step"
-                    (knobA T.coarseFbParams)
-                    (l . T.coarseStepLow)
-        , [setting ("coarse."<>name<>".tol")
-                   "Coarse feedback low step"
-                   (knobA T.coarseFbParams)
-                   (l . T.coarseTolerance)]
-        ]
-      where
-        name = psdChannelNames ^. l
-
 settings :: [Setting]
 settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
-    , psdSettings, searchSettings, coarseFbSettings
+    , feedbackSettings
     , [setting "decimation"
                "decimation factor of samples"
                (knobA T.adcDecimation) id]
@@ -255,9 +140,6 @@ settings = concat
                "Maximum variance allowed in PSD signal"
                stateA preAmpMaxSigma2]
     ]
-
-realDouble :: RealFrac a => Iso' a Double
-realDouble = iso realToFrac realToFrac
 
 showCmd :: Command
 showCmd = command ["show"] help "PATTERN" $ \args->do
@@ -273,12 +155,11 @@ showCmd = command ["show"] help "PATTERN" $ \args->do
 commands :: [Command]
 commands = [ helloCmd
            , centerCmd
-           , setRawPositionCmd
            , scanCmd
            ]
-           ++ logCmds ++ roughCalCmds ++ fineCalCmds ++
-           [ setPsdSetpointCmd
-           , readSensorsCmd
+           ++ stageCmds ++ logCmds ++ roughCalCmds ++ fineCalCmds
+           ++ feedbackCmds ++
+           [ readSensorsCmd
            , sourceCmd
            , resetCmd
            , eventCountersCmd
