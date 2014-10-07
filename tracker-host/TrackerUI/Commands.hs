@@ -22,7 +22,6 @@ import System.IO
 import Control.Concurrent
 import Control.Concurrent.STM
 
-import Data.Functor.Rep
 import Control.Lens hiding (setting, Setting)
 import Linear
 
@@ -37,12 +36,12 @@ import qualified Data.Csv as Csv
 
 import qualified Tracker as T
 import Tracker.Types
-import Tracker.RoughCal.Model as Model
 import TrackerUI.Types
 
 import TrackerUI.Commands.Utils
 import TrackerUI.Commands.PreAmp
 import TrackerUI.Commands.Plot
+import TrackerUI.Commands.RoughCal
 
 psdChannelNames :: PsdChannels String
 psdChannelNames =
@@ -69,10 +68,6 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     liftTrackerE $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
 
--- | Return the stage to center
-center :: TrackerUI ()
-center = use centerPos >>= liftTrackerE . T.setRawPosition . fmap fromIntegral
-
 centerCmd :: Command
 centerCmd = command ["center"] help "" $ \_->center
   where help = "Set stage at center position"
@@ -88,53 +83,6 @@ scanCmd = command ["scan"] help "[file]" $ \args -> do
     center
   where help = "Perform a scan and dump to file (uses rough scan parameters)"
 
-roughScanCmd :: Command
-roughScanCmd = command ["rough", "scan"] help "" $ \_->do
-    rs <- uses roughScan $ (T.scanSize . _z .~ 0)
-                         . (T.scanPoints . _z .~ 1)
-    freq <- use roughScanFreq
-    scan <- liftTrackerE $ T.roughScan freq rs
-    lastRoughScan .= Just scan
-    center
-  where help = "Perform rough scan"
-
-roughCenterCmd :: Command
-roughCenterCmd = command ["rough", "center"] help "" $ \_->do
-    scan <- use lastRoughScan >>= tryJust "No last rough calibration"
-    let c = T.roughCenter scan
-    liftInputT $ outputStrLn $ show c
-    roughScan . T.scanCenter .= fmap round c
-    fineScan . T.fineScanCenter .= fmap round c
-    centerPos .= fmap round c
-    center
-  where help = "Find center of particle from XY rough scan"
-
-roughZScanCmd :: Command
-roughZScanCmd = command ["rough", "zscan"] help "" $ \_->do
-    rs <- uses roughScan $ (T.scanSize . _y .~ 0)
-                         . (T.scanPoints . _y .~ 1)
-    freq <- use roughScanFreq
-    zScan <- liftTrackerE $ T.roughScan freq rs
-    lastRoughZScan .= Just zScan
-    center
-  where help = "Perform rough Z scan"
-
-roughFitCmd :: Command
-roughFitCmd = command ["rough", "fit"] help "" $ \args->do
-    scan <- use lastRoughScan >>= tryJust "No rough calibration"
-    let samples = V.map (\s->(s^.stage._xy, s^.psd._x.sdDiff))
-                  $ V.map (fmap realToFrac) scan
-        m0 = Model.initialModel samples
-        m = head $ drop 10 $ Model.fit samples m0
-        center = Model.modelCenter m
-        --gains = Model.modelToGains center m
-    liftIO $ print m0
-    liftIO $ print m
-    --liftIO $ print gains
-    --when ("gains" `elem` args)
-    --  $ liftTrackerE $ T.setKnob T.psdGains gains
-  where help = "Perform fit on rough calibration"
-
 showSensors :: Show a => Sensors a -> String
 showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
                                    (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
@@ -147,22 +95,6 @@ setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
           n = fromIntegral $ V.length s
       T.setKnob T.psdSetpoint (sum_ & mapped . mapped %~ \x->fromIntegral x `div` n)
   where help = "Set PSD feedback setpoint to current sensor values"
-
-dumpRoughCmd :: Command
-dumpRoughCmd = command ["rough", "dump"] help "[FILENAME]" $ \args->do
-    let fname = fromMaybe "rough-cal.txt" $ listToMaybe args
-    s <- use lastRoughScan >>= tryJust "No rough calibration."
-    liftIO $ writeTsv fname $ V.toList s
-    liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
-  where help = "Dump last rough calibration"
-
-dumpZRoughCmd :: Command
-dumpZRoughCmd = command ["rough", "zdump"] help "[FILENAME]" $ \args->do
-    let fname = fromMaybe "rough-zcal.txt" $ listToMaybe args
-    s <- use lastRoughZScan >>= tryJust "No rough Z calibration."
-    liftIO $ writeTsv fname $ V.toList s
-    liftInputT $ outputStrLn $ "Last rough calibration dumped to "++fname
-  where help = "Dump last rough Z calibration"
 
 fineScanCmd :: Command
 fineScanCmd = command ["fine", "scan"] help "" $ \_->do
@@ -350,16 +282,6 @@ feedbackCmds =
         liftTrackerE (T.getKnob T.feedbackMode) >>= liftInputT . outputStrLn . show
     ]
 
-stageV3 :: Iso' (Stage a) (V3 a)
-stageV3 = iso (\(Stage v)->v) Stage
-
-v3Tuple :: Iso' (V3 a) (a,a,a)
-v3Tuple = iso (\(V3 x y z)->(x,y,z)) (\(x,y,z)->V3 x y z)
-
-readParse :: Read a => [String] -> Maybe a
-readParse [] = Nothing
-readParse (a:_) = Safe.readZ a
-
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
   where get = sAccessors ^. aGet
@@ -375,44 +297,6 @@ settingCommands (Setting {..}) = [getter, setter]
                                            $ "Invalid value: "++unwords args
                                       return True
         showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value
-
-setting :: (Show a, Read a)
-        => String -> String
-        -> Accessors TrackerUI b -> Lens' b a -> Setting
-setting name help a l =
-    Setting name (Just help) readParse show a l
-
-r3Setting :: (Show a, Read a)
-          => String -> String
-          -> Accessors TrackerUI b -> Lens' b (V3 a) -> [Setting]
-r3Setting name help a l =
-    setting name help a (l . v3Tuple) : repSettings name labels a l
-  where
-    labels = V3 "x" "y" "z"
-
-repSettings :: forall a f b. (Show a, Read a, Representable f, Foldable f, Rep f ~ E f)
-            => String -> f String
-            -> Accessors TrackerUI b
-            -> Lens' b (f a)
-            -> [Setting]
-repSettings name labels a l =
-    let f :: f Setting
-        f = tabulate $ \l'->
-              let label = labels ^. el l'
-              in Setting (name++"."++label) Nothing readParse show a (l . el l')
-    in toList f
-
-roughCalSettings :: [Setting]
-roughCalSettings = concat
-    [ r3Setting "rough.size" "rough calibration field size in code-points"
-            stateA (roughScan . T.scanSize . stageV3)
-    , r3Setting "rough.center" "rough calibration field center in code-points"
-            stateA (roughScan . T.scanCenter . stageV3)
-    , r3Setting "rough.points" "number of points in rough calibration scan"
-            stateA (roughScan . T.scanPoints . stageV3)
-    , [pureSetting "rough.freq" (Just "update frequency of rough calibration scan")
-            readParse show roughScanFreq]
-    ]
 
 fineCalSettings :: [Setting]
 fineCalSettings = concat
@@ -529,13 +413,9 @@ commands = [ helloCmd
            , centerCmd
            , setRawPositionCmd
            , scanCmd
-           , roughScanCmd
-           , roughCenterCmd
-           , roughZScanCmd
-           , roughFitCmd
-           , setPsdSetpointCmd
-           , dumpRoughCmd
-           , dumpZRoughCmd
+           ]
+           ++ roughCalCmds ++
+           [ setPsdSetpointCmd
            , fineScanCmd
            , fineCalCmd
            , fineDumpCmd
