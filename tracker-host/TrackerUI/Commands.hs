@@ -39,10 +39,10 @@ import qualified Tracker as T
 import Tracker.Types
 import Tracker.RoughCal.Model as Model
 import TrackerUI.Types
-import TrackerUI.Plot
 
-import TrackerUI.Commands.PreAmp       
 import TrackerUI.Commands.Utils
+import TrackerUI.Commands.PreAmp
+import TrackerUI.Commands.Plot
 
 psdChannelNames :: PsdChannels String
 psdChannelNames =
@@ -209,38 +209,6 @@ readSensorsCmd = command ["sensors", "read"] help "" $ \_->do
     s <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
     liftInputT $ outputStr $ showSensors $ V.head s
   where help = "Read sensors values"
-
-startPlotCmd :: Command
-startPlotCmd = command ["plot", "start"] help "" $ \_->do
-    plot <- use trackerPlot
-    case plot of
-      Nothing -> do
-        plot' <- startPlot
-        trackerPlot .= Just plot'
-      Just _  -> do
-        throwError $ "Plot already running"
-  where help = "Start plot view"
-
-setPlotNPointsCmd :: Command
-setPlotNPointsCmd = command ["set", "plot.npoints"] help "" $ \args->do
-    plot <- use trackerPlot >>= tryJust "No plot"
-    tryHead "Expected number of points" args >>= tryRead "Invalid number of points" >>= liftIO . setNPoints plot
-  where help = "Set number of points in plot"
-
-setYSizeCmd :: Command
-setYSizeCmd = command ["set", "plot.ysize"] help "" $ \args->do
-    plot <- use trackerPlot >>= tryJust "No plot"
-    size <- case args of
-              []  -> return Nothing
-              x:_ -> Just <$> tryRead "Invalid size" x
-    liftIO $ setYSize plot size
-  where help = "Set Y extent"
-
-plotCommands :: [Command]
-plotCommands = [ startPlotCmd
-               , setPlotNPointsCmd
-               , setYSizeCmd
-               ]
 
 logger :: Handle -> Int -> TChan (V.Vector (Sensors Int16)) -> TVar Int -> IO ()
 logger h decimation queue countVar = forever $ do
