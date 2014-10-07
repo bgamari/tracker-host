@@ -42,6 +42,7 @@ import TrackerUI.Commands.Utils
 import TrackerUI.Commands.PreAmp
 import TrackerUI.Commands.Plot
 import TrackerUI.Commands.RoughCal
+import TrackerUI.Commands.FineCal
 
 psdChannelNames :: PsdChannels String
 psdChannelNames =
@@ -95,37 +96,6 @@ setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
           n = fromIntegral $ V.length s
       T.setKnob T.psdSetpoint (sum_ & mapped . mapped %~ \x->fromIntegral x `div` n)
   where help = "Set PSD feedback setpoint to current sensor values"
-
-fineScanCmd :: Command
-fineScanCmd = command ["fine", "scan"] help "" $ \_->do
-    points <- use fineScan >>= liftTrackerE . T.fineScan
-    lastFineScan ?= points
-  where help = "Perform fine calibration scan"
-
-fineCalCmd :: Command
-fineCalCmd = command ["fine", "cal"] help "" $ \_->do
-    s <- use fineScale
-    points <- use lastFineScan >>= tryJust "No fine calibration scan"
-    let (psdSetpt, gains) = T.fineCal points
-        gains' = over (mapped . mapped . mapped) (realToFrac . (*s)) gains
-    liftTrackerE $ do
-        T.setKnob T.psdGains gains'
-        T.setKnob T.psdSetpoint $ over (mapped . mapped) round psdSetpt
-    liftIO $ putStrLn "Feedback gains = "
-    liftIO $ putStrLn $ unlines
-           $ fmap (F.foldMap (\x->shows x "\t"))
-           $ concat $ F.toList $ fmap F.toList gains'
-    liftIO $ putStrLn "Feedback setpoint = "
-    liftIO $ putStrLn $ concat $ fmap (F.foldMap (\x->shows x "\t")) $ F.toList psdSetpt
-  where help = "Perform fine calibration regression"
-
-fineDumpCmd :: Command
-fineDumpCmd = command ["fine", "dump"] help "" $ \args->do
-    let fname = fromMaybe "fine-cal.txt" $ listToMaybe args
-    s <- use lastFineScan >>= tryJust "No fine calibration."
-    liftIO $ writeTsv fname $ V.toList s
-    liftInputT $ outputStrLn $ "Last fine calibration dumped to "++fname
-  where help = "Dump fine calibration points"
 
 readSensorsCmd :: Command
 readSensorsCmd = command ["sensors", "read"] help "" $ \_->do
@@ -298,16 +268,6 @@ settingCommands (Setting {..}) = [getter, setter]
                                       return True
         showValue value = liftInputT $ outputStrLn $ sName++" = "++sFormat value
 
-fineCalSettings :: [Setting]
-fineCalSettings = concat
-    [ [ pureSetting "fine.points" (Just "number of points in fine calibration")
-            readParse show (fineScan . T.fineScanPoints)]
-    , r3Setting "fine.range" "size of fine calibration in code points"
-            stateA (fineScan . T.fineScanRange . stageV3)
-    , [pureSetting "fine.gain-scale" (Just "factor to scale result of regression by to get feedback gains")
-            readParse show fineScale]
-    ]
-
 stageSettings :: [Setting]
 stageSettings = concat
     [ r3Setting "stage.output-gain.prop" "stage output proportional gain"
@@ -414,11 +374,8 @@ commands = [ helloCmd
            , setRawPositionCmd
            , scanCmd
            ]
-           ++ roughCalCmds ++
+           ++ roughCalCmds ++ fineCalCmds ++
            [ setPsdSetpointCmd
-           , fineScanCmd
-           , fineCalCmd
-           , fineDumpCmd
            , readSensorsCmd
            , logStartCmd
            , logStopCmd
