@@ -19,8 +19,12 @@ setRawPositionCmd = command ["set-pos"] help "(X,Y,Z)" $ \args->do
     liftTrackerE $ T.setRawPosition $ pos^.from (stageV3 . v3Tuple)
   where help = "Set raw stage position"
   
+centerCmd :: Command
+centerCmd = command ["center"] help "" $ \_->center
+  where help = "Set stage at center position"
+
 stageCmds :: [Command]
-stageCmds = [setRawPositionCmd]
+stageCmds = [setRawPositionCmd, centerCmd]
 
 stageSettings :: [Setting]
 stageSettings = concat

@@ -49,10 +49,6 @@ helloCmd = command ["hello"] help ""
     $ const $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
 
-centerCmd :: Command
-centerCmd = command ["center"] help "" $ \_->center
-  where help = "Set stage at center position"
-
 scanCmd :: Command
 scanCmd = command ["scan"] help "[file]" $ \args -> do
     fname <- tryHead "expected file name" args
@@ -154,7 +150,6 @@ showCmd = command ["show"] help "PATTERN" $ \args->do
 
 commands :: [Command]
 commands = [ helloCmd
-           , centerCmd
            , scanCmd
            ]
            ++ stageCmds ++ logCmds ++ roughCalCmds ++ fineCalCmds
