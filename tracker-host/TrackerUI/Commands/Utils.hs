@@ -5,6 +5,7 @@
 module TrackerUI.Commands.Utils where
 
 import Data.Foldable as F
+import Data.List (intercalate)
 
 import Control.Lens hiding (setting, Setting)
 import Data.Functor.Rep
@@ -79,3 +80,7 @@ repSettings name labels a l =
               let label = labels ^. el l'
               in Setting (name++"."++label) Nothing readParse show a (l . el l')
     in toList f
+
+showSensors :: Show a => T.Sensors a -> String
+showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
+                                   (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)

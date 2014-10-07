@@ -15,12 +15,11 @@ import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Applicative
 import Control.Monad.State hiding (sequence, forM_, mapM_)
 import Control.Monad.Error.Class
-import System.IO
-
-import Control.Concurrent.STM
 
 import Control.Lens hiding (setting, Setting)
 import Linear
+
+import Control.Concurrent.STM
 
 import Control.Error.Util
 import Data.EitherR (fmapLT)
@@ -38,6 +37,7 @@ import TrackerUI.Commands.PreAmp
 import TrackerUI.Commands.Plot
 import TrackerUI.Commands.RoughCal
 import TrackerUI.Commands.FineCal
+import TrackerUI.Commands.Excite
 import TrackerUI.Commands.Log
 
 psdChannelNames :: PsdChannels String
@@ -79,10 +79,6 @@ scanCmd = command ["scan"] help "[file]" $ \args -> do
     liftInputT $ outputStrLn $ "Scan dumped to "++fname
     center
   where help = "Perform a scan and dump to file (uses rough scan parameters)"
-
-showSensors :: Show a => Sensors a -> String
-showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
-                                   (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 setPsdSetpointCmd :: Command
 setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
@@ -141,59 +137,6 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
            []  -> throwError "No matching commands"
            _   -> liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
   where help = "Display help message"
-
-exciteCmds :: [Command]
-exciteCmds =
-    [ command ["excite", "start"]
-      "Start excitation" "" $ \_->
-        use excitation >>= liftTrackerE . T.configureExcitation . fmap maybeExciteChannel
-    , command ["excite", "stop"]
-      "Stop excitation" "" $ \_->do
-        liftTrackerE $ T.configureExcitation (pure Nothing)
-    , command ["excite", "cal"]
-      "Run calibration" "" $ \_->do
-        samples <- use corrPoints >>= liftTracker . fetchPoints
-        let test = fmap (view (psd . _x . sdDiff)) samples
-        decimation <- liftTrackerE $ T.getKnob T.adcDecimation
-        decimatedExc <- uses (excitation . _x . excChanExcitation)
-                             (T.excitePeriod %~ (/ realToFrac decimation) . realToFrac)
-        phaseAmp <- liftTracker $ T.phaseAmp decimatedExc (fmap realToFrac test)
-        liftIO $ print phaseAmp
-        liftIO $ withFile "r.txt" WriteMode $ \h->
-            V.mapM_ (hPutStrLn h . showSensors) samples
-    ]
-
-exciteSettings :: [Setting]
-exciteSettings =
-    concat [ f "x" _x, f "y" _y, f "z" _z ]++
-    [ setting "excite.corr-points"
-              "number of points to use in correlation"
-              stateA corrPoints
-    ]
-  where f :: String
-          -> Lens' (Stage ExciteChannel) ExciteChannel
-          -> [Setting]
-        f n l = [ setting ("excite."++n++".period")
-                          "excitation period"
-                          stateA
-                          (excitation . l . excChanExcitation . T.excitePeriod)
-                , setting ("excite."++n++".amp")
-                          "excitation amplitude"
-                          stateA
-                          (excitation . l . excChanExcitation . T.exciteAmp)
-                , setting ("excite."++n++".enabled")
-                          "excitation enabled"
-                          stateA
-                          (excitation . l . excChanEnabled)
-                ]
-
-fetchPoints :: MonadIO m => Int -> T.TrackerT m (V.Vector (Sensors Sample))
-fetchPoints n = do
-    queue <- T.getSensorQueue
-    let go v | V.length v >= n  = return $ V.take n v
-             | otherwise        = do v' <- liftIO $ atomically $ readTChan queue
-                                     go (v V.++ v')
-    go V.empty
 
 feedbackCmds :: [Command]
 feedbackCmds =
