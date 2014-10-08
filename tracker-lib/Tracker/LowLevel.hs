@@ -10,6 +10,7 @@ module Tracker.LowLevel
     , readReply
     , parseReply
     , readAck
+    , liftThrough
       -- * Convenient re-exports
     , MonadIO
     ) where

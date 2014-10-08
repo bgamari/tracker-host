@@ -83,6 +83,10 @@ data TrackerState
                    , _trackerPlot    :: Maybe TrackerPlot
                    , _corrPoints     :: Int
                    , _excitation     :: Stage ExciteChannel
+
+                   , _stopTrap       :: Maybe (TrackerUI ())
+                   , _bleachThresh   :: Int
+                   , _particleStd    :: Double
                    }
 makeLenses ''TrackerState
 
@@ -111,6 +115,7 @@ defaultTrackerState =
                  , _trackerPlot    = Nothing
                  , _corrPoints     = 4000
                  , _excitation     = fmap (ExcChan False) T.defaultExcitation
+                 , _stopTrap       = Nothing
                  }
 
 data Accessors m a = Accessors { _aGet :: m a

@@ -40,6 +40,7 @@ import TrackerUI.Commands.Excite
 import TrackerUI.Commands.Log
 import TrackerUI.Commands.Feedback
 import TrackerUI.Commands.Stage
+import TrackerUI.Commands.Trap
 
 exitCmd :: Command
 exitCmd = Cmd ["exit"] (Just "Exit the program") "" $ const $ return False
@@ -168,6 +169,7 @@ commands = [ helloCmd
              ++ plotCommands
              ++ exciteCmds
              ++ feedbackCmds
+             ++ trapCmds
 
 runCommand :: [String] -> TrackerUI Bool
 runCommand [] = return True

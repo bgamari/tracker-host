@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module MonitorTimetag where
+module Trap.MonitorTimetag where
 
 import Control.Monad.IO.Class
 import Control.Error
@@ -15,7 +15,7 @@ import Pipes.Safe
 import Pipes.Binary
 import Pipes.ByteString as PBS
 
-import Timetag
+import Trap.Timetag
 import HPhoton.IO.FpgaTimetagger
 
 failEitherT :: MonadThrow m => EitherT String m r -> m r

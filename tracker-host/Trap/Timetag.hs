@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternGuards #-}
 
-module Timetag
+module Trap.Timetag
     ( Timetag
     , open
     , startCapture

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Aotf
+module Trap.Aotf
     ( Aotf
     , open
     , Channel
