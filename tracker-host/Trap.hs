@@ -5,16 +5,12 @@ module Trap
     ( start
     , ParticleFoundCriterion
     , TrapConfig (..)
-    , TrapEnv (..)
     , stdDevFound
     ) where
 
-import Prelude hiding (sequenceA)
+import Prelude
 import Control.Monad (forever, when)
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State
-import Data.Traversable
-import Data.Word
 import Data.Int
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
@@ -33,14 +29,12 @@ import qualified Pipes.Prelude as PP
 import qualified Tracker.LowLevel as T
 import qualified Tracker.Commands as T
 import qualified Tracker.Types as T
-import Tracker.Raster
 
 import HPhoton.IO.FpgaTimetagger.Pipes
 import HPhoton.Types (Time)
 
 import Trap.MonitorTimetag
 import Trap.Timetag as TT
-import qualified Trap.Aotf
 
 type BinCount = Int
 
@@ -50,21 +44,12 @@ data TrapConfig = TrapC
     { bleached      :: BinCount -> Bool
     , foundParticle :: ParticleFoundCriterion
     , binWidth      :: Time
+    , setExcitation :: Switch
+    , setTrap       :: Switch
+    , searchScan    :: [T.Stage Int32]
     }
 
 type Switch = MonadIO m => Bool -> m ()
-
-data TrapEnv = TrapE
-    { setExcitation :: Switch
-    , setTrap       :: Switch
-    }
-
-scan :: RasterScan T.Stage Double
-scan = RasterScan
-    { _scanCenter = zero
-    , _scanSize   = T.mkStage 60000 60000 0
-    , _scanPoints = T.mkStage 30 30 1
-    }
 
 stdDevFound :: Double -> ParticleFoundCriterion
 stdDevFound s =
@@ -93,47 +78,46 @@ binRecords binWidth = go 0 0
         then yield count >> go 0 (t `div` binWidth)
         else go (count+1) bin
 
-run :: TrapEnv -> TrapConfig -> Timetag -> TChan BinCount
+run :: TrapConfig -> Timetag -> TChan BinCount
     -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) r
-run env config tt counts = forever $ do
-    findParticle config
+run cfg tt counts = forever $ do
+    findParticle cfg
 
     lift $ liftEitherIO $ TT.startCapture tt
     delayMillis 1000
-    setExcitation env True
-    waitUntilBleached config counts
-    setExcitation env False
+    setExcitation cfg True
+    waitUntilBleached cfg counts
+    setExcitation cfg False
     delayMillis 1000
     lift $ liftEitherIO $ TT.stopCapture tt
 
-    setTrap env False
+    setTrap cfg False
     advancePoints 10
     delayMillis 100
-    setTrap env True
+    setTrap cfg True
 
-start :: TrapEnv -> TrapConfig -> EitherT String (T.TrackerT IO) ()
-start env config = do
+start :: TrapConfig -> EitherT String (T.TrackerT IO) ()
+start cfg = do
     tt <- liftIO $ TT.open "/tmp/timetag.sock"
     counts <- liftIO newBroadcastTChanIO
-    thread <- liftIO $ async $ watchBins tt (binWidth config) counts
+    thread <- liftIO $ async $ watchBins tt (binWidth cfg) counts
 
     T.setKnob T.stageSetpoint zero
     T.setKnob T.feedbackMode T.StageFeedback
     T.setKnob T.adcDecimation 2
     T.startAdcStream
     T.setKnob T.adcTriggerMode T.TriggerAuto
-    runStateT (run env config tt counts)
-              (cycle $ map (fmap round) $ rasterScan sequenceA scan)
+    _ <- runStateT (run cfg tt counts) (cycle $ searchScan cfg)
     return ()
 
 waitUntilBleached :: MonadIO m => TrapConfig -> TChan BinCount -> m ()
-waitUntilBleached config countsChan = liftIO $ do
+waitUntilBleached cfg countsChan = liftIO $ do
     putStrLn "Waiting until bleached"
     ch <- atomically $ dupTChan countsChan
     let go = do
             count <- atomically $ readTChan ch
             putStrLn $ "bin count = "++show count
-            when (not $ bleached config count) go
+            when (not $ bleached cfg count) go
     go
     return ()
 
@@ -146,13 +130,13 @@ advancePoints n = do
     lift $ T.setKnob T.stageSetpoint p
 
 findParticle :: TrapConfig -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
-findParticle config = do
+findParticle cfg = do
     let go = do
             advancePoints 1
             queue <- lift $ lift T.getSensorQueue
             s <- liftIO $ atomically $ readTChan queue
             let psd = V.map (^. (T.psd . _Unwrapped')) s
-            when (not $ foundParticle config psd) go
+            when (not $ foundParticle cfg psd) go
     liftIO $ putStrLn "Searching for particle"
     go
 
