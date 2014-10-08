@@ -130,6 +130,7 @@ settings :: [Setting]
 settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
     , feedbackSettings
+    , trapSettings
     , [setting "decimation"
                "decimation factor of samples"
                (knobA T.adcDecimation) id]
