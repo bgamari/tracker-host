@@ -35,7 +35,6 @@ import Control.Error
 import System.Console.Haskeline.MonadException
 import Control.Monad.Morph
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Class
 import Control.Concurrent.STM
 import Control.Concurrent.Async
 import Numeric
@@ -67,8 +66,11 @@ liftThrough f (TrackerT a) = TrackerT $ do
     r <- ask
     liftIO $ f $ runReaderT a r
 
-trackerVendor = 0x1d50 :: VendorId
-trackerProduct = 0x7777 :: ProductId
+trackerVendor :: VendorId
+trackerVendor = 0x1d50
+
+trackerProduct :: ProductId
+trackerProduct = 0x7777
 
 findDevice :: Ctx -> VendorId -> ProductId -> IO (V.Vector Device)
 findDevice ctx vid pid = do
@@ -76,9 +78,6 @@ findDevice ctx vid pid = do
   where go :: Device -> IO Bool
         go dev = do desc <- getDeviceDesc dev
                     return $ deviceVendorId desc == vid && deviceProductId desc == pid
-
-withDevice :: Monad m => (DeviceHandle -> m a) -> TrackerT m a
-withDevice f = TrackerT (view device) >>= lift . f
 
 withDeviceIO :: MonadIO m => (DeviceHandle -> IO a) -> TrackerT m a
 withDeviceIO f = TrackerT (view device) >>= liftIO . f
@@ -136,9 +135,12 @@ sensorListen = forever $ do
         Just d' -> liftIO $ atomically $ writeTChan queue $ parseFrames d'
         Nothing -> return ()
 
+cmdInEndpt, cmdOutEndpt, dataInEndpt :: EndpointAddress
 cmdInEndpt = EndpointAddress 0x1 In
 cmdOutEndpt = EndpointAddress 0x2 Out
 dataInEndpt = EndpointAddress 0x3 In
+
+cmdTimeout, dataTimeout :: Timeout
 cmdTimeout = 500   -- milliseconds
 dataTimeout = 100  -- milliseconds
 
@@ -166,8 +168,7 @@ readReply :: MonadIO m => EitherT String (TrackerT m) (Maybe ByteString)
 readReply = EitherT $ withDeviceIO $ \h->do
     (d, status) <- readBulk h cmdInEndpt 512 cmdTimeout
     debugOut $ "   < "++showByteString (BS.take 32 d)
-    let cmd = BS.head d
-        statusCode = BS.head $ BS.drop 1 d
+    let statusCode = BS.head $ BS.drop 1 d
     return $ case status of
         TimedOut               -> Left "Reply read timed out"
         _ | BS.length d < 2    -> Left "Reply too short"
