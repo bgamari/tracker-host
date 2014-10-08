@@ -77,8 +77,9 @@ binRecords binWidth = go 0 0
         then yield count >> go 0 (t `div` binWidth)
         else go (count+1) bin
 
-run :: TrapConfig -> Timetag -> TChan BinCount
-    -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) r
+type TrapM = StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) 
+
+run :: TrapConfig -> Timetag -> TChan BinCount -> TrapM r
 run cfg tt counts = forever $ do
     findParticle cfg
 
@@ -120,7 +121,7 @@ waitUntilBleached cfg countsChan = liftIO $ do
     go
     return ()
 
-advancePoints :: Int -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
+advancePoints :: Int -> TrapM ()
 advancePoints n = do
     pts <- get
     let p:rest = drop n pts
@@ -128,7 +129,7 @@ advancePoints n = do
     liftIO $ putStrLn $ "Position = "++show p
     lift $ T.setKnob T.stageSetpoint p
 
-findParticle :: TrapConfig -> StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) ()
+findParticle :: TrapConfig -> TrapM ()
 findParticle cfg = do
     let go = do
             advancePoints 1
