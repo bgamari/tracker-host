@@ -7,8 +7,6 @@ module Trap
     , TrapConfig (..)
     , TrapEnv (..)
     , stdDevFound
-    , setTrap
-    , setExcitation
     ) where
 
 import Prelude hiding (sequenceA)
@@ -21,7 +19,6 @@ import Data.Int
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 import Control.Concurrent.STM
-import System.Process (callProcess)
 import Data.Vector (Vector)
 import Statistics.Sample (stdDev)
 
