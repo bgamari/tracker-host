@@ -41,7 +41,7 @@ startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
     std <- use particleStd
     bleach <- use bleachThresh
     let cfg = TrapC
-            { bleached = (> bleach)
+            { bleached = (< bleach)
             , foundParticle = stdDevFound std
             , binWidth = round (1 * 128e6 :: Double)
             , setExcitation = \on -> Aotf.setMode aotf exciteCh
