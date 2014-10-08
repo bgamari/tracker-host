@@ -73,7 +73,6 @@ binRecords binWidth = go 0 0
   where
     go count bin = do
       t <- await
-      liftIO $ print t
       if t `div` binWidth > bin
         then yield count >> go 0 (t `div` binWidth)
         else go (count+1) bin
