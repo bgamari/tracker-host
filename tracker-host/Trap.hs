@@ -72,10 +72,12 @@ binRecords :: MonadIO m => Time -> Pipe Time Int m r
 binRecords binWidth = go 0 0
   where
     go count bin = do
-      t <- await
-      if t `div` binWidth > bin
-        then yield count >> go 0 (t `div` binWidth)
-        else go (count+1) bin
+        t <- await
+        let b = t `div` binWidth
+        case () of
+          _ | b == bin  -> go (count+1) bin
+          _ | otherwise -> do yield count
+                              go 0 b
 
 type TrapM = StateT [T.Stage Int32] (EitherT String (T.TrackerT IO)) 
 
