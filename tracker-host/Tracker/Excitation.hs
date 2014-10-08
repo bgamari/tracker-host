@@ -99,7 +99,7 @@ phaseAmp excitation samples = do
     return $ (phase, amp)
     
 plotSVG :: (ToRenderable a, Functor m, MonadIO m) => FilePath -> a -> m ()
-plotSVG fname a = void $ liftIO $ renderableToFile def (toRenderable a) fname
+plotSVG fname a = void $ liftIO $ renderableToFile def fname (toRenderable a)
 
 plotPoints :: (PlotValue x, PlotValue y) => [(x,y)] -> Plot x y
 plotPoints pts = toPlot $ plot_points_values .~ pts $ def
