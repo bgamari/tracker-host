@@ -25,15 +25,17 @@ defaultOutputGains = pure (PropInt 1e-2 0)
 main :: IO ()
 main = either error (const $ return ()) =<< go
   where go = runTrackerUI commands $ do
-          liftTrackerE $ do T.echo "Hello World!" >>= liftIO . print
-                            T.setKnob T.stageGain defaultStageGains
-                            T.setKnob T.outputGain defaultOutputGains
-                            T.setFeedbackFreq 50000
-                            T.setKnob T.adcFreq 50000
-                            T.setKnob T.adcDecimation 4
-                            T.startAdcStream
-                            T.setKnob T.adcTriggerMode T.TriggerAuto
+          liftTrackerE $ do
+              T.echo "Hello World!" >>= liftIO . print
+              T.setKnob T.stageGain defaultStageGains
+              T.setKnob T.outputGain defaultOutputGains
+              T.setFeedbackFreq 50000
+              T.setKnob T.adcFreq 50000
+              T.setKnob T.adcDecimation 4
+              T.startAdcStream
+              T.setKnob T.adcTriggerMode T.TriggerAuto
           while $ prompt
+          liftTrackerE $ T.stopAdcStream
 
 while :: Monad m => m Bool -> m ()
 while m = m >>= \a->when a (while m)
