@@ -297,8 +297,8 @@ instance Binary CoarseFbChannel where
         getV3 :: Get (V3 Int16)
         getV3 = sequence $ pure getInt16le
     put (CoarseFbChan h l t) = do
-        traverse putInt16le h
-        traverse putInt16le l
+        traverse_ putInt16le h
+        traverse_ putInt16le l
         putWord16le t
 
 coarseFbParams :: Knob (PsdChannels CoarseFbChannel)
