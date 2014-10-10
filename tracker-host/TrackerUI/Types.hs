@@ -116,6 +116,8 @@ defaultTrackerState =
                  , _corrPoints     = 4000
                  , _excitation     = fmap (ExcChan False) T.defaultExcitation
                  , _stopTrap       = Nothing
+                 , _bleachThresh   = 100
+                 , _particleStd    = 10
                  }
 
 data Accessors m a = Accessors { _aGet :: m a
