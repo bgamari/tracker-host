@@ -128,12 +128,13 @@ parseFrames a =
                    return $ Sensors stage sumDiff
 
 sensorListen :: MonadIO m => TrackerT m ()
-sensorListen = forever $ do
-    d <- either error id `liftM` runEitherT readData
+sensorListen = do
     queue <- TrackerT $ view sensorQueue
-    case d of
-        Just d' -> liftIO $ atomically $ writeTChan queue $ parseFrames d'
-        Nothing -> return ()
+    forever $ do
+        d <- either error id `liftM` runEitherT readData
+        case d of
+            Just d' -> liftIO $ atomically $ writeTChan queue $ parseFrames d'
+            Nothing -> return ()
 
 cmdInEndpt, cmdOutEndpt, dataInEndpt :: EndpointAddress
 cmdInEndpt = EndpointAddress 0x1 In
