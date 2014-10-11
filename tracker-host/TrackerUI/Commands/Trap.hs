@@ -11,6 +11,9 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Either
 import Control.Concurrent.Async
 
+import Statistics.Sample (stdDev)
+import qualified Data.Vector as V
+
 import Linear
 import Control.Lens hiding (Setting, setting)
 
@@ -31,8 +34,12 @@ scan :: RasterScan T.Stage Double
 scan = RasterScan
     { _scanCenter = zero
     , _scanSize   = T.mkStage 60000 60000 0
-    , _scanPoints = T.mkStage 30 30 1
+    , _scanPoints = T.mkStage 300 300 1
     }
+
+stdDevFound :: Double -> ParticleFoundCriterion
+stdDevFound s v =
+    s < stdDev (V.map realToFrac $ V.map (^. (_x . T.sdSum)) v)
 
 startTrapCmd :: Command
 startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do

@@ -5,7 +5,6 @@ module Trap
     ( start
     , ParticleFoundCriterion
     , TrapConfig (..)
-    , stdDevFound
     ) where
 
 import Prelude
@@ -15,10 +14,10 @@ import Data.Int
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 import Control.Concurrent.STM
-import Data.Vector (Vector)
-import Statistics.Sample (stdDev)
 
+import Data.Vector (Vector)
 import qualified Data.Vector as V
+
 import Control.Error
 import Control.Lens
 import Linear
@@ -38,7 +37,7 @@ import Trap.Timetag as TT
 
 type BinCount = Int
 
-type ParticleFoundCriterion = Vector (T.PsdChannels Int16) -> Bool
+type ParticleFoundCriterion = Vector (T.Psd (T.SumDiff Int16)) -> Bool
 
 data TrapConfig = TrapC
     { bleached      :: BinCount -> Bool
@@ -50,10 +49,6 @@ data TrapConfig = TrapC
     }
 
 type Switch = MonadIO m => Bool -> m ()
-
-stdDevFound :: Double -> ParticleFoundCriterion
-stdDevFound s =
-    (> s) . stdDev . V.map (^. (_Wrapped' . _x . T.sdSum . to realToFrac))
 
 watchBins :: Timetag -> Time -> TChan BinCount -> IO ()
 watchBins tt binWidth counts =
@@ -85,18 +80,28 @@ run :: TrapConfig -> Timetag -> TChan BinCount -> TrapM r
 run cfg tt counts = forever $ do
     findParticle cfg
 
+    status "Start capture"
     lift $ liftEitherIO $ TT.startCapture tt
     delayMillis 1000
     setExcitation cfg True
+    status "Set excitation"
     waitUntilBleached cfg counts
+    status "Bleached"
     setExcitation cfg False
+    status "Kill excitation"
     delayMillis 1000
     lift $ liftEitherIO $ TT.stopCapture tt
+    status "Stop capture"
 
     setTrap cfg False
     advancePoints 10
     delayMillis 100
     setTrap cfg True
+    status "Next"
+  where
+    status :: String -> TrapM ()
+    --status = liftIO . putStrLn
+    status _ = return ()
 
 start :: TrapConfig -> EitherT String (T.TrackerT IO) ()
 start cfg = do
@@ -121,7 +126,6 @@ waitUntilBleached cfg countsChan = liftIO $ do
             putStrLn $ "bin count = "++show count
             when (not $ bleached cfg count) go
     go
-    return ()
 
 advancePoints :: Int -> TrapM ()
 advancePoints n = do
@@ -137,9 +141,8 @@ findParticle cfg = do
             advancePoints 1
             queue <- lift $ lift T.getSensorQueue
             s <- liftIO $ atomically $ readTChan queue
-            let psd = V.map (^. (T.psd . _Unwrapped')) s
+            let psd = V.map (^. T.psd) s
             when (not $ foundParticle cfg psd) go
-    liftIO $ putStrLn "Searching for particle"
     go
 
 liftEitherIO :: MonadIO m => EitherT e IO a -> EitherT e m a
