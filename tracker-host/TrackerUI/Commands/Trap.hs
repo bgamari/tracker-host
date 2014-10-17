@@ -57,15 +57,20 @@ startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
                                       [if on then "--on" else "--off"]
             , searchScan = map (fmap round) $ rasterScan sequenceA scan
             }
-    thread <- liftTracker $ liftThrough async $ runEitherT $ Trap.start cfg
-    stopTrap ?= liftIO (cancel thread)
+    actions <- liftTrackerE $ Trap.start cfg
+    trapActions ?= actions
 
 stopTrapCmd :: Command
 stopTrapCmd = command ["trap", "stop"] "Stop trapping" "" $ \_-> do
-    use stopTrap >>= maybe (return ()) id
+    use trapActions >>= liftIO . maybe (return ()) trapStop
+    trapActions .= Nothing
+
+nextTrapCmd :: Command
+nextTrapCmd = command ["trap", "next"] "Move to next particle" "" $ \_-> do
+    use trapActions >>= liftIO . maybe (return ()) trapNext
 
 trapCmds :: [Command]
-trapCmds = [ startTrapCmd, stopTrapCmd ]
+trapCmds = [ startTrapCmd, nextTrapCmd, stopTrapCmd ]
 
 trapSettings :: [Setting]         
 trapSettings =

@@ -21,6 +21,7 @@ import Control.Lens hiding (Setting, matching)
 
 import qualified Tracker as T
 import TrackerUI.Plot.Types
+import qualified Trap
 import PreAmp
 import PreAmp.Optimize (GainOffset(..))
 import Tracker ( TrackerT, Stage(..), Psd(..), Sensors, Sample
@@ -84,7 +85,7 @@ data TrackerState
                    , _corrPoints     :: Int
                    , _excitation     :: Stage ExciteChannel
 
-                   , _stopTrap       :: Maybe (TrackerUI ())
+                   , _trapActions    :: Maybe Trap.TrapActions
                    , _bleachThresh   :: Int
                    , _particleStd    :: Double
                    }
@@ -115,7 +116,7 @@ defaultTrackerState =
                  , _trackerPlot    = Nothing
                  , _corrPoints     = 4000
                  , _excitation     = fmap (ExcChan False) T.defaultExcitation
-                 , _stopTrap       = Nothing
+                 , _trapActions    = Nothing
                  , _bleachThresh   = 100
                  , _particleStd    = 10
                  }
