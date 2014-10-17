@@ -6,10 +6,8 @@ module TrackerUI.Commands.Trap
     ) where
 
 import Data.Traversable (sequenceA)
-
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Either
-import Control.Concurrent.Async
+import System.Process (callProcess)
 
 import Statistics.Sample (stdDev)
 import qualified Data.Vector as V
@@ -17,13 +15,10 @@ import qualified Data.Vector as V
 import Linear
 import Control.Lens hiding (Setting, setting)
 
-import System.Process (callProcess)
-
 import Tracker.Types as T
 import Tracker.Raster
 import TrackerUI.Commands.Utils
 import TrackerUI.Types
-import Tracker.LowLevel (liftThrough)       
 import Trap
 import Trap.Aotf as Aotf
 
@@ -56,6 +51,7 @@ startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
             , setTrap = \on-> liftIO $ callProcess "thorlabs-laser"
                                       [if on then "--on" else "--off"]
             , searchScan = map (fmap round) $ rasterScan sequenceA scan
+            , outputFiles = ["data/run"++show i | i <- [0..]]
             }
     actions <- liftTrackerE $ Trap.start cfg
     trapActions ?= actions

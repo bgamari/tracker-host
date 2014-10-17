@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Trap
     ( start
@@ -18,6 +19,10 @@ import Control.Concurrent.STM
 
 import Data.Vector (Vector)
 import qualified Data.Vector as V
+
+import System.Posix.IO (openFd, closeFd, defaultFileFlags, OpenMode (..))
+import System.FilePath ((</>), takeDirectory)
+import System.Directory (createDirectoryIfMissing)
 
 import Control.Error
 import Control.Lens
@@ -47,6 +52,7 @@ data TrapConfig = TrapC
     , setExcitation :: Switch
     , setTrap       :: Switch
     , searchScan    :: [T.Stage Int32]
+    , outputFiles   :: [FilePath]
     }
 
 data TrapActions = TrapA
@@ -80,7 +86,12 @@ binRecords binWidth = go 0 0
           _ | otherwise -> do yield count
                               go 0 b
 
-type TrapM = StateT [T.Stage Int32] (EitherT String (T.TrackerT IO))
+data TrapState = TrapS { _scanPoints  :: [T.Stage Int32]
+                       , _outFiles    :: [FilePath]
+                       }
+makeLenses ''TrapState
+
+type TrapM = StateT TrapState (EitherT String (T.TrackerT IO))
 
 run :: TrapConfig -> TMVar () -> TVar Bool -> Timetag -> TChan BinCount
     -> TrapM ()
@@ -90,7 +101,14 @@ run cfg nextVar stopVar tt counts = go
         findParticle cfg
 
         status "Start capture"
+        outName : rest <- use outFiles
+        outFiles .= rest
+        liftIO $ createDirectoryIfMissing True (takeDirectory outName)
+        dataFd <- liftIO $ openFd outName
+                                  WriteOnly (Just 0644) defaultFileFlags
+        output <- lift $ liftEitherIO $ TT.addOutputFd tt "trap output" dataFd
         lift $ liftEitherIO $ TT.startCapture tt
+        liftIO $ closeFd dataFd
         delayMillis 1000
         setExcitation cfg True
         status "Set excitation"
@@ -105,6 +123,7 @@ run cfg nextVar stopVar tt counts = go
         status "Kill excitation"
         delayMillis 1000
         lift $ liftEitherIO $ TT.stopCapture tt
+        lift $ liftEitherIO $ TT.removeOutput tt output
         status "Stop capture"
 
         setTrap cfg False
@@ -133,9 +152,11 @@ start cfg = do
     T.setKnob T.adcDecimation 2
     T.startAdcStream
     T.setKnob T.adcTriggerMode T.TriggerAuto
+    let s = TrapS { _scanPoints = cycle $ searchScan cfg
+                  , _outFiles = outputFiles cfg
+                  }
     thrd <- lift $ T.liftThrough async $ runEitherT
-            $ runStateT (run cfg nextVar stopVar tt counts)
-                        (cycle $ searchScan cfg)
+            $ runStateT (run cfg nextVar stopVar tt counts) s
 
     return $ TrapA
         { trapNext = atomically $ putTMVar nextVar ()
@@ -155,9 +176,9 @@ waitUntilBleached cfg countsChan = liftIO $ do
 
 advancePoints :: Int -> TrapM ()
 advancePoints n = do
-    pts <- get
+    pts <- use scanPoints
     let p:rest = drop n pts
-    put rest
+    scanPoints .= rest
     liftIO $ putStrLn $ "Position = "++show p
     lift $ T.setKnob T.stageSetpoint p
 
