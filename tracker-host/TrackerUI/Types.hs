@@ -17,7 +17,7 @@ import Control.Applicative
 
 import qualified Data.Vector as V
 import System.Console.Haskeline
-import Control.Lens hiding (Setting)
+import Control.Lens hiding (Setting, matching)
 
 import qualified Tracker as T
 import TrackerUI.Plot.Types
@@ -155,11 +155,11 @@ sortNubOn :: (Eq b, Ord b) => (a -> b) -> [a] -> [a]
 sortNubOn f = nubBy ((==) `on` f) . sortBy (compare `on` f)
 
 completeCommand :: MonadIO m => [Command] -> CompletionFunc m
-completeCommand commands (left, right) = do
-    let tokens = words (reverse left)++case left of
-                                         ' ':_  -> [""]
-                                         _      -> []
-    return ( left
+completeCommand commands (l, _) = do
+    let tokens = words (reverse l)++case l of
+                                        ' ':_  -> [""]
+                                        _      -> []
+    return ( l
            , sortNubOn replacement $ completions [(c^.cmdName, c) | c <- commands] tokens)
   where
     completions :: [([String], Command)] -> [String] -> [Completion]
