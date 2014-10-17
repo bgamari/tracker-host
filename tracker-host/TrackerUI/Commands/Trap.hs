@@ -51,7 +51,7 @@ startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
             , setTrap = \on-> liftIO $ callProcess "thorlabs-laser"
                                       [if on then "--on" else "--off"]
             , searchScan = map (fmap round) $ rasterScan sequenceA scan
-            , outputFiles = ["data/run"++show i | i <- [0..]]
+            , outputFiles = ["data/run"++show i | i <- [0 ..] :: [Integer]]
             }
     actions <- liftTrackerE $ Trap.start cfg
     trapActions ?= actions

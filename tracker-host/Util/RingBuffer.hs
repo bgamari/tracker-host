@@ -12,7 +12,6 @@ import Prelude hiding (length, concat)
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VGM
 import Control.Concurrent
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Primitive
@@ -80,9 +79,9 @@ concat xs rb = withRing rb $ do
 
     -- did we wrap around?
     when (takeN > untilWrap) $ do
-        let src  = VGM.drop untilWrap xs'
-            dest = VGM.take (takeN - untilWrap) $ ringBuffer rb
-        liftIO $ VGM.copy dest src
+        let src'  = VGM.drop untilWrap xs'
+            dest' = VGM.take (takeN - untilWrap) $ ringBuffer rb
+        liftIO $ VGM.copy dest' src'
     advance takeN
 
 -- | The maximum number of items the ring can contain
