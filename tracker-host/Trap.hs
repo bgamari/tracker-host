@@ -139,6 +139,10 @@ run cfg nextVar stopVar tt counts = go
     --status = liftIO . putStrLn
     status _ = return ()
 
+printError :: MonadIO m => EitherT String m () -> m ()
+printError action = do
+    runEitherT action >>= either (liftIO . putStrLn) return 
+
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
     tt <- liftIO $ TT.open "/tmp/timetag.sock"
@@ -155,8 +159,8 @@ start cfg = do
     let s = TrapS { _scanPoints = cycle $ searchScan cfg
                   , _outFiles = outputFiles cfg
                   }
-    thrd <- lift $ T.liftThrough async $ runEitherT
-            $ runStateT (run cfg nextVar stopVar tt counts) s
+    thrd <- lift $ T.liftThrough async $ printError
+            $ void $ runStateT (run cfg nextVar stopVar tt counts) s
 
     return $ TrapA
         { trapNext = atomically $ putTMVar nextVar ()
