@@ -41,7 +41,6 @@ recvUntil term s = go BS.empty
   where
     go !accum = do
         c <- liftIO $ recv s 1
-        liftIO $ print c
         case () of
           () | BS.null c         -> return accum
              |BS.head c == term  -> return accum
@@ -57,8 +56,6 @@ readReply (Timetag s) = go BS.empty
   where
     go !accum = do
       reply <- liftIO $ recvUntil '\n' s
-      liftIO $ print reply
-      liftIO $ print $ "ready" `BS.isPrefixOf` reply
       case () of
         _ | BS.null reply                 ->
             left "Timetag.readReply: timetag_acquire connection terminated"

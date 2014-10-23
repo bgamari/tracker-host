@@ -113,9 +113,10 @@ run cfg nextVar stopVar tt counts = go
                                   WriteOnly (Just 0644) defaultFileFlags
         output <- lift $ liftEitherIO $ TT.addOutputFd tt "trap_output" dataFd
         lift $ liftEitherIO $ TT.startCapture tt
+        status "capture started"
         delayMillis 1000
-        setExcitation cfg True
         status "Set excitation"
+        setExcitation cfg True
 
         void $ liftIO $ atomically $ tryTakeTMVar nextVar  -- ensure it's empty
         bleached <- liftIO $ async $ waitUntilBleached cfg counts
