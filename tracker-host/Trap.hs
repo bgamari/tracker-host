@@ -188,7 +188,6 @@ start cfg = do
 
 waitUntilBleached :: MonadIO m => TrapConfig -> TChan BinCount -> m ()
 waitUntilBleached cfg countsChan = liftIO $ do
-    putStrLn "Waiting until bleached"
     ch <- atomically $ dupTChan countsChan
     let go = do
             count <- atomically $ readTChan ch
@@ -201,7 +200,6 @@ advancePoints n = do
     pts <- use scanPoints
     let p:rest = drop n pts
     scanPoints .= rest
-    liftIO $ putStrLn $ "Position = "++show p
     lift $ T.setKnob T.stageSetpoint p
 
 findParticle :: TrapConfig -> TrapM ()
