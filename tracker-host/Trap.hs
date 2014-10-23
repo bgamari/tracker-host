@@ -145,7 +145,7 @@ printError action = do
 
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
-    tt <- liftIO $ TT.open "/tmp/timetag.sock"
+    tt <- TT.open "/tmp/timetag.sock"
     counts <- liftIO newBroadcastTChanIO
     thread <- liftIO $ async $ watchBins tt (binWidth cfg) counts
     stopVar <- liftIO $ newTVarIO False

@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Trap.Timetag
     ( Timetag
@@ -14,7 +15,7 @@ module Trap.Timetag
     ) where
 
 import Control.Error
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.IO.Class
 import Data.Monoid
 import qualified Data.ByteString.Char8 as BS
@@ -26,18 +27,19 @@ import System.Posix.Types
 
 newtype Timetag = Timetag Socket
 
-open :: FilePath -> IO Timetag
+open :: MonadIO m => FilePath -> EitherT String m Timetag
 open path = do
-    s <- socket AF_UNIX Stream defaultProtocol
-    connect s (SockAddrUnix path)
-    --ready <- liftIO $ recv s 128
-    recvUntil '\n' s >>= print
-    return $ Timetag s
+    s <- liftIO $ socket AF_UNIX Stream defaultProtocol
+    liftIO $ connect s (SockAddrUnix path)
+    ready <- liftIO $ recvUntil '\n' s
+    if ready `BS.isPrefixOf` ready
+      then return $ Timetag s
+      else left $ "Expected 'ready', saw "++show ready
 
 recvUntil :: Char -> Socket -> IO BS.ByteString
 recvUntil term s = go BS.empty
   where
-    go accum = do
+    go !accum = do
         c <- liftIO $ recv s 1
         if c == BS.singleton term
           then return accum
@@ -45,21 +47,30 @@ recvUntil term s = go BS.empty
 
 command :: BS.ByteString -> Timetag -> EitherT String IO (Maybe BS.ByteString)
 command cmd tt@(Timetag s) = do
-    liftIO $ send s cmd
+    n <- liftIO $ send s cmd
     readReply tt
 
 readReply :: Timetag -> EitherT String IO (Maybe BS.ByteString)
-readReply (Timetag s) = do
-    reply <- liftIO $ recvUntil '\n' s
-    case () of
-      _ | BS.null reply                 ->
-          left "Timetag.readReply: timetag_acquire connection terminated"
-      _ | "= " `BS.isPrefixOf` reply    -> return $ Just $ BS.drop 2 reply
-      _ | "ready" `BS.isPrefixOf` reply -> return Nothing
-      _ | "error" `BS.isPrefixOf` reply ->
-          left $ "Timetag.readReply: error reply: "++show reply
-      _ | otherwise                     ->
-          left $ "Timetag.readReply: unknown reply: "++show reply
+readReply (Timetag s) = go BS.empty
+  where
+    go !accum = do
+      reply <- liftIO $ recvUntil '\n' s
+      liftIO $ print reply
+      liftIO $ print $ "ready" `BS.isPrefixOf` reply
+      case () of
+        _ | BS.null reply                 ->
+            left "Timetag.readReply: timetag_acquire connection terminated"
+        _ | "= " `BS.isPrefixOf` reply    -> do
+             go $ accum <> BS.drop 2 reply
+        _ | "ready" `BS.isPrefixOf` reply -> do
+             return $ if BS.null accum then Nothing else Just accum
+        _ | "error" `BS.isPrefixOf` reply -> do
+            ready <- liftIO $ recvUntil '\n' s -- kill next "ready"
+            when (not $ "ready" `BS.isPrefixOf` ready)
+                $ left $ "Expected 'ready' after 'error', saw "++show ready
+            left $ "Timetag.readReply: error reply: "++show reply
+        _ | otherwise                     ->
+            left $ "Timetag.readReply: unknown reply: "++show reply
 
 startCapture :: Timetag -> EitherT String IO ()
 startCapture = void . command "start_capture\n"
