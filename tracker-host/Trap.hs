@@ -165,8 +165,11 @@ start cfg = do
 
     return $ TrapA
         { trapNext = atomically $ putTMVar nextVar ()
-        , trapStop = atomically $ do writeTVar stopVar True
-                                     putTMVar nextVar ()
+        , trapStop = do atomically $ do writeTVar stopVar True
+                                        putTMVar nextVar ()
+                        wait thrd
+                        cancel watchThread
+                        void $ runEitherT $ TT.close tt
         }
 
 waitUntilBleached :: MonadIO m => TrapConfig -> TChan BinCount -> m ()
