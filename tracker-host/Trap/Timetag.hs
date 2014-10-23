@@ -41,9 +41,11 @@ recvUntil term s = go BS.empty
   where
     go !accum = do
         c <- liftIO $ recv s 1
-        if c == BS.singleton term
-          then return accum
-          else go (accum <> c)
+        liftIO $ print c
+        case () of
+          () | BS.null c         -> return accum
+             |BS.head c == term  -> return accum
+             | otherwise         -> go (accum <> c)
 
 command :: BS.ByteString -> Timetag -> EitherT String IO (Maybe BS.ByteString)
 command cmd tt@(Timetag s) = do
