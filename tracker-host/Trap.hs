@@ -20,6 +20,10 @@ import Control.Concurrent.STM
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 
+import Data.Time.Clock
+import Data.Time.Format
+import System.IO
+
 import System.Posix.IO (openFd, defaultFileFlags, OpenMode (..))
 import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
@@ -98,9 +102,14 @@ makeLenses ''TrapState
 
 type TrapM = StateT TrapState (EitherT String (T.TrackerT IO))
 
-run :: TrapConfig -> TMVar () -> TVar Bool -> Timetag -> TChan BinCount
+run :: TrapConfig
+    -> TMVar ()    -- ^ Used to force advance to next particle
+    -> TVar Bool   -- ^ Set to terminate
+    -> Handle      -- ^ Log
+    -> Timetag     -- ^ Timetagger
+    -> TChan BinCount
     -> TrapM ()
-run cfg nextVar stopVar tt counts = go
+run cfg nextVar stopVar log tt counts = go
   where
     go = do
         findParticle cfg
@@ -141,8 +150,11 @@ run cfg nextVar stopVar tt counts = go
         when (not stop) go
 
     status :: String -> TrapM ()
-    status = liftIO . putStrLn
-    --status _ = return ()
+    status msg = do
+        t <- liftIO $ getCurrentTime
+        let fmt = iso8601DateFormat (Just "%H:%M:%S")
+            text = formatTime defaultTimeLocale fmt t++": "++msg
+        liftIO $ hPutStrLn log text
 
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
@@ -160,8 +172,10 @@ start cfg = do
     let s = TrapS { _scanPoints = cycle $ searchScan cfg
                   , _outFiles = outputFiles cfg
                   }
+
+    log <- tryIO' $ openFile "trap.log" WriteMode
     thrd <- lift $ T.liftThrough async $ printError
-            $ void $ runStateT (run cfg nextVar stopVar tt counts) s
+            $ void $ runStateT (run cfg nextVar stopVar log tt counts) s
 
     return $ TrapA
         { trapNext = atomically $ putTMVar nextVar ()
