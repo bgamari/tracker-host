@@ -62,14 +62,19 @@ data TrapActions = TrapA
 
 type Switch = MonadIO m => Bool -> m ()
 
-watchBins :: Timetag -> Time -> TChan BinCount -> IO ()
-watchBins tt binWidth counts =
-    runSafeT
-    $ runEffect $ monitor tt "trapping"
-               >-> unwrapRecords
-               >-> PP.map snd
-               >-> binRecords binWidth
-               >-> toTChan counts
+printError :: MonadIO m => EitherT String m () -> m ()
+printError action = do
+    runEitherT action >>= either (liftIO . putStrLn) return
+
+watchBins :: Time -> TChan BinCount -> IO ()
+watchBins binWidth counts = printError $ do
+    tt <- TT.open "/tmp/timetag.sock"
+    liftIO $ runSafeT $ runEffect
+             $ monitor tt "trapping"
+           >-> unwrapRecords
+           >-> PP.map snd
+           >-> binRecords binWidth
+           >-> toTChan counts
   where
     toTChan :: MonadIO m => TChan a -> Consumer a m r
     toTChan chan =
@@ -136,18 +141,14 @@ run cfg nextVar stopVar tt counts = go
         when (not stop) go
 
     status :: String -> TrapM ()
-    --status = liftIO . putStrLn
-    status _ = return ()
-
-printError :: MonadIO m => EitherT String m () -> m ()
-printError action = do
-    runEitherT action >>= either (liftIO . putStrLn) return 
+    status = liftIO . putStrLn
+    --status _ = return ()
 
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
     tt <- TT.open "/tmp/timetag.sock"
     counts <- liftIO newBroadcastTChanIO
-    thread <- liftIO $ async $ watchBins tt (binWidth cfg) counts
+    thread <- liftIO $ async $ watchBins (binWidth cfg) counts
     stopVar <- liftIO $ newTVarIO False
     nextVar <- liftIO newEmptyTMVarIO
 
