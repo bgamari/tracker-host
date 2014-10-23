@@ -20,8 +20,8 @@ import Control.Concurrent.STM
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 
-import System.Posix.IO (openFd, closeFd, defaultFileFlags, OpenMode (..))
-import System.FilePath ((</>), takeDirectory)
+import System.Posix.IO (openFd, defaultFileFlags, OpenMode (..))
+import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
 
 import Control.Error
@@ -67,13 +67,13 @@ printError action = do
     runEitherT action >>= either (liftIO . putStrLn) return
 
 watchBins :: Time -> TChan BinCount -> IO ()
-watchBins binWidth counts = printError $ do
+watchBins _binWidth counts = printError $ do
     tt <- TT.open "/tmp/timetag.sock"
     liftIO $ runSafeT $ runEffect
              $ monitor tt "trapping"
            >-> unwrapRecords
            >-> PP.map snd
-           >-> binRecords binWidth
+           >-> binRecords _binWidth
            >-> toTChan counts
   where
     toTChan :: MonadIO m => TChan a -> Consumer a m r
@@ -81,11 +81,11 @@ watchBins binWidth counts = printError $ do
       forever $ await >>= liftIO . atomically . writeTChan chan
 
 binRecords :: MonadIO m => Time -> Pipe Time Int m r
-binRecords binWidth = go 0 0
+binRecords _binWidth = go 0 0
   where
     go count bin = do
         t <- await
-        let b = t `div` binWidth
+        let b = t `div` _binWidth
         case () of
           _ | b == bin  -> go (count+1) bin
           _ | otherwise -> do yield count
@@ -119,9 +119,9 @@ run cfg nextVar stopVar tt counts = go
         setExcitation cfg True
 
         void $ liftIO $ atomically $ tryTakeTMVar nextVar  -- ensure it's empty
-        bleached <- liftIO $ async $ waitUntilBleached cfg counts
-        next <- liftIO $ async $ atomically $ takeTMVar nextVar
-        liftIO $ waitAnyCancel [bleached, next]
+        _bleached <- liftIO $ async $ waitUntilBleached cfg counts
+        _next <- liftIO $ async $ atomically $ takeTMVar nextVar
+        _ <- liftIO $ waitAnyCancel [_bleached, _next]
 
         status "Bleached"
         setExcitation cfg False
@@ -148,7 +148,7 @@ start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
     tt <- TT.open "/tmp/timetag.sock"
     counts <- liftIO newBroadcastTChanIO
-    thread <- liftIO $ async $ watchBins (binWidth cfg) counts
+    watchThread <- liftIO $ async $ watchBins (binWidth cfg) counts
     stopVar <- liftIO $ newTVarIO False
     nextVar <- liftIO newEmptyTMVarIO
 
