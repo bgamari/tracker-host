@@ -49,7 +49,7 @@ startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
             , setExcitation = \on -> Aotf.setMode aotf exciteCh
                                      $ if on then Aotf.On else Aotf.Off
             , setTrap = \on-> liftIO $ callProcess "thorlabs-laser"
-                                      [if on then "--on" else "--off"]
+                                      [if on then "--power=200" else "--power=0"]
             , searchScan = map (fmap round) $ rasterScan sequenceA scan
             , outputFiles = ["data/run"++show i | i <- [0 ..] :: [Integer]]
             }
