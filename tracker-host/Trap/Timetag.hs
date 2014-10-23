@@ -87,8 +87,9 @@ addOutputFd :: Timetag
             -> Fd             -- ^ The fd to recieve the output
             -> EitherT String IO OutputId
 addOutputFd tt@(Timetag s) name (Fd fd) = do
-    liftIO $ send s ("add_output_fd "<>name<>"\n")
-    liftIO $ threadDelay 10000
+    let cmd = "add_output_fd "<>name<>"\n"
+    liftIO $ send s cmd
+    reply <- readReply tt
     liftIO $ sendFd s fd
     reply <- readReply tt
     case reply of
