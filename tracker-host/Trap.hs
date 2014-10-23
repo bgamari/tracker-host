@@ -173,7 +173,7 @@ start cfg = do
                   , _outFiles = outputFiles cfg
                   }
 
-    log <- tryIO' $ openFile "trap.log" WriteMode
+    log <- fmapLT show $ tryIO $ openFile "trap.log" WriteMode
     thrd <- lift $ T.liftThrough async $ printError
             $ void $ runStateT (run cfg nextVar stopVar log tt counts) s
 
