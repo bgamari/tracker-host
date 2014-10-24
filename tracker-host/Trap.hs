@@ -35,6 +35,8 @@ import Pipes.Safe
 import qualified Pipes.Prelude as PP
 import qualified Pipes.ByteString as PBS
 
+import qualified System.ZMQ4 as ZMQ
+
 import qualified Tracker.LowLevel as T
 import qualified Tracker.Commands as T
 import qualified Tracker.Types as T
@@ -73,10 +75,10 @@ printError :: MonadIO m => EitherT String m () -> m ()
 printError action = do
     runEitherT action >>= either (liftIO . putStrLn) return
 
-watchBins :: Time -> TChan BinCount -> IO ()
-watchBins _binWidth counts = printError $ do
+watchBins :: Time -> TChan BinCount -> ZMQ.Context -> IO ()
+watchBins _binWidth counts ctx = printError $ do
     liftIO $ runSafeT $ runEffect
-             $ void monitor
+             $ void (monitor ctx)
            >-> unwrapRecords
            >-> PP.map snd
            >-> binRecords _binWidth
@@ -110,8 +112,9 @@ run :: TrapConfig
     -> Handle      -- ^ Log
     -> Timetag     -- ^ Timetagger
     -> TChan BinCount
+    -> ZMQ.Context
     -> TrapM ()
-run cfg nextVar stopVar log tt counts = go
+run cfg nextVar stopVar log tt counts ctx = go
   where
     go = do
         findParticle cfg
@@ -122,7 +125,7 @@ run cfg nextVar stopVar log tt counts = go
         lift $ tryIO' $ createDirectoryIfMissing True (takeDirectory outName)
         outHandle <- lift $ tryIO' $ openFile outName WriteMode 
         output <- lift $ tryIO' $ async $ runSafeT $ runEffect
-                       $ rawRecords >-> PBS.toHandle outHandle
+                       $ rawRecords ctx >-> PBS.toHandle outHandle
         lift $ liftEitherIO $ TT.startCapture tt
         status "capture started"
         delayMillis 1000
@@ -161,8 +164,9 @@ run cfg nextVar stopVar log tt counts = go
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
     tt <- TT.open
+    ctx <- liftIO ZMQ.context
     counts <- liftIO newBroadcastTChanIO
-    watchThread <- liftIO $ async $ watchBins (binWidth cfg) counts
+    watchThread <- liftIO $ async $ watchBins (binWidth cfg) counts ctx
     stopVar <- liftIO $ newTVarIO False
     nextVar <- liftIO newEmptyTMVarIO
 
@@ -176,8 +180,8 @@ start cfg = do
                   }
 
     log <- tryIO' $ openFile "trap.log" WriteMode
-    thrd <- lift $ T.liftThrough async $ printError
-            $ void $ runStateT (run cfg nextVar stopVar log tt counts) s
+    thrd <- lift $ T.liftThrough async $ printError $ void
+            $ runStateT (run cfg nextVar stopVar log tt counts ctx) s
 
     return $ TrapA
         { trapNext = atomically $ putTMVar nextVar ()

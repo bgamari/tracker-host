@@ -19,24 +19,18 @@ import qualified System.ZMQ4 as ZMQ
 
 import HPhoton.IO.FpgaTimetagger
 
-monitor :: Producer Record (SafeT IO) (Either (DecodingError, Producer ByteString (SafeT IO) ()) ())
-monitor = rawRecords ^. decoded
+monitor :: ZMQ.Context
+        -> Producer Record (SafeT IO) (Either (DecodingError, Producer ByteString (SafeT IO) ()) ())
+monitor ctx = rawRecords ctx ^. decoded
 
-rawRecords :: Producer ByteString (SafeT IO) ()
-rawRecords = bracket start cleanup go
+rawRecords :: ZMQ.Context -> Producer ByteString (SafeT IO) ()
+rawRecords ctx = bracket start ZMQ.close receiveSocket
   where
     start = do
-        ctx <- ZMQ.context
         sock <- ZMQ.socket ctx ZMQ.Sub
         ZMQ.subscribe sock ""
         ZMQ.connect sock "ipc:///tmp/timetag-data"
-        return (ctx, sock)
-
-    cleanup (ctx, sock) = do
-        ZMQ.close sock
-        ZMQ.shutdown ctx
-
-    go (_, socket) = receiveSocket socket
+        return sock
 
 receiveSocket :: (ZMQ.Receiver a, MonadIO m)
               => ZMQ.Socket a -> Producer ByteString m r
