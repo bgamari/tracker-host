@@ -24,7 +24,6 @@ import Data.Time.Clock
 import Data.Time.Format
 import System.IO
 
-import System.Posix.IO (openFd, defaultFileFlags, OpenMode (..))
 import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
 
@@ -34,6 +33,7 @@ import Linear
 import Pipes
 import Pipes.Safe
 import qualified Pipes.Prelude as PP
+import qualified Pipes.ByteString as PBS
 
 import qualified Tracker.LowLevel as T
 import qualified Tracker.Commands as T
@@ -66,15 +66,17 @@ data TrapActions = TrapA
 
 type Switch = MonadIO m => Bool -> m ()
 
+tryIO' :: MonadIO m => IO a -> EitherT String m a
+tryIO' = fmapLT show . tryIO
+
 printError :: MonadIO m => EitherT String m () -> m ()
 printError action = do
     runEitherT action >>= either (liftIO . putStrLn) return
 
 watchBins :: Time -> TChan BinCount -> IO ()
 watchBins _binWidth counts = printError $ do
-    tt <- TT.open "/tmp/timetag.sock"
     liftIO $ runSafeT $ runEffect
-             $ monitor tt "trapping"
+             $ void monitor
            >-> unwrapRecords
            >-> PP.map snd
            >-> binRecords _binWidth
@@ -117,10 +119,10 @@ run cfg nextVar stopVar log tt counts = go
         status "Start capture"
         outName : rest <- use outFiles
         outFiles .= rest
-        liftIO $ createDirectoryIfMissing True (takeDirectory outName)
-        dataFd <- liftIO $ openFd outName
-                                  WriteOnly (Just 0644) defaultFileFlags
-        output <- lift $ liftEitherIO $ TT.addOutputFd tt "trap_output" dataFd
+        lift $ tryIO' $ createDirectoryIfMissing True (takeDirectory outName)
+        outHandle <- lift $ tryIO' $ openFile outName WriteMode 
+        output <- lift $ tryIO' $ async $ runSafeT $ runEffect
+                       $ rawRecords >-> PBS.toHandle outHandle
         lift $ liftEitherIO $ TT.startCapture tt
         status "capture started"
         delayMillis 1000
@@ -137,7 +139,7 @@ run cfg nextVar stopVar log tt counts = go
         status "Kill excitation"
         delayMillis 1000
         lift $ liftEitherIO $ TT.stopCapture tt
-        lift $ liftEitherIO $ TT.removeOutput tt output
+        lift $ liftIO $ cancel output
         status "Stop capture"
 
         setTrap cfg False
@@ -173,7 +175,7 @@ start cfg = do
                   , _outFiles = outputFiles cfg
                   }
 
-    log <- fmapLT show $ tryIO $ openFile "trap.log" WriteMode
+    log <- tryIO' $ openFile "trap.log" WriteMode
     thrd <- lift $ T.liftThrough async $ printError
             $ void $ runStateT (run cfg nextVar stopVar log tt counts) s
 

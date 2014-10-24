@@ -1,12 +1,12 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Trap.MonitorTimetag where
 
+import Control.Monad (forever)
 import Control.Monad.IO.Class
 import Control.Error
 import Control.Lens
-import System.Posix.IO.ByteString
-import System.IO (Handle)
 
 import qualified Data.ByteString as BS
 
@@ -15,31 +15,29 @@ import Pipes.Safe
 import Pipes.Binary
 import Pipes.ByteString as PBS
 
-import Trap.Timetag
+import qualified System.ZMQ4 as ZMQ
+
 import HPhoton.IO.FpgaTimetagger
 
-failEitherT :: MonadThrow m => EitherT String m r -> m r
-failEitherT m = do
-    result <- runEitherT m
-    case result of
-      Left e -> fail e
-      Right r -> return r
+monitor :: Producer Record (SafeT IO) (Either (DecodingError, Producer ByteString (SafeT IO) ()) ())
+monitor = rawRecords ^. decoded
 
-monitor :: Timetag -> BS.ByteString -> Producer Record (SafeT IO) ()
-monitor tt name = bracket start cleanup go
+rawRecords :: Producer ByteString (SafeT IO) ()
+rawRecords = bracket start cleanup go
   where
-    start = failEitherT $ do
-        (readFd, writeFd) <- liftIO $ createPipe
-        outputId <- addOutputFd tt name writeFd
-        readH <- liftIO $ fdToHandle readFd
-        return (readH, outputId)
+    start = do
+        ctx <- ZMQ.context
+        sock <- ZMQ.socket ctx ZMQ.Sub
+        ZMQ.subscribe sock ""
+        ZMQ.connect sock "ipc:///tmp/timetag-data"
+        return (ctx, sock)
 
-    cleanup (_, outputId) = failEitherT $ do
-        removeOutput tt outputId
+    cleanup (ctx, sock) = do
+        ZMQ.close sock
+        ZMQ.shutdown ctx
 
-    go :: (Handle, OutputId) -> Producer Record (SafeT IO) ()
-    go (readH, _) = do
-        res <- PBS.fromHandle readH ^. decoded
-        case res of
-          Left (e,_) -> fail $ show e
-          Right _    -> return ()
+    go (_, socket) = receiveSocket socket
+
+receiveSocket :: (ZMQ.Receiver a, MonadIO m)
+              => ZMQ.Socket a -> Producer ByteString m r
+receiveSocket socket = forever $ liftIO (ZMQ.receive socket) >>= yield
