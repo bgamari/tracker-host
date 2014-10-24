@@ -160,7 +160,7 @@ run cfg nextVar stopVar log tt counts = go
 
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
-    tt <- TT.open "/tmp/timetag.sock"
+    tt <- TT.open
     counts <- liftIO newBroadcastTChanIO
     watchThread <- liftIO $ async $ watchBins (binWidth cfg) counts
     stopVar <- liftIO $ newTVarIO False

@@ -26,8 +26,8 @@ data Timetag = Timetag ZMQ.Context (ZMQ.Socket ZMQ.Req)
 tryIO' :: MonadIO m => IO a -> EitherT String m a
 tryIO' = fmapLT show . tryIO
 
-open :: MonadIO m => FilePath -> EitherT String m Timetag
-open path = tryIO' $ do
+open :: MonadIO m => EitherT String m Timetag
+open = tryIO' $ do
     ctx <- ZMQ.context
     s <- ZMQ.socket ctx ZMQ.Req
     ZMQ.connect s "ipc:///tmp/timetag-ctrl"
