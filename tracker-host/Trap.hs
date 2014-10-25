@@ -104,10 +104,19 @@ binRecords _binWidth = go 0 0
 
 data TrapState = TrapS { _scanPoints  :: [T.Stage Int32]
                        , _outFiles    :: [FilePath]
+                       , _logFile     :: Handle
                        }
 makeLenses ''TrapState
 
 type TrapM = StateT TrapState (EitherT String (T.TrackerT IO))
+
+status :: String -> TrapM ()
+status msg = do
+    log <- use logFile
+    t <- liftIO $ getCurrentTime
+    let fmt = iso8601DateFormat (Just "%H:%M:%S")
+        text = formatTime defaultTimeLocale fmt t++": "++msg
+    liftIO $ hPutStrLn log text
 
 run :: TrapConfig
     -> TMVar ()    -- ^ Used to force advance to next particle
@@ -157,13 +166,6 @@ run cfg nextVar stopVar log tt counts ctx = go
         stop <- liftIO $ atomically $ readTVar stopVar
         when (not stop) go
 
-    status :: String -> TrapM ()
-    status msg = do
-        t <- liftIO $ getCurrentTime
-        let fmt = iso8601DateFormat (Just "%H:%M:%S")
-            text = formatTime defaultTimeLocale fmt t++": "++msg
-        liftIO $ hPutStrLn log text
-
 start :: TrapConfig -> EitherT String (T.TrackerT IO) TrapActions
 start cfg = do
     tt <- TT.open
@@ -172,6 +174,7 @@ start cfg = do
     watchThread <- liftIO $ async $ watchBins (binWidth cfg) counts ctx
     stopVar <- liftIO $ newTVarIO False
     nextVar <- liftIO newEmptyTMVarIO
+    log <- tryIO' $ openFile "trap.log" WriteMode
 
     T.setKnob T.stageSetpoint zero
     T.setKnob T.feedbackMode T.StageFeedback
@@ -179,10 +182,10 @@ start cfg = do
     T.startAdcStream
     T.setKnob T.adcTriggerMode T.TriggerAuto
     let s = TrapS { _scanPoints = cycle $ searchScan cfg
-                  , _outFiles = outputFiles cfg
+                  , _outFiles   = outputFiles cfg
+                  , _logFile    = log
                   }
 
-    log <- tryIO' $ openFile "trap.log" WriteMode
     thrd <- lift $ T.liftThrough async $ printError $ void
             $ runStateT (run cfg nextVar stopVar log tt counts ctx) s
 
