@@ -154,8 +154,7 @@ commands :: [Command]
 commands = [ helloCmd
            , scanCmd
            ]
-           ++ stageCmds ++ logCmds ++ roughCalCmds ++ fineCalCmds
-           ++ feedbackCmds ++
+           ++ stageCmds ++ logCmds ++ roughCalCmds ++ fineCalCmds ++
            [ readSensorsCmd
            , sourceCmd
            , resetCmd
