@@ -73,7 +73,10 @@ tryIO' = fmapLT show . tryIO
 
 printError :: MonadIO m => EitherT String m () -> m ()
 printError action = do
-    runEitherT action >>= either (liftIO . putStrLn) return
+    res <- runEitherT action
+    case res of
+      Left e  -> liftIO $ putStrLn $ "error: Trap: "++e
+      Right _ -> return ()
 
 watchBins :: Time -> TChan BinCount -> ZMQ.Context -> IO ()
 watchBins _binWidth counts ctx = printError $ do
@@ -123,7 +126,7 @@ run cfg nextVar stopVar log tt counts ctx = go
         outName : rest <- use outFiles
         outFiles .= rest
         lift $ tryIO' $ createDirectoryIfMissing True (takeDirectory outName)
-        outHandle <- lift $ tryIO' $ openFile outName WriteMode 
+        outHandle <- lift $ tryIO' $ openFile outName WriteMode
         output <- lift $ tryIO' $ async $ runSafeT $ runEffect
                        $ rawRecords ctx >-> PBS.toHandle outHandle
         lift $ liftEitherIO $ TT.startCapture tt
@@ -197,7 +200,6 @@ waitUntilBleached cfg countsChan = liftIO $ do
     ch <- atomically $ dupTChan countsChan
     let go = do
             count <- atomically $ readTChan ch
-            putStrLn $ "bin count = "++show count
             when (not $ bleached cfg count) go
     go
 

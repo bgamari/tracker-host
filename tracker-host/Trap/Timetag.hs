@@ -57,7 +57,6 @@ stopCapture = assertOk . command "stop_capture"
 resetCounter :: Timetag -> EitherT String IO ()
 resetCounter = assertOk . command "reset_counter"
 
-
 isCaptureRunning :: Timetag -> EitherT String IO Bool
 isCaptureRunning tt = do
     reply <- command "capture?\n" tt

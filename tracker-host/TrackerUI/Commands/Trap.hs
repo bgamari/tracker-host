@@ -68,7 +68,7 @@ nextTrapCmd = command ["trap", "next"] "Move to next particle" "" $ \_-> do
 trapCmds :: [Command]
 trapCmds = [ startTrapCmd, nextTrapCmd, stopTrapCmd ]
 
-trapSettings :: [Setting]         
+trapSettings :: [Setting]
 trapSettings =
     [ setting "trap.bleach-thresh"
               "Fluorescence intensity threshold for trap termination"
