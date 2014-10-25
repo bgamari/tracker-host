@@ -57,9 +57,9 @@ waitUntilPathFinished = do
     when (not done) waitUntilPathFinished
 
 readAllTChan :: TVar Bool -> TChan a -> IO [a]
-readAllTChan running c = go []
+readAllTChan runningVar c = go []
   where go xs = do threadDelay 1000
-                   (a, running) <- atomically $ (,) <$> tryReadTChan c <*> readTVar running
+                   (a, running) <- atomically $ (,) <$> tryReadTChan c <*> readTVar runningVar
                    case a of
                      Nothing
                        | not running -> return $ reverse xs
