@@ -5,15 +5,11 @@ module Trap.MonitorTimetag where
 
 import Control.Monad (forever)
 import Control.Monad.IO.Class
-import Control.Error
 import Control.Lens
-
-import qualified Data.ByteString as BS
 
 import Pipes
 import Pipes.Safe
 import Pipes.Binary
-import Pipes.ByteString as PBS
 
 import qualified System.ZMQ4 as ZMQ
 

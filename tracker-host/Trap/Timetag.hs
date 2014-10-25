@@ -15,9 +15,7 @@ module Trap.Timetag
     ) where
 
 import Control.Error
-import Control.Monad (void, when)
 import Control.Monad.IO.Class
-import Data.Monoid
 import qualified System.ZMQ4 as ZMQ
 import qualified Data.ByteString.Char8 as BS
 
