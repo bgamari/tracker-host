@@ -158,7 +158,7 @@ run cfg nextVar stopVar log tt counts ctx = go
         status "Stop capture"
 
         setTrap cfg False
-        advancePoints 1000
+        advancePoints 10
         delayMillis 1000
         setTrap cfg True
         status "Next"
