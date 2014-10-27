@@ -36,6 +36,7 @@ executable tracker-host
                        errors,
                        either,
                        cassava,
+                       ring-buffer,
 
 		       -- Trapping
                        hphoton,

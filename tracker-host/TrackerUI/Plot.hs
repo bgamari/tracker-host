@@ -24,7 +24,7 @@ import Tracker as T
 import TrackerUI.Types
 import TrackerUI.Queue
 import TrackerUI.Plot.Types
-import qualified Util.RingBuffer as RB
+import qualified Data.RingBuffer as RB
 
 import Graphics.Rendering.GLPlot
 import qualified Graphics.UI.GLFW as GLFW
