@@ -9,7 +9,7 @@ module Trap
     , TrapActions (..)
     ) where
 
-import Prelude
+import Prelude hiding (log)
 import Control.Monad (forever, when)
 import Control.Monad.Trans.State
 import Data.Int
@@ -124,12 +124,11 @@ status msg = do
 run :: TrapConfig
     -> TMVar ()    -- ^ Used to force advance to next particle
     -> TVar Bool   -- ^ Set to terminate
-    -> Handle      -- ^ Log
     -> Timetag     -- ^ Timetagger
     -> TChan BinCount
     -> ZMQ.Context
     -> TrapM ()
-run cfg nextVar stopVar log tt counts ctx = go
+run cfg nextVar stopVar tt counts ctx = go
   where
     go = do
         findParticle cfg
@@ -190,7 +189,7 @@ start cfg = do
                   }
 
     thrd <- lift $ T.liftThrough async $ printError $ void
-            $ runStateT (run cfg nextVar stopVar log tt counts ctx) s
+            $ runStateT (run cfg nextVar stopVar tt counts ctx) s
 
     return $ TrapA
         { trapNext = atomically $ putTMVar nextVar ()
