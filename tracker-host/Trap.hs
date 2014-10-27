@@ -10,7 +10,7 @@ module Trap
     ) where
 
 import Prelude
-import Control.Monad (forever, when, void)
+import Control.Monad (forever, when)
 import Control.Monad.Trans.State
 import Data.Int
 import Control.Concurrent (threadDelay)
@@ -19,6 +19,8 @@ import Control.Concurrent.STM
 
 import Data.Vector (Vector)
 import qualified Data.Vector as V
+import qualified Data.Vector.Generic as VG
+import Statistics.Sample (stdDev)
 
 import Data.Time.Clock
 import Data.Time.Format
@@ -46,6 +48,7 @@ import HPhoton.Types (Time)
 
 import Trap.MonitorTimetag
 import Trap.Timetag as TT
+import qualified Data.RingBuffer as RB
 
 type BinCount = Int
 
@@ -53,7 +56,7 @@ type ParticleFoundCriterion = Vector (T.Psd (T.SumDiff Int16)) -> Bool
 
 data TrapConfig = TrapC
     { bleached      :: BinCount -> Bool
-    , foundParticle :: ParticleFoundCriterion
+    , foundParticleThresh :: Double -- ^ Threshold on sum standard deviation
     , binWidth      :: Time
     , setExcitation :: Switch
     , setTrap       :: Switch
@@ -213,15 +216,45 @@ advancePoints n = do
     scanPoints .= rest
     lift $ T.setKnob T.stageSetpoint p
 
+fromChannel :: MonadIO m => TChan a -> Producer' a m r
+fromChannel chan = go
+  where
+    go = do
+      x <- liftIO $ atomically $ readTChan chan
+      yield x
+      go
+
+decimate :: (VG.Vector v a, Monad m) => Int -> Pipe (v a) a m r
+decimate dec = go VG.empty dec
+  where
+    go xs n
+      | VG.null xs = do
+        xs' <- await
+        go xs' n
+      | VG.length xs < n = do
+        go VG.empty (n - VG.length xs)
+      | otherwise = do
+        yield (xs VG.! n)
+        go (VG.drop n xs) dec
+
+intoRingBuffer :: (VG.Vector v a, MonadIO m) => RB.RingBuffer v a -> Consumer' a m r
+intoRingBuffer rb = forever $ do
+    x <- await
+    liftIO $ RB.append x rb
+
 findParticle :: TrapConfig -> TrapM ()
 findParticle cfg = do
+    queue <- lift $ lift T.getSensorQueue
+    rb <- liftIO $ RB.new 100 :: TrapM (RB.RingBuffer V.Vector (T.Sensors Int16))
+    accumThread <- liftIO $ async $ runEffect
+                   $ fromChannel queue >-> decimate 100 >-> intoRingBuffer rb
     let go = do
             advancePoints 1
-            queue <- lift $ lift T.getSensorQueue
-            s <- liftIO $ atomically $ readTChan queue
-            let psd = V.map (^. T.psd) s
-            when (not $ foundParticle cfg psd) go
+            std <- RB.withItems rb $ \xs->
+                return $ stdDev $ V.map (^. (T.psd . _x . T.sdSum . to realToFrac)) xs
+            when (foundParticleThresh cfg < std) go
     go
+    liftIO $ cancel accumThread
 
 liftEitherIO :: MonadIO m => EitherT e IO a -> EitherT e m a
 liftEitherIO m = liftIO (runEitherT m) >>= EitherT . return

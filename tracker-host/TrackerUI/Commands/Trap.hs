@@ -9,9 +9,6 @@ import Data.Traversable (sequenceA)
 import Control.Monad.IO.Class
 import System.Process (callProcess)
 
-import Statistics.Sample (stdDev)
-import qualified Data.Vector as V
-
 import Linear
 import Control.Lens hiding (Setting, setting)
 
@@ -32,10 +29,6 @@ scan = RasterScan
     , _scanPoints = T.mkStage 300 300 1
     }
 
-stdDevFound :: Double -> ParticleFoundCriterion
-stdDevFound s v =
-    s < stdDev (V.map realToFrac $ V.map (^. (_x . T.sdSum)) v)
-
 startTrapCmd :: Command
 startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
     aotf <- liftEitherT $ Aotf.open "/dev/ttyUSB.aotf"
@@ -44,7 +37,7 @@ startTrapCmd = command ["trap", "start"] "Start trapping" "" $ \_-> do
     bleach <- use bleachThresh
     let cfg = TrapC
             { bleached = (< bleach)
-            , foundParticle = stdDevFound std
+            , foundParticleThresh = std
             , binWidth = round (1 * 128e6 :: Double)
             , setExcitation = \on -> Aotf.setMode aotf exciteCh
                                      $ if on then Aotf.On else Aotf.Off
