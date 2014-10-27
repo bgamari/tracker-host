@@ -173,6 +173,7 @@ commands = [ helloCmd
 
 runCommand :: [String] -> TrackerUI Bool
 runCommand [] = return True
+runCommand (('#':_):_)  = return True
 runCommand input = do
     let cmds = filter (\c->(c^.cmdName) `isPrefixOf` input) commands
     case cmds of
