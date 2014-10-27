@@ -7,6 +7,7 @@ module TrackerUI.Commands.Trap
 
 import Data.Traversable (sequenceA)
 import Control.Monad.IO.Class
+import Control.Concurrent.STM
 import System.Process (callProcess)
 
 import Statistics.Sample (stdDev)
@@ -15,6 +16,7 @@ import qualified Data.Vector as V
 import Linear
 import Control.Lens hiding (Setting, setting)
 
+import Tracker.LowLevel as T
 import Tracker.Types as T
 import Tracker.Raster
 import TrackerUI.Commands.Utils
@@ -65,8 +67,14 @@ nextTrapCmd :: Command
 nextTrapCmd = command ["trap", "next"] "Move to next particle" "" $ \_-> do
     use trapActions >>= liftIO . maybe (return ()) trapNext
 
+trapStatsCmd :: Command
+trapStatsCmd = command ["trap", "stats"] "Print PSD statistics" "" $ \_-> do
+    v <- liftTracker $ T.getSensorQueue >>= liftIO . atomically . readTChan
+    let s = stdDev $ V.map (^. (T.psd . _x . T.sdSum . to realToFrac)) v
+    liftIO $ print $ "Sum stdev "++show s
+
 trapCmds :: [Command]
-trapCmds = [ startTrapCmd, nextTrapCmd, stopTrapCmd ]
+trapCmds = [ startTrapCmd, nextTrapCmd, stopTrapCmd, trapStatsCmd ]
 
 trapSettings :: [Setting]
 trapSettings =
