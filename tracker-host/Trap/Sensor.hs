@@ -22,8 +22,8 @@ decimate dec = go VG.empty dec
       | VG.null xs = do
         xs' <- await
         go xs' n
-      | VG.length xs < n = do
-        go VG.empty (n - VG.length xs)
-      | otherwise = do
+      | VG.length xs > n = do
         yield (xs VG.! n)
         go (VG.drop n xs) dec
+      | otherwise = do
+        go VG.empty (n - VG.length xs)
