@@ -12,7 +12,7 @@ module PreAmp.Optimize ( optimize
 import Prelude hiding (sequence)
 import Data.Function
 import Data.List (minimumBy)
-import Data.Traversable (Traversable, sequenceA)
+import Data.Traversable (sequenceA)
 import Data.Foldable (Foldable)
 import Control.Applicative
 import Control.Concurrent (threadDelay)
