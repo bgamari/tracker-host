@@ -34,11 +34,11 @@ instance Bounded CodePoint where
 channels :: PsdChannels Channel
 channels =
     PsdChans $ Psd $ V2 (mkSumDiff xSum xDiff) (mkSumDiff ySum yDiff)
-
-xSum  = Ch 0
-xDiff = Ch 1
-ySum  = Ch 2
-yDiff = Ch 3
+  where
+    xSum  = Ch 0
+    xDiff = Ch 1
+    ySum  = Ch 2
+    yDiff = Ch 3
 
 write :: MonadIO m => PreAmp -> String -> m ()
 write (PreAmp h) = liftIO . hPutStr h
