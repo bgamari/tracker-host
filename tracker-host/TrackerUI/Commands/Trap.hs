@@ -10,6 +10,9 @@ import Control.Monad.IO.Class
 import Control.Concurrent.STM
 import System.Process (callProcess)
 
+import qualified Data.Vector as V
+import Statistics.Sample (stdDev)
+
 import Linear
 import Control.Lens hiding (Setting, setting)
 
