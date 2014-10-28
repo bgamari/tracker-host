@@ -37,8 +37,8 @@ close (Timetag ctx s) = tryIO' $ do
     ZMQ.shutdown ctx
 
 command :: BS.ByteString -> Timetag -> EitherT String IO BS.ByteString
-command cmd tt@(Timetag _ s) = tryIO' $ do
-    n <- ZMQ.send s [] cmd
+command cmd (Timetag _ s) = tryIO' $ do
+    _ <- ZMQ.send s [] cmd
     ZMQ.receive s
 
 assertOk :: EitherT String IO BS.ByteString -> EitherT String IO ()
