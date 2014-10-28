@@ -2,9 +2,12 @@
 
 module TrackerUI.Commands.Excite (exciteCmds, exciteSettings) where
 
+import Prelude hiding (concat)
 import Control.Applicative
 import System.IO
 import Control.Monad.IO.Class
+import Data.List (intercalate)
+import Data.Foldable as F
 
 import Control.Lens hiding (Setting, setting)
 import Linear
@@ -45,6 +48,10 @@ exciteCmds =
         liftIO $ withFile "r.txt" WriteMode $ \h->
             V.mapM_ (hPutStrLn h . showSensors) samples
     ]
+
+showSensors :: Show a => T.Sensors a -> String
+showSensors x = intercalate "\t" $ (F.toList $ fmap show $ x ^. T.stage) ++[""]++
+                                   (F.concat $ fmap (F.toList . fmap show) $ x ^. T.psd)
 
 exciteSettings :: [Setting]
 exciteSettings =
