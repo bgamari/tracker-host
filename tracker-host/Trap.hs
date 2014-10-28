@@ -120,6 +120,7 @@ status msg = do
     let fmt = iso8601DateFormat (Just "%H:%M:%S")
         text = formatTime defaultTimeLocale fmt t++": "++msg
     liftIO $ hPutStrLn log text
+    liftIO $ hFlush log
 
 run :: TrapConfig
     -> TMVar ()    -- ^ Used to force advance to next particle
