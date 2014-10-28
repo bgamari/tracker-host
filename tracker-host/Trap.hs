@@ -46,6 +46,7 @@ import qualified Tracker.Types as T
 import HPhoton.IO.FpgaTimetagger.Pipes
 import HPhoton.Types (Time)
 
+import Trap.Sensor
 import Trap.MonitorTimetag
 import Trap.Timetag as TT
 import qualified Data.RingBuffer as RB
@@ -215,27 +216,6 @@ advancePoints n = do
     let p:rest = drop n pts
     scanPoints .= rest
     lift $ T.setKnob T.stageSetpoint p
-
-fromChannel :: MonadIO m => TChan a -> Producer' a m r
-fromChannel chan = go
-  where
-    go = do
-      x <- liftIO $ atomically $ readTChan chan
-      yield x
-      go
-
-decimate :: (VG.Vector v a, Monad m) => Int -> Pipe (v a) a m r
-decimate dec = go VG.empty dec
-  where
-    go xs n
-      | VG.null xs = do
-        xs' <- await
-        go xs' n
-      | VG.length xs < n = do
-        go VG.empty (n - VG.length xs)
-      | otherwise = do
-        yield (xs VG.! n)
-        go (VG.drop n xs) dec
 
 intoRingBuffer :: (VG.Vector v a, MonadIO m) => RB.RingBuffer v a -> Consumer' a m r
 intoRingBuffer rb = forever $ do
