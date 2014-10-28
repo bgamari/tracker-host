@@ -47,13 +47,13 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \_->do
   where help = "Perform rough Z scan"
 
 roughFitCmd :: Command
-roughFitCmd = command ["rough", "fit"] help "" $ \args->do
+roughFitCmd = command ["rough", "fit"] help "" $ \_->do
     scan <- use lastRoughScan >>= tryJust "No rough calibration"
     let samples = V.map (\s->(s^.stage._xy, s^.psd._x.sdDiff))
                   $ V.map (fmap realToFrac) scan
         m0 = Model.initialModel samples
         m = head $ drop 10 $ Model.fit samples m0
-        center = Model.modelCenter m
+        --center = Model.modelCenter m
         --gains = Model.modelToGains center m
     liftIO $ print m0
     liftIO $ print m
