@@ -13,7 +13,7 @@ import Linear
 import Control.Lens
 
 import PreAmp
-import PreAmp.Optimize as PreAmp
+import qualified PreAmp.Optimize as PreAmp
 
 import Tracker.Types
 import TrackerUI.Types
@@ -31,11 +31,11 @@ optimizePreAmp = command ["preamp", "optimize"] help "" $ \_->do
     pa <- tryJust "No pre-amplifier open" =<< use preAmp
     maxVar <- use preAmpMaxSigma2
     let channel :: (forall a. Lens' (PsdChannels a) a)
-                -> TrackerUI (GainOffset CodePoint)
+                -> TrackerUI (PreAmp.GainOffset CodePoint)
         channel l = do
             liftIO $ putStr $ "Optimizing "++views l show names++": "
             res <- liftTrackerE $ noteT "Failed to optimize"
-                                $ MaybeT $ optimize pa l maxVar
+                                $ MaybeT $ PreAmp.optimize pa l maxVar
             liftIO $ print res
             return res
 
@@ -43,7 +43,7 @@ optimizePreAmp = command ["preamp", "optimize"] help "" $ \_->do
         names = PsdChans $ mkPsd (mkSumDiff "sumX" "diffX")
                                  (mkSumDiff "sumY" "diffY")
 
-        actions :: PsdChannels (TrackerUI (GainOffset CodePoint))
+        actions :: PsdChannels (TrackerUI (PreAmp.GainOffset CodePoint))
         actions =
           PsdChans
           $ Psd $ V2 (mkSumDiff (channel $ _Wrapping' PsdChans . _x . sdSum)
@@ -74,12 +74,12 @@ preAmpCmds = concat [ cmd (_Wrapping' PsdChans . _x . sdSum) "xsum"
                   (Just "Set pre-amplifier gain") "[GAIN]" $ \args -> do
                 pa <- use preAmp >>= tryJust "No pre-amplifier open"
                 gain <- tryHead "expected gain" args >>= tryRead "invalid gain"
-                liftEitherT $ PreAmp.setGain pa ch $ fromIntegral gain
+                liftEitherT $ PreAmp.setGain pa ch $ fromIntegral (gain :: Int)
                 preAmpValues . proj . PreAmp.gain .= fromIntegral gain
                 return True
             , Cmd ["get", "amp."++name++".gain"]
                   (Just "Get pre-amplifier gain") "" $ \_ -> do
-                void $ uses (preAmpValues . proj . gain) print
+                void $ uses (preAmpValues . proj . PreAmp.gain) print
                 return True
             , Cmd ["set", "amp."++name++".offset"]
                   (Just "Set pre-amplifier offset") "[OFFSET]" $ \args -> do
