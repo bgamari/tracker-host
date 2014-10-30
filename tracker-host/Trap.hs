@@ -200,6 +200,7 @@ start cfg = do
                         wait thrd
                         cancel watchThread
                         void $ runEitherT $ TT.close tt
+                        hClose log
         }
 
 waitUntilBleached :: MonadIO m => TrapConfig -> TChan BinCount -> m ()
