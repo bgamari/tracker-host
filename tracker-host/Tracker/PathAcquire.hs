@@ -42,12 +42,12 @@ pathAcquire freq path = do
     startPath freq False
     mapM_ queuePoints $ points
     waitUntilPathFinished
-    -- Grab remaining frames
-    liftIO $ atomically $ writeTVar running False
-    frames <- liftIO $ wait framesAsync
     -- Restart ADC triggering
     setKnob adcDecimation dec
     setKnob adcTriggerMode TriggerAuto
+    -- Grab remaining frames
+    liftIO $ atomically $ writeTVar running False
+    frames <- liftIO $ wait framesAsync
     return $ V.concat frames
 
 waitUntilPathFinished :: MonadIO m => EitherT String (TrackerT m) ()
