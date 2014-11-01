@@ -68,19 +68,19 @@ readAllTChan runningVar c = go []
                        | otherwise   -> go xs
                      Just x  -> go (x:xs)
 
-queuePoints :: MonadIO m => [Stage Word16] -> EitherT String (TrackerT m) Bool
+queuePoints :: MonadIO m => [Stage Word16] -> EitherT String (TrackerT m) ()
 queuePoints points = go
-  where go = do r <- enqueuePoints $ V.fromList points
-                case r of
-                  Just running -> return running
-                  Nothing      -> liftIO (threadDelay 10000) >> go
+  where
+    go = do (added, running) <- enqueuePoints $ V.fromList points
+            when (not running) $ left "queuePoints: Path points underflowed"
+            when (not added) $ liftIO (threadDelay 10000) >> go 
 
 primePath :: MonadIO m
           => [[Stage Word16]] -> EitherT String (TrackerT m) [[Stage Word16]]
 primePath [] = return []
 primePath (points:rest) = do
-    r <- enqueuePoints $ V.fromList points
-    case r of
-      Just running -> if running then error "primePath: Attempted to prime while already running"
-                                 else primePath rest
-      Nothing      -> return rest
+    (added, running) <- enqueuePoints $ V.fromList points
+    case (added, running) of
+      (_, True)  -> left "primePath: Attempted to prime while already running"
+      (True,  _) -> primePath rest
+      (False, _) -> return rest

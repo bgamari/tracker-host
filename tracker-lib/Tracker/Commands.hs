@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE PatternGuards #-}
 
 module Tracker.Commands ( -- * Types
                           Knob
@@ -252,8 +253,9 @@ clearPath = do
     writeCommand 0x40 $ return ()
     readAck "clearPath"
 
+-- | Add points to queued path. Returns @(points_added, path_running)@.
 enqueuePoints :: MonadIO m
-              => V.Vector (Stage Word16) -> EitherT String (TrackerT m) (Maybe Bool)
+              => V.Vector (Stage Word16) -> EitherT String (TrackerT m) (Bool, Bool)
 enqueuePoints points 
   | V.length points > maxPathPoints =
       left "enqueuePoints: Attempted to enqueue too many points at once"
@@ -263,16 +265,15 @@ enqueuePoints points
           mapM_ (mapM_ putWord16le) points
       r <- readReply
       case r of 
-        Nothing                     -> return Nothing
-        Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
-        _                           -> left "enqueuePoints: Unexpected response"
+        Just r' | [b0, b1] <- BS.unpack r' ->
+          let queued = b0 /= 0
+              running = b1 /= 0
+          in return (queued, running)
+        _ ->
+          left "enqueuePoints: Unexpected response"
 
 isPathRunning :: MonadIO m => EitherT String (TrackerT m) Bool
-isPathRunning = do
-    s <- enqueuePoints V.empty
-    case s of
-      Just a  -> return a
-      Nothing -> left "isPathRunning: Unexpected nack"
+isPathRunning = snd <$> enqueuePoints V.empty
 
 startPath :: MonadIO m => Word32 -> Bool -> EitherT String (TrackerT m) ()
 startPath freq syncAdc = do
