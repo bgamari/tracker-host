@@ -16,9 +16,11 @@ import Tracker.Commands
 import Tracker.Types
 
 batchBy :: Int -> [a] -> [[a]]
-batchBy _ [] = []
-batchBy n xs = batch : batchBy n rest
-  where (batch,rest) = splitAt n xs
+batchBy n = go
+  where
+    go [] = []
+    go xs = batch : batchBy n rest
+      where (batch,rest) = splitAt n xs
 
 pathAcquire :: MonadIO m => Word32 -> [Stage Word16]
             -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
