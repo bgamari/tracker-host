@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module TrackerUI.Commands.PreAmp (preAmpCmds) where
+module TrackerUI.Commands.PreAmp (preAmpCmds, preAmpSettings) where
 
 import Prelude hiding (sequence)
 import Data.Traversable
@@ -10,7 +10,7 @@ import Control.Monad.Trans.Maybe
 import Control.Error (noteT)
 
 import Linear
-import Control.Lens
+import Control.Lens hiding (setting, Setting)
 
 import PreAmp
 import qualified PreAmp.Optimize as PreAmp
@@ -94,3 +94,10 @@ preAmpCmds = concat [ cmd (_Wrapping' PsdChans . _x . sdSum) "xsum"
                 return True
             ]
           where ch = PreAmp.channels ^. proj
+
+preAmpSettings :: [Setting]
+preAmpSettings =
+    [ setting "preamp.optimize.maxVar"
+              "Maximum variance allowed in PSD signal"
+              stateA preAmpMaxSigma2
+    ]

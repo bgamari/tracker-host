@@ -138,9 +138,7 @@ settings = concat
                 "decimation factor of samples"
                 (knobA T.adcDecimation) id
       ]
-    , [setting "preamp.optimize.maxVar"
-               "Maximum variance allowed in PSD signal"
-               stateA preAmpMaxSigma2]
+    , preAmpSettings
     ]
 
 showCmd :: Command
