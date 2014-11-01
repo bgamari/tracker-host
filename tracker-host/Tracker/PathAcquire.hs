@@ -44,7 +44,7 @@ pathAcquire freq path = do
     -- First fill up path queue and start running path
     points <- primePath $ batchBy maxPathPoints path
     startPath freq False
-    mapM_ queuePoints $ points
+    mapM_ queuePoints points
     waitUntilPathFinished
     -- Restart ADC triggering
     setKnob feedbackMode mode
