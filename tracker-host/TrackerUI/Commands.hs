@@ -131,9 +131,13 @@ settings = concat
     [ roughCalSettings, fineCalSettings, stageSettings, exciteSettings
     , feedbackSettings
     , trapSettings
-    , [setting "decimation"
-               "decimation factor of samples"
-               (knobA T.adcDecimation) id]
+    , [ setting "adc.freq"
+                "trigger frequency of ADC"
+                (knobA T.adcFreq) id
+      , setting "decimation"
+                "decimation factor of samples"
+                (knobA T.adcDecimation) id
+      ]
     , [setting "preamp.optimize.maxVar"
                "Maximum variance allowed in PSD signal"
                stateA preAmpMaxSigma2]
