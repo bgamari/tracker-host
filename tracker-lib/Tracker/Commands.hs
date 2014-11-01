@@ -255,7 +255,8 @@ clearPath = do
 enqueuePoints :: MonadIO m
               => V.Vector (Stage Word16) -> EitherT String (TrackerT m) (Maybe Bool)
 enqueuePoints points 
-  | V.length points > maxPathPoints = return Nothing
+  | V.length points > maxPathPoints =
+      left "enqueuePoints: Attempted to enqueue too many points at once"
   | otherwise = do
       writeCommand 0x41 $ do
           putWord8 $ fromIntegral $ V.length points
@@ -271,7 +272,7 @@ isPathRunning = do
     s <- enqueuePoints V.empty
     case s of
       Just a  -> return a
-      Nothing -> error "isPathRunning: Unexpected nack"
+      Nothing -> left "isPathRunning: Unexpected nack"
 
 startPath :: MonadIO m => Word32 -> Bool -> EitherT String (TrackerT m) ()
 startPath freq syncAdc = do
