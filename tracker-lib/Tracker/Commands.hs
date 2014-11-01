@@ -18,6 +18,7 @@ module Tracker.Commands ( -- * Types
                         , TriggerMode(..)
                         , adcTriggerMode
                         , adcDecimation
+                        , feedbackFreq
                         , FeedbackMode(..)
                         , feedbackMode
                         , searchStep
@@ -33,7 +34,6 @@ module Tracker.Commands ( -- * Types
                         , startAdcStream
                         , stopAdcStream
                         , flushAdcStream
-                        , setFeedbackFreq
                         , setRawPosition
                         , clearPath
                         , maxPathPoints
@@ -202,10 +202,8 @@ flushAdcStream = do
     writeCommand 0x2c $ return ()
     readAck "flushAdcStream"
     
-setFeedbackFreq :: MonadIO m => Word32 -> EitherT String (TrackerT m) ()
-setFeedbackFreq freq = do
-    writeCommand 0x30 $ putWord32le freq
-    readAck "setFeedbackFreq"
+feedbackFreq :: Knob Word32
+feedbackFreq = Knob "feedback-freq" 0x30 getWord32le 0x31 putWord32le
 
 data FeedbackMode = NoFeedback
                   | PsdFeedback
@@ -215,13 +213,13 @@ data FeedbackMode = NoFeedback
                   deriving (Show, Eq, Ord, Bounded, Enum)
 
 feedbackMode :: Knob FeedbackMode
-feedbackMode = Knob "feedback-mode" 0x31 getter 0x32 putter
+feedbackMode = Knob "feedback-mode" 0x32 getter 0x33 putter
   where getter = getEnum getWord8
         putter = putEnum putWord32le
 
 setRawPosition :: MonadIO m => Stage Word16 -> EitherT String (TrackerT m) ()
 setRawPosition pos = do
-    writeCommand 0x33 $ mapM_ putWord16le pos
+    writeCommand 0x34 $ mapM_ putWord16le pos
     readAck "setRawPosition"
 
 maxPathPoints :: Int

@@ -29,7 +29,7 @@ main = either error (const $ return ()) =<< go
               T.echo "Hello World!" >>= liftIO . print
               T.setKnob T.stageGain defaultStageGains
               T.setKnob T.outputGain defaultOutputGains
-              T.setFeedbackFreq 50000
+              T.setKnob T.feedbackFreq 50000
               T.setKnob T.adcFreq 50000
               T.setKnob T.adcDecimation 4
               T.startAdcStream

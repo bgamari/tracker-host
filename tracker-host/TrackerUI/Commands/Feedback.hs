@@ -118,4 +118,7 @@ coarseFbSettings = concat $ toList $ tabulatePsdChannels go
 
 feedbackSettings :: [Setting]
 feedbackSettings =
-    psdSettings ++ searchSettings ++ coarseFbSettings
+    psdSettings ++ searchSettings ++ coarseFbSettings ++
+    [ setting "feedback.freq" "Feedback loop update frequency"
+              (knobA T.feedbackFreq) id
+    ]
