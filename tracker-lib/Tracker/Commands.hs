@@ -56,32 +56,9 @@ import Control.Error
 import Control.Applicative
 import Control.Monad.IO.Class
 
-import Linear
-
 import Tracker.LowLevel
 import Tracker.Types
 import Tracker.Commands.Types
-
-getEnum :: (Integral n, Enum a) => Get n -> Get a
-getEnum getN = toEnum . fromIntegral <$> getN
-
-putEnum :: (Integral n, Enum a) => (n -> Put) -> (a -> Put)
-putEnum putN = putN . fromIntegral . fromEnum
-
--- | Put a 32-bit signed integer
---
--- Exploits the fact that 'fromIntegral' preserves representation, not sign
-putInt32le :: Int32 -> Put
-putInt32le = putWord32le . fromIntegral
-
-getInt32le :: Get Int32
-getInt32le = fromIntegral <$> getWord32le
-
-putInt16le :: Int16 -> Put
-putInt16le = putWord16le . fromIntegral
-
-getInt16le :: Get Int16
-getInt16le = fromIntegral <$> getWord16le
 
 data Knob a = Knob { _knobName    :: String 
                    , _knobGetCmd  :: CmdId
@@ -107,8 +84,8 @@ echo :: MonadIO m => ByteString -> EitherT String (TrackerT m) (Maybe ByteString
 echo payload = do
     writeCommand 0x0 $ do putWord8 (fromIntegral $ BS.length payload)
                           putByteString payload
-    parseReply $ do length <- getWord8
-                    getByteString $ fromIntegral length
+    parseReply $ do len <- getWord8
+                    getByteString $ fromIntegral len
 
 reset :: MonadIO m => EitherT String (TrackerT m) ()
 reset = writeCommand 0x01 $ putWord32le 0xdeadbeef
@@ -294,16 +271,6 @@ searchObjGains = Knob "search-obj-gains" 0x45 getter 0x46 putter
 
 searchObjThresh :: Knob Word16
 searchObjThresh = Knob "search-obj-thresh" 0x47 getWord16le 0x48 putWord16le
-
-instance Binary CoarseFbChannel where
-    get = CoarseFbChan <$> getV3 <*> getV3 <*> getWord16le
-      where
-        getV3 :: Get (V3 Int16)
-        getV3 = sequence $ pure getInt16le
-    put (CoarseFbChan h l t) = do
-        traverse_ putInt16le h
-        traverse_ putInt16le l
-        putWord16le t
 
 coarseFbParams :: Knob (PsdChannels CoarseFbChannel)
 coarseFbParams = Knob "coarse-fb-params" 0x49 getter 0x4a putter
