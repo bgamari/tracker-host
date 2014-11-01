@@ -32,6 +32,7 @@ module Tracker.Commands ( -- * Types
                         , setExcitation
                         , startAdcStream
                         , stopAdcStream
+                        , flushAdcStream
                         , setFeedbackFreq
                         , setRawPosition
                         , clearPath

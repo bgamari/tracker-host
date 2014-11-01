@@ -31,6 +31,7 @@ pathAcquire freq path = do
     -- the firmware will enable triggering upon starting the path
     -- disable triggering so we only see samples from after this point
     setKnob adcTriggerMode TriggerOff
+    flushAdcStream
     clearPath
     -- Start capturing data
     dec <- getKnob adcDecimation
