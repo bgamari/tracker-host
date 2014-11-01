@@ -265,7 +265,7 @@ enqueuePoints points
       case r of 
         Nothing                     -> return Nothing
         Just r' | BS.length r' == 1 -> return $ Just $ BS.head r' /= 0
-        _                           -> return Nothing
+        _                           -> left "enqueuePoints: Unexpected response"
 
 isPathRunning :: MonadIO m => EitherT String (TrackerT m) Bool
 isPathRunning = do
