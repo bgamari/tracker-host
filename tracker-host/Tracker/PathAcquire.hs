@@ -86,4 +86,4 @@ primePath (points:rest) = do
     case (added, running) of
       (_, True)  -> left "primePath: Attempted to prime while already running"
       (True,  _) -> primePath rest
-      (False, _) -> return rest
+      (False, _) -> return (points:rest)
