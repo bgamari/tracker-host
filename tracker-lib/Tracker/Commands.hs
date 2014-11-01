@@ -247,7 +247,8 @@ setRawPosition pos = do
     writeCommand 0x33 $ mapM_ putWord16le pos
     readAck "setRawPosition"
 
-maxPathPoints = 80 :: Int
+maxPathPoints :: Int
+maxPathPoints = 80
 
 clearPath :: MonadIO m => EitherT String (TrackerT m) ()
 clearPath = do
