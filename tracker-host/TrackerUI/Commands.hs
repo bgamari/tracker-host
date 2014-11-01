@@ -15,7 +15,7 @@ import Control.Applicative
 import Control.Monad.State hiding (sequence, forM_, mapM_)
 import Control.Monad.Error.Class
 
-import Control.Lens hiding (setting, Setting)
+import Control.Lens hiding (setting, Setting, matching)
 import Linear
 
 import Control.Concurrent.STM
@@ -103,8 +103,8 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
         cmds = cmdFilter commands
         formatCmd :: Command -> Maybe String
         formatCmd c = case c ^. cmdHelp of
-                         Just help -> Just $ take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ') ++ help
-                         Nothing   -> Nothing
+                         Just helpMsg -> Just $ take 40 (unwords (c^.cmdName)++" "++c^.cmdArgs++repeat ' ') ++ helpMsg
+                         Nothing      -> Nothing
     in case cmds of
            []  -> throwError "No matching commands"
            _   -> liftInputT $ outputStr $ unlines $ mapMaybe formatCmd cmds
@@ -112,13 +112,13 @@ helpCmd = command ["help"] help "[CMD]" $ \args->
 
 settingCommands :: Setting -> [Command]
 settingCommands (Setting {..}) = [getter, setter]
-  where get = sAccessors ^. aGet
-        put = sAccessors ^. aPut
+  where getA = sAccessors ^. aGet
+        putA = sAccessors ^. aPut
         getter = Cmd ["get",sName] (("Get "++) <$> sHelp) "" $ \_->
-                   get >>= showValue . view sLens >> return True
+                   getA >>= showValue . view sLens >> return True
         setter = Cmd ["set",sName] (("Set "++) <$> sHelp) "VALUE" $ \args->
                    case sParse args of
-                     Just value -> do get >>= put . (sLens .~ value)
+                     Just value -> do getA >>= putA . (sLens .~ value)
                                       showValue value
                                       return True
                      Nothing    -> do liftInputT $ outputStrLn
