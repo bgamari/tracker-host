@@ -26,6 +26,7 @@ pathAcquire _ [] = do
     liftIO $ putStrLn "pathAcquire: Tried to acquire on empty path"
     return V.empty
 pathAcquire freq path = do
+    mode <- getKnob feedbackMode
     setKnob feedbackMode StageFeedback
     -- the firmware will enable triggering upon starting the path
     -- disable triggering so we only see samples from after this point
@@ -43,6 +44,7 @@ pathAcquire freq path = do
     mapM_ queuePoints $ points
     waitUntilPathFinished
     -- Restart ADC triggering
+    setKnob feedbackMode mode
     setKnob adcDecimation dec
     setKnob adcTriggerMode TriggerAuto
     -- Grab remaining frames
