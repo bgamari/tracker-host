@@ -41,9 +41,11 @@ pathAcquire freq path = do
     running <- liftIO $ newTVarIO True
     queue <- lift getSensorQueue
     framesAsync <- liftIO $ async $ readAllTChan running queue
-    -- First fill up path queue and start running path
+    -- First fill up path queue
     points <- primePath $ batchBy maxPathPoints path
+    -- The queue is full, start running path
     startPath freq False
+    -- Queue remaining points as the queue drains
     mapM_ queuePoints points
     waitUntilPathFinished
     -- Restart ADC triggering
