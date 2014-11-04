@@ -14,6 +14,7 @@ import Data.List (isPrefixOf, stripPrefix, intercalate)
 import Control.Applicative
 import Control.Monad.State hiding (sequence, forM_, mapM_)
 import Control.Monad.Error.Class
+import System.IO
 
 import Control.Lens hiding (setting, Setting, matching)
 import Linear
@@ -26,8 +27,12 @@ import qualified Control.Error.Safe as Safe
 import System.Console.Haskeline
 
 import qualified Data.Vector as V
+import qualified Control.Foldl as Foldl
+import qualified Data.Csv as Csv
+import qualified Data.ByteString.Lazy as LBS
 
 import qualified Tracker as T
+import qualified Tracker.PathAcquire as T
 import Tracker.Types
 import TrackerUI.Types
 
@@ -50,13 +55,18 @@ helloCmd = command ["hello"] help ""
     $ const $ liftInputT $ outputStrLn "hello world!"
   where help = "Print hello world!"
 
+forEach :: Monad m => (a -> m ()) -> Foldl.FoldM m a ()
+forEach action = Foldl.FoldM (const action) (return ()) return
+
 scanCmd :: Command
 scanCmd = command ["scan"] help "[file]" $ \args -> do
     fname <- tryHead "expected file name" args
     rs <- use roughScan
     freq <- use roughScanFreq
-    scan <- liftTrackerE $ T.roughScan freq rs
-    liftIO $ writeTsv fname $ V.toList scan
+    h <- liftIO $ openFile fname WriteMode
+    liftTrackerE $ T.pathAcquire freq (T.rasterScanToPath rs) $ forEach
+                 $ LBS.hPutStr h . Csv.encodeWith tsvEncodeOptions . F.toList
+    liftIO $ hClose h
     liftInputT $ outputStrLn $ "Scan dumped to "++fname
     center
   where help = "Perform a scan and dump to file (uses rough scan parameters)"

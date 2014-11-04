@@ -22,9 +22,10 @@ import qualified Tracker as T
 import TrackerUI.Types
 
 writeTsv :: Csv.ToRecord a => FilePath -> [a] -> IO ()
-writeTsv fname = BSL.writeFile fname . Csv.encodeWith opts
-    where
-      opts = Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
+writeTsv fname = BSL.writeFile fname . Csv.encodeWith tsvEncodeOptions
+
+tsvEncodeOptions =
+    Csv.defaultEncodeOptions { Csv.encDelimiter=fromIntegral $ ord '\t' }
 
 tryHead :: String -> [a] -> TrackerUI a
 tryHead e []    = throwError e

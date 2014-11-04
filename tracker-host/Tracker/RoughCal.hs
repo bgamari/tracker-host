@@ -1,7 +1,8 @@
 {-# LANGUAGE RecordWildCards, RankNTypes, FlexibleContexts, UndecidableInstances,
              DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
-module Tracker.RoughCal ( roughScan
+module Tracker.RoughCal ( rasterScanToPath
+                        , roughScan
                         , roughCenter
                         ) where
 
@@ -21,15 +22,16 @@ import Tracker.PathAcquire
 import Tracker.LowLevel
 --import Tracker.RoughCal.Model
 
+rasterScanToPath :: RasterScan Stage Word16 -> [Stage Word16]
+rasterScanToPath = map (fmap round) . rasterScan sequenceStage . fmap toDouble
+    where
+      toDouble a = realToFrac a :: Double
+      sequenceStage s = (\z x y -> Stage $ V3 x y z) <$> (s ^. _z) <*> (s ^. _x) <*> (s ^. _y)
+
 roughScan :: MonadIO m
-          => Word32 -> RasterScan Stage Word16
+          => Word32 -> [Stage Word16]
           -> EitherT String (TrackerT m) (V.Vector (Sensors Sample))
-roughScan freq s =
-    let s' = fmap realToFrac s :: RasterScan Stage Double
-        path = map (fmap round) $ rasterScan sequenceStage s'
-        sequenceStage s = (\z x y -> Stage $ V3 x y z) <$> (s ^. _z) <*> (s ^. _x) <*> (s ^. _y)
-        --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
-    in pathAcquire freq path concatenatingM
+roughScan freq path = pathAcquire freq path concatenatingM
 
 center :: (Fractional a, Ord b) => V.Vector (Stage a, b) -> Stage a
 center v =

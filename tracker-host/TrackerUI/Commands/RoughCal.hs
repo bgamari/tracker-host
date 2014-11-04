@@ -20,7 +20,7 @@ roughScanCmd = command ["rough", "scan"] help "" $ \_->do
     rs <- uses roughScan $ (T.scanSize . _z .~ 0)
                          . (T.scanPoints . _z .~ 1)
     freq <- use roughScanFreq
-    scan <- liftTrackerE $ T.roughScan freq rs
+    scan <- liftTrackerE $ T.roughScan freq $ T.rasterScanToPath rs
     lastRoughScan .= Just scan
     center
   where help = "Perform rough scan"
@@ -41,7 +41,7 @@ roughZScanCmd = command ["rough", "zscan"] help "" $ \_->do
     rs <- uses roughScan $ (T.scanSize . _y .~ 0)
                          . (T.scanPoints . _y .~ 1)
     freq <- use roughScanFreq
-    zScan <- liftTrackerE $ T.roughScan freq rs
+    zScan <- liftTrackerE $ T.roughScan freq $ T.rasterScanToPath rs
     lastRoughZScan .= Just zScan
     center
   where help = "Perform rough Z scan"
