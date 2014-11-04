@@ -45,7 +45,6 @@ executable tracker-host
                        pipes-bytestring >=2.1 && <2.2,
                        pipes-binary,
                        pipes-safe,
-                       pipes-concurrency,
                        foldl,
                        dlist,
                        process >=1.2 && <1.3,

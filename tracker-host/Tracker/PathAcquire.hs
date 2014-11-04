@@ -11,10 +11,10 @@ import Control.Error
 import Control.Monad.Trans
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, wait)
-import Control.Concurrent.STM ( TChan, tryReadTChan
-                              , TVar, newTVarIO, writeTVar, readTVar)
+import Control.Concurrent.STM ( TChan, tryReadTChan, TVar, writeTVar
+                              , newTVarIO, atomically, readTVar)
 
-import Pipes.Concurrent
+import Pipes
 import qualified Pipes.Prelude as PP
 import qualified Control.Foldl as Foldl
 import qualified Data.DList as DList
@@ -58,9 +58,8 @@ pathAcquire freq path consumer = do
     setKnob adcDecimation 1
     running <- liftIO $ newTVarIO True
     queue <- lift getSensorQueue
-    (output, input) <- liftIO $ spawn Unbounded
-    void $ liftIO $ async $ readAllTChan running queue output
-    consumerAsync <- liftIO $ async $ Foldl.impurely PP.foldM consumer (fromInput input)
+    consumerAsync <- liftIO $ async $ Foldl.impurely PP.foldM consumer
+                                    $ readAllTChan running queue
     -- First fill up path queue
     points <- primePath $ batchBy maxPathPoints path
     -- The queue is full, start running path
@@ -82,19 +81,18 @@ waitUntilPathFinished = do
     running <- isPathRunning
     when running waitUntilPathFinished
 
-readAllTChan :: TVar Bool -> TChan a -> Output a -> IO ()
-readAllTChan runningVar inputChan output = go
+readAllTChan :: TVar Bool -> TChan a -> Producer a IO ()
+readAllTChan runningVar inputChan = go
   where
     go = do
-        threadDelay 1000
-        (a, running) <- atomically $ (,) <$> tryReadTChan inputChan
-                                         <*> readTVar runningVar
+        (a, running) <- lift $ atomically $ (,) <$> tryReadTChan inputChan
+                                                <*> readTVar runningVar
         case a of
           Nothing
             | not running -> return ()
-            | otherwise   -> go
-          Just x  -> do atomically $ send output x
-                        go
+            | otherwise   -> lift (threadDelay 1000) >> go
+          Just x  -> yield x >> go
+
 
 queuePoints :: MonadIO m => [Stage Word16] -> EitherT String (TrackerT m) ()
 queuePoints points = go
