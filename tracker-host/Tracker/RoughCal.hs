@@ -29,7 +29,7 @@ roughScan freq s =
         path = map (fmap round) $ rasterScan sequenceStage s'
         sequenceStage s = (\z x y -> Stage $ V3 x y z) <$> (s ^. _z) <*> (s ^. _x) <*> (s ^. _y)
         --path = map (fmap round) $ rasterSine (realToFrac <$> _scanStart) (realToFrac <$> scanSize) (V3 1 10 40) 10000
-    in pathAcquire freq path
+    in pathAcquire freq path concatenatingM
 
 center :: (Fractional a, Ord b) => V.Vector (Stage a, b) -> Stage a
 center v =

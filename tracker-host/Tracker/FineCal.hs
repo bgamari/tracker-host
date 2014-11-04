@@ -105,4 +105,4 @@ fineScan fs = do
             doPoint = T.sequence
                     $ coord <$> fs ^. fineScanCenter <*> fs ^. fineScanRange
         replicateM (fs ^. fineScanPoints) doPoint
-    pathAcquire (fs^.fineScanFreq) path
+    pathAcquire (fs^.fineScanFreq) path concatenatingM
