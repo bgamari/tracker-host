@@ -36,41 +36,47 @@ makeLenses ''FineScan
 isoMatrix :: (Element a)
           => f a -> [ReifiedLens' (f a) a]
           -> Iso' (V.Vector (f a)) (LA.Matrix a)
-isoMatrix y0 projections = iso to from
-  where proj = V.fromList projections
-        to v = let f (i,j) = let p = runLens $ proj V.! j
-                                 x = v V.! i
-                             in x ^. p
-               in LA.buildMatrix (V.length v) (V.length proj) f
-        from m | LA.cols m == V.length proj =
-                 let build = foldl' (\y1 (p,x)->y1 & runLens p .~ x) y0
-                             . zip projections
-                 in V.fromList $ map build $ LA.toLists m
-               | otherwise = error "Incorret matrix size"
+isoMatrix y0 projections = iso _to _from
+  where
+    proj = V.fromList projections
+    _to v =
+        let f (i,j) = let p = runLens $ proj V.! j
+                          x = v V.! i
+                      in x ^. p
+        in LA.buildMatrix (V.length v) (V.length proj) f
+    _from m
+      | LA.cols m == V.length proj =
+        let build = foldl' (\y1 (p,x)->y1 & runLens p .~ x) y0
+                    . zip projections
+        in V.fromList $ map build $ LA.toLists m
+      | otherwise = error "Incorret matrix size"
         
 stagesToMatrix :: Element a => V.Vector (Stage a) -> LA.Matrix a
 stagesToMatrix v = LA.buildMatrix (V.length v) 3 f
-  where f (i,j) = case j of
-                     0  -> x ^. _x
-                     1  -> x ^. _y
-                     2  -> x ^. _z
-          where x = v V.! i
+  where
+    f (i,j) = case j of
+                0  -> x ^. _x
+                1  -> x ^. _y
+                2  -> x ^. _z
+      where x = v V.! i
 
 psdsToMatrix :: Element a => V.Vector (Psd (SumDiff a)) -> LA.Matrix a
 psdsToMatrix v = LA.buildMatrix (V.length v) 4 f
-  where f (i,j) = case j of
-                     0  -> x ^. _x . sdSum
-                     1  -> x ^. _x . sdDiff
-                     2  -> x ^. _y . sdSum
-                     3  -> x ^. _y . sdDiff
-          where x = v V.! i
+  where
+    f (i,j) = case j of
+                0  -> x ^. _x . sdSum
+                1  -> x ^. _x . sdDiff
+                2  -> x ^. _y . sdSum
+                3  -> x ^. _y . sdDiff
+      where x = v V.! i
 
 feedbackGainsFromMatrix :: Element a => LA.Matrix a -> Psd (SumDiff (Stage a))
 feedbackGainsFromMatrix m = mkPsd (mkSumDiff sumX diffX) (mkSumDiff sumY diffY)
-  where sumX  = mkStage (m LA.@@> (0,0)) (m LA.@@> (1,0)) (m LA.@@> (2,0))
-        diffX = mkStage (m LA.@@> (0,1)) (m LA.@@> (1,1)) (m LA.@@> (2,1))
-        sumY  = mkStage (m LA.@@> (0,2)) (m LA.@@> (1,2)) (m LA.@@> (2,2))
-        diffY = mkStage (m LA.@@> (0,3)) (m LA.@@> (1,3)) (m LA.@@> (2,3))
+  where
+    sumX  = mkStage (m LA.@@> (0,0)) (m LA.@@> (1,0)) (m LA.@@> (2,0))
+    diffX = mkStage (m LA.@@> (0,1)) (m LA.@@> (1,1)) (m LA.@@> (2,1))
+    sumY  = mkStage (m LA.@@> (0,2)) (m LA.@@> (1,2)) (m LA.@@> (2,2))
+    diffY = mkStage (m LA.@@> (0,3)) (m LA.@@> (1,3)) (m LA.@@> (2,3))
 
 thinSvd' :: (Field a, Element a) => V.Vector (Sensors a) -> Psd (SumDiff (Stage a))
 thinSvd' xs = 
