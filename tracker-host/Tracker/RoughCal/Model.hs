@@ -84,7 +84,7 @@ finiteDiff :: (Fractional a, Additive f, Applicative f, Traversable f)
            => a -> (f a -> a) -> (f a -> f a)
 finiteDiff h f x = fmap (\y->(y-fx) / h) fdx
   where fx = f x
-        fdx = f . (x ^+^) <$> kronecker (pure h)
+        fdx = f . (x ^+^) <$> scaled (pure h)
 {-# INLINE finiteDiff #-}
 
 fit :: (RealFloat a, Traversable f, Applicative f, Metric f)
