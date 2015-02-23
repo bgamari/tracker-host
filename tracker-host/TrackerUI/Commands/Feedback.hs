@@ -41,9 +41,10 @@ setPsdSetpointCmd :: Command
 setPsdSetpointCmd = command ["set-psd-setpoint"] help "" $ \_->do
     liftTrackerE $ do
       s <- lift T.getSensorQueue >>= liftIO . atomically . readTChan
-      let sum_ = V.foldl (\acc x->acc ^+^ (x ^. T.psd)) zero s
+      let accum :: T.PsdChannels Integer
+          accum = V.foldl (\acc x->acc ^+^ fmap fromIntegral (x ^. T.psd)) zero s
           n = fromIntegral $ V.length s
-      T.setKnob T.psdSetpoint (sum_ & mapped . mapped %~ \x->fromIntegral x `div` n)
+      T.setKnob T.psdSetpoint (accum & mapped . mapped %~ \x->fromIntegral $ x `div` n)
   where help = "Set PSD feedback setpoint to current sensor values"
 
 feedbackCmds :: [Command]
