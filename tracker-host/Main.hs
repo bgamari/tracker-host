@@ -17,7 +17,7 @@ prompt = do
     runCommand input
 
 defaultStageGains :: Stage (Stage Fixed16)
-defaultStageGains = kronecker $ Stage $ V3 1 1 1
+defaultStageGains = scaled $ Stage $ V3 1 1 1
 
 defaultOutputGains :: Stage (PropInt Fixed16)
 defaultOutputGains = pure (PropInt 1e-2 0)
