@@ -1,6 +1,7 @@
 # tracker-host
 
-Host software for 
+Host software for an [mDAQ](http://github.com/bgamari/mdaq)-based system for
+back-focal plane inferferometric tracking of sub-micron particles.
 
 ## Installation
 
@@ -9,5 +10,4 @@ Host software for
     $ git clone git://github.com/bgamari/tracker-host
     $ cd tracker-host
     $ cabal update
-    $ cabal install
-
+    $ cabal install tracker-lib/ tracker-host/
